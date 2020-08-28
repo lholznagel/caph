@@ -12,19 +12,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
 
     Database::create().await?;
-    blueprint_item_market().await?;
+
+    let database = Database::load().await?;
+    /*let region = database
+        .region_data
+        .clone()
+        .into_iter()
+        .find(|x| x.name == "Lonetrek")
+        .unwrap()
+        .region_id;
+
+    blueprint_item_market(database, region).await?;*/
+    blueprint_ress_calc().await?;
 
     Ok(())
 }
 
-async fn blueprint_item_market() -> Result<(), EveError> {
-    let blueprints = filter_type_ids_by_market(RegionId(10000016))
+async fn blueprint_item_market(database: Database, region: RegionId) -> Result<(), EveError> {
+    let blueprints = filter_type_ids_by_market(&database, region)
         .await?
         .into_iter()
         .filter(|x| x.name.contains("Blueprint"))
         .collect::<Vec<TypeData>>();
 
-    let non_blueprints = filter_type_ids_by_market(RegionId(10000016))
+    let non_blueprints = filter_type_ids_by_market(&database, region)
         .await?
         .into_iter()
         .filter(|x| {
@@ -38,10 +49,18 @@ async fn blueprint_item_market() -> Result<(), EveError> {
         })
         .collect::<Vec<TypeData>>();
 
-    let item_blueprint = BlueprintItem::new(RegionId(10000016)).collect(non_blueprints).await?;
+    let item_blueprint = BlueprintItem::new(region)
+        .collect(non_blueprints)
+        .await?;
 
     let mut table = Table::new();
-    table.add_row(row!["Item name", "Price", "Buyers", "Blueprint cost", "Potential market"]);
+    table.add_row(row![
+        "Item name",
+        "Price",
+        "Buyers",
+        "Blueprint cost",
+        "Potential market"
+    ]);
 
     for item in item_blueprint {
         if item.item.buyers == 0 {
@@ -58,7 +77,6 @@ async fn blueprint_item_market() -> Result<(), EveError> {
             item.item.item_name,
             (item.item.order.price as u32).to_formatted_string(&Locale::de),
             item.item.buyers.to_formatted_string(&Locale::de),
-            item.item.sellers.to_formatted_string(&Locale::de),
             blueprint_price.to_formatted_string(&Locale::de),
             (item.item.potential_market as u32).to_formatted_string(&Locale::de)
         ]);
@@ -68,9 +86,11 @@ async fn blueprint_item_market() -> Result<(), EveError> {
     Ok(())
 }
 
-async fn _blueprint_ress_calc() -> Result<(), EveError> {
+async fn blueprint_ress_calc() -> Result<(), EveError> {
     let database = Database::load().await?;
-    let result = BlueprintResourceCalc::new(database).collect("Cormorant Blueprint".into(), 20).await?;
+    let result = BlueprintResourceCalc::new(database)
+        .collect("Cormorant Blueprint".into(), 8)
+        .await?;
 
     let mut table = Table::new();
 
@@ -92,4 +112,3 @@ async fn _blueprint_ress_calc() -> Result<(), EveError> {
     table.printstd();
     Ok(())
 }
-

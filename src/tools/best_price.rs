@@ -34,7 +34,9 @@ impl BestPrice {
     pub async fn collect(self, type_data: Vec<TypeData>) -> Result<Vec<BestPriceResult>> {
         let mut result = Vec::new();
         for data in type_data {
-            if let (Some(x), buyers, sellers, potential_market) = self.find_best_order(&data).await? {
+            if let (Some(x), buyers, sellers, potential_market) =
+                self.find_best_order(&data).await?
+            {
                 result.push(BestPriceResult {
                     buyers,
                     sellers,
@@ -64,7 +66,7 @@ impl BestPrice {
         } else {
             return None;
         };
- 
+
         // Attribute 161 -> density
         if let Some(x) = type_data.find_dogma(AttributeId(161)) {
             Some(cargo_size as f32 / x)
@@ -74,7 +76,10 @@ impl BestPrice {
         }
     }
 
-    async fn find_best_order(&self, type_data: &TypeData) -> Result<(Option<MarketOrder>, u32, u32, f32)> {
+    async fn find_best_order(
+        &self,
+        type_data: &TypeData,
+    ) -> Result<(Option<MarketOrder>, u32, u32, f32)> {
         let orders = Eve::default()
             .fetch_market_orders(self.region, type_data.type_id)
             .await?;

@@ -10,14 +10,15 @@ use crate::database::*;
 use crate::error::*;
 use crate::eve::*;
 
-pub async fn filter_type_ids_by_market(region: RegionId) -> Result<Vec<TypeData>> {
-    let market_types = Eve::default()
-        .fetch_region_market_types(region)
-        .await?;
-    
-    let type_data = Database::load()
-        .await?
+pub async fn filter_type_ids_by_market(
+    database: &Database,
+    region: RegionId,
+) -> Result<Vec<TypeData>> {
+    let market_types = Eve::default().fetch_region_market_types(region).await?;
+
+    let type_data = database
         .type_data
+        .clone()
         .into_iter()
         .filter(|x| {
             for market_type in &market_types {
@@ -32,10 +33,13 @@ pub async fn filter_type_ids_by_market(region: RegionId) -> Result<Vec<TypeData>
     Ok(type_data)
 }
 
-pub async fn filter_type_ids_by_name(name: Vec<String>) -> Result<Vec<TypeData>> {
-    let type_data = Database::load()
-        .await?
+pub async fn filter_type_ids_by_name(
+    database: &Database,
+    name: Vec<String>,
+) -> Result<Vec<TypeData>> {
+    let type_data = database
         .type_data
+        .clone()
         .into_iter()
         .filter(|x| {
             for filter in &name {

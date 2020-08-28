@@ -17,7 +17,7 @@ pub struct Blueprint {
 pub struct Material {
     pub quantity: u32,
     #[serde(alias = "typeID")]
-    pub type_id: TypeId
+    pub type_id: TypeId,
 }
 
 impl Blueprint {
@@ -32,12 +32,12 @@ pub struct BlueprintYamlParser {
     #[serde(alias = "blueprintTypeID")]
     blueprint_type_id: TypeId,
     #[serde(alias = "maxProductionLimit")]
-    max_production_limit: u32
+    max_production_limit: u32,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct TimeModel {
-    time: u32
+    time: u32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -47,7 +47,7 @@ pub struct ActivityManufactoring {
     #[serde(default)]
     products: Vec<Material>,
     #[serde(default)]
-    time: u32
+    time: u32,
 }
 
 impl BlueprintYamlParser {
@@ -63,7 +63,11 @@ impl BlueprintYamlParser {
         for (type_id, value) in parsed {
             let map = value.as_mapping().unwrap();
             for (key, value) in map {
-                let mut blueprint = Blueprint { type_id: TypeId(0), materials: Vec::new(), produces: None };
+                let mut blueprint = Blueprint {
+                    type_id: TypeId(0),
+                    materials: Vec::new(),
+                    produces: None,
+                };
                 blueprint.type_id = type_id;
 
                 if key.as_str().unwrap_or_default() == "activities" {
@@ -71,7 +75,8 @@ impl BlueprintYamlParser {
 
                     for (key, value) in map {
                         if key.as_str().unwrap() == "manufacturing" {
-                            let manufactoring: ActivityManufactoring = serde_yaml::from_value(value.clone()).unwrap();
+                            let manufactoring: ActivityManufactoring =
+                                serde_yaml::from_value(value.clone()).unwrap();
                             blueprint.materials = manufactoring.materials;
 
                             if let Some(x) = manufactoring.products.get(0) {

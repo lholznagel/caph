@@ -19,8 +19,7 @@ impl Eve {
             let next_page = self
                 .fetch(&format!(
                     "markets/{}/types/?datasource=tranquility&page={}",
-                    region_id.0,
-                    page
+                    region_id.0, page
                 ))
                 .await?
                 .json::<Vec<TypeId>>()

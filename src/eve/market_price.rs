@@ -13,9 +13,7 @@ pub struct MarketPrice {
 impl Eve {
     pub async fn fetch_market_prices(&self) -> Result<Vec<MarketPrice>> {
         let response = self
-            .fetch(&format!(
-                "markets/prices/?datasource=tranquility&page=1",
-            ))
+            .fetch(&format!("markets/prices/?datasource=tranquility&page=1",))
             .await?;
 
         let market_prices: Vec<MarketPrice> = response.json().await?;

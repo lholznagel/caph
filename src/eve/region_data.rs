@@ -40,7 +40,7 @@ impl Eve {
         Ok(result)
     }
 
-    pub async fn fetch_region_ids(&self) -> Result<Vec<TypeId>> {
+    pub async fn fetch_region_ids(&self) -> Result<Vec<RegionId>> {
         self.fetch_ids("universe/regions/?datasource=tranquility&page=")
             .await
     }

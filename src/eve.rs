@@ -35,7 +35,10 @@ impl Eve {
 
             // status 200 and 404 are ok
             if response.status() != 200 && response.status() != 404 {
-                log::error!("Fetch resulted in non 200 status code. {}. Retrying.", response.status());
+                log::error!(
+                    "Fetch resulted in non 200 status code. {}. Retrying.",
+                    response.status()
+                );
                 continue;
             }
 

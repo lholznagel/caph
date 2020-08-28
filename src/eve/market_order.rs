@@ -27,15 +27,15 @@ impl Eve {
         let response = self
             .fetch(&format!(
                 "markets/{}/orders/?datasource=tranquility&order_type=all&type_id={}&page=1",
-                region_id.0,
-                type_id.0
+                region_id.0, type_id.0
             ))
             .await?;
 
         let pages = self.page_count(&response);
         log::debug!("Downloaded market orders page  1 from {}", pages);
 
-        let mut market_buy_orders: Vec<MarketOrder> = Vec::with_capacity((pages as u16 * 1_000) as usize);
+        let mut market_buy_orders: Vec<MarketOrder> =
+            Vec::with_capacity((pages as u16 * 1_000) as usize);
 
         let first: Vec<MarketOrder> = response.json().await?;
         market_buy_orders.extend(first);

@@ -6,18 +6,16 @@ use std::cmp::Ordering;
 #[derive(Clone, Debug)]
 pub struct BlueprintItemResult {
     pub item: BestPriceResult,
-    pub blueprint: Option<MarketOrder>
+    pub blueprint: Option<MarketOrder>,
 }
 
 pub struct BlueprintItem {
-    region: RegionId
+    region: RegionId,
 }
 
 impl BlueprintItem {
     pub fn new(region: RegionId) -> Self {
-        Self {
-            region
-        }
+        Self { region }
     }
 
     pub async fn collect(&self, type_data: Vec<TypeData>) -> Result<Vec<BlueprintItemResult>> {
@@ -30,7 +28,7 @@ impl BlueprintItem {
             if item_best_price.len() == 1 {
                 result.push(BlueprintItemResult {
                     item: item_best_price.get(0).unwrap().clone(),
-                    blueprint: blueprint_cost
+                    blueprint: blueprint_cost,
                 });
             }
 
@@ -38,7 +36,8 @@ impl BlueprintItem {
         }
 
         result.sort_by(|x, y| {
-            y.item.order
+            y.item
+                .order
                 .price
                 .partial_cmp(&x.item.order.price)
                 .unwrap_or(Ordering::Equal)
@@ -48,15 +47,13 @@ impl BlueprintItem {
     }
 
     async fn get_blueprint_cost(&self, type_id: TypeId) -> Result<Option<MarketOrder>> {
-        Ok(
-            Eve::default()
-                .fetch_market_orders(self.region, type_id)
-                .await?
-                .into_iter()
-                .filter(|x| !x.is_buy_order)
-                .enumerate()
-                .max_by(|(_, a), (_, b)| a.price.partial_cmp(&b.price).unwrap_or(Ordering::Equal))
-                .map(|(_, x)| x)
-        )
+        Ok(Eve::default()
+            .fetch_market_orders(self.region, type_id)
+            .await?
+            .into_iter()
+            .filter(|x| !x.is_buy_order)
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.price.partial_cmp(&b.price).unwrap_or(Ordering::Equal))
+            .map(|(_, x)| x))
     }
 }

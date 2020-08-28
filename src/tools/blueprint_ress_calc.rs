@@ -4,7 +4,7 @@ use crate::*;
 #[derive(Clone, Debug)]
 pub struct BlueprintRessCalcResult {
     pub name: String,
-    pub count: u32
+    pub count: u32,
 }
 
 pub struct BlueprintResourceCalc {
@@ -13,12 +13,14 @@ pub struct BlueprintResourceCalc {
 
 impl BlueprintResourceCalc {
     pub fn new(database: Database) -> Self {
-        Self {
-            database,
-        }
+        Self { database }
     }
 
-    pub async fn collect(&self, blueprint_name: String, count: u16) -> Result<Vec<BlueprintRessCalcResult>> {
+    pub async fn collect(
+        &self,
+        blueprint_name: String,
+        count: u16,
+    ) -> Result<Vec<BlueprintRessCalcResult>> {
         let type_data = self
             .database
             .type_data
@@ -48,7 +50,7 @@ impl BlueprintResourceCalc {
 
                 blueprint_materials.push(BlueprintRessCalcResult {
                     name,
-                    count: material.quantity * count as u32
+                    count: material.quantity * count as u32,
                 })
             }
 
