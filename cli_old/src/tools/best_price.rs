@@ -1,6 +1,6 @@
 use crate::error::*;
-use crate::*;
 
+use eve_online_api::*;
 use std::cmp::Ordering;
 
 #[derive(Clone, Debug)]
@@ -31,7 +31,7 @@ impl BestPrice {
         self
     }
 
-    pub async fn collect(self, type_data: Vec<TypeData>) -> Result<Vec<BestPriceResult>> {
+    pub async fn collect(self, type_data: Vec<Type>) -> Result<Vec<BestPriceResult>> {
         let mut result = Vec::new();
         for data in type_data {
             if let (Some(x), buyers, sellers, potential_market) =
@@ -60,15 +60,22 @@ impl BestPrice {
         Ok(result)
     }
 
-    fn calc_max_items_for_cargo(&self, type_data: &TypeData) -> Option<f32> {
+    fn calc_max_items_for_cargo(&self, type_data: &Type) -> Option<f32> {
         let cargo_size = if let Some(x) = self.cargo_size {
             x
         } else {
             return None;
         };
 
-        // Attribute 161 -> density
-        if let Some(x) = type_data.find_dogma(AttributeId(161)) {
+        let dogma = type_data
+            .dogma_attributes
+            .unwrap_or_default()
+            .into_iter()
+            // Attribute 161 -> density
+            .find(|x| x.attribute_id == AttributeId(161))
+            .map(|x| x.value);
+
+        if let Some(x) = dogma {
             Some(cargo_size as f32 / x)
         } else {
             log::warn!("Could not find density dogma.");
@@ -78,11 +85,12 @@ impl BestPrice {
 
     async fn find_best_order(
         &self,
-        type_data: &TypeData,
+        type_data: &Type,
     ) -> Result<(Option<MarketOrder>, u32, u32, f32)> {
-        let orders = Eve::default()
-            .fetch_market_orders(self.region, type_data.type_id)
-            .await?;
+        let orders = EveClient::default()
+            .fetch_market_orders(self.region)
+            .await?
+            .unwrap_or_default();
 
         let buy_order = orders
             .clone()

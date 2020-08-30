@@ -8,7 +8,6 @@ pub use self::blueprint_ress_calc::*;
 
 use crate::database::*;
 use crate::error::*;
-use crate::eve::*;
 
 pub async fn filter_type_ids_by_market(
     database: &Database,

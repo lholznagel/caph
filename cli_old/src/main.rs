@@ -1,4 +1,3 @@
-use eve::*;
 use num_format::{Locale, ToFormattedString};
 use prettytable::{cell, row, Cell, Row, Table};
 
@@ -15,15 +14,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let database = Database::load().await?;
     /*let region = database
-        .region_data
-        .clone()
-        .into_iter()
-        .find(|x| x.name == "Lonetrek")
-        .unwrap()
-        .region_id;
+    .region_data
+    .clone()
+    .into_iter()
+    .find(|x| x.name.contains("Bl"))
+    .unwrap()
+    .region_id;*/
 
-    blueprint_item_market(database, region).await?;*/
-    blueprint_ress_calc().await?;
+    blueprint_item_market(database, RegionId(10000032)).await?;
+    //blueprint_ress_calc().await?;
 
     Ok(())
 }
@@ -49,9 +48,7 @@ async fn blueprint_item_market(database: Database, region: RegionId) -> Result<(
         })
         .collect::<Vec<TypeData>>();
 
-    let item_blueprint = BlueprintItem::new(region)
-        .collect(non_blueprints)
-        .await?;
+    let item_blueprint = BlueprintItem::new(region).collect(non_blueprints).await?;
 
     let mut table = Table::new();
     table.add_row(row![

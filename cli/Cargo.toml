@@ -1,0 +1,15 @@
+[package]
+name = "eve_online_cli"
+version = "0.1.0"
+authors = ["Lars Holznagel <contact@lholznagel.info>"]
+edition = "2018"
+
+[dependencies]
+clap = "3.0.0-beta.1"
+eve_online_api = { path = "../api" }
+indicatif = "0.15.0"
+log = "0.4.11"
+loggify = "1.4.0"
+num-format = "0.4.0"
+prettytable-rs = "0.8.0"
+tokio = { version = "0.2", features = ["full"] }

@@ -1,0 +1,10 @@
+[package]
+name = "eve_online_api"
+version = "0.1.0"
+authors = ["lholznagel"]
+edition = "2018"
+
+[dependencies]
+log = "0.4.11"
+reqwest = { version = "0.10", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1.0.115", default-features = false, features = ["derive"] }

@@ -1,6 +1,7 @@
 use crate::error::*;
-use crate::*;
+use crate::BestPriceResult;
 
+use eve_online_api::*;
 use std::cmp::Ordering;
 
 #[derive(Clone, Debug)]
@@ -18,7 +19,7 @@ impl BlueprintItem {
         Self { region }
     }
 
-    pub async fn collect(&self, type_data: Vec<TypeData>) -> Result<Vec<BlueprintItemResult>> {
+    pub async fn collect(&self, type_data: Vec<Type>) -> Result<Vec<BlueprintItemResult>> {
         let mut result = Vec::new();
 
         for (counter, data) in type_data.clone().into_iter().enumerate() {
