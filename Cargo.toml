@@ -9,4 +9,5 @@ codegen-units = 1
 members = [
   'api',
   'cli',
+  'sde_parser'
 ]
