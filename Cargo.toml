@@ -7,7 +7,7 @@ codegen-units = 1
 
 [workspace]
 members = [
-  'api',
   'cli',
+  'eve_api',
   'sde_parser'
 ]
