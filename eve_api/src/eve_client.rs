@@ -1,8 +1,8 @@
 use crate::error::*;
 use crate::id;
 
-use reqwest::{Client, Response};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use surf::{Client, Response};
 
 pub trait Id {
     fn id(&self) -> u32;
@@ -49,6 +49,7 @@ impl EveClient {
 
         loop {
             let url = format!("{}/{}", EveClient::BASE_ADDR, path);
+
             let response = Client::new()
                 .get(&url)
                 .send()
@@ -76,19 +77,19 @@ impl EveClient {
 
     // path = universe/systems/?datasource=tranquility&page=
     pub(crate) async fn fetch_ids<T: DeserializeOwned>(&self, path: &str) -> Result<Vec<T>> {
-        let response = self.fetch(&format!("{}{}", path, 1)).await?;
+        let mut response = self.fetch(&format!("{}{}", path, 1)).await?;
 
         let pages = self.page_count(&response);
         log::debug!("[EVE_API] Downloaded page  1 from {}", pages);
 
         let mut ids: Vec<T> = Vec::new();
-        ids.extend(response.json::<Vec<T>>().await?);
+        ids.extend(response.body_json::<Vec<T>>().await?);
 
         for page in 2..=pages {
             let next_page = self
                 .fetch(&format!("{}{}", path, page))
                 .await?
-                .json::<Vec<T>>()
+                .body_json::<Vec<T>>()
                 .await
                 .map_err(EveApiError::ReqwestError)?;
 
@@ -106,7 +107,7 @@ impl EveClient {
         id: u32,
         sub_path: Option<&str>,
     ) -> Result<Option<Vec<T>>> {
-        let response = self
+        let mut response = self
             .fetch(&format!("{}/{}/{}", path, id, sub_path.unwrap_or_default()))
             .await?;
 
@@ -117,7 +118,7 @@ impl EveClient {
         let pages = self.page_count(&response);
 
         let mut fetched_data: Vec<T> = Vec::new();
-        fetched_data.extend(response.json::<Vec<T>>().await?);
+        fetched_data.extend(response.body_json::<Vec<T>>().await?);
 
         for page in 2..=pages {
             let next_page = self
@@ -129,7 +130,7 @@ impl EveClient {
                     page
                 ))
                 .await?
-                .json::<Vec<T>>()
+                .body_json::<Vec<T>>()
                 .await
                 .map_err(EveApiError::ReqwestError)?;
 
@@ -145,7 +146,7 @@ impl EveClient {
         id: u32,
         sub_path: Option<&str>,
     ) -> Result<Option<T>> {
-        let response = self
+        let mut response = self
             .fetch(&format!("{}/{}/{}", path, id, sub_path.unwrap_or_default()))
             .await?;
 
@@ -153,16 +154,12 @@ impl EveClient {
             return Ok(None);
         }
 
-        Ok(Some(response.json().await?))
+        Ok(Some(response.body_json().await?))
     }
 
     pub(crate) fn page_count(&self, response: &Response) -> u8 {
-        let headers = response.headers();
-        if let Some(x) = headers.get("x-pages") {
-            x.to_str()
-                .unwrap_or_default()
-                .parse::<u8>()
-                .unwrap_or_default()
+        if let Some(x) = response.header("x-pages") {
+            x.as_str().parse::<u8>().unwrap_or_default()
         } else {
             0u8
         }

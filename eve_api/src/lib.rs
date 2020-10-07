@@ -22,7 +22,7 @@ macro_rules! fetch {
         pub async fn $name(&self) -> crate::error::Result<$result> {
             self.fetch($path)
                 .await?
-                .json()
+                .body_json()
                 .await
                 .map_err(crate::error::EveApiError::ReqwestError)
         }
@@ -76,6 +76,12 @@ macro_rules! id {
         impl std::fmt::Display for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{}", self.0)
+            }
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self(0u32)
             }
         }
     };

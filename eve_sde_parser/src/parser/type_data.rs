@@ -2,7 +2,7 @@ use eve_online_api::GroupId;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct TypeIdData {
     pub name: HashMap<String, String>,
     pub published: bool,

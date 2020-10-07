@@ -5,6 +5,7 @@ authors = ["Lars Holznagel <contact@lholznagel.info>"]
 edition = "2018"
 
 [dependencies]
+async-std = "1.6.5"
 clap = "3.0.0-beta.1"
 eve_online_api = { path = "../eve_api" }
 indicatif = "0.15.0"
@@ -12,4 +13,3 @@ log = "0.4.11"
 loggify = "1.4.0"
 num-format = "0.4.0"
 prettytable-rs = "0.8.0"
-tokio = { version = "0.2", features = ["full"] }

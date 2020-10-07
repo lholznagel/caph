@@ -87,7 +87,7 @@ impl EveClient {
             _ => "all",
         };
 
-        let response = self
+        let mut response = self
             .fetch(&format!(
                 "markets/{}/orders?type_id={}&order_type={}",
                 id, type_id, order_type
@@ -101,7 +101,7 @@ impl EveClient {
         let pages = self.page_count(&response);
 
         let mut fetched_data: Vec<MarketOrder> = Vec::new();
-        fetched_data.extend(response.json::<Vec<MarketOrder>>().await?);
+        fetched_data.extend(response.body_json::<Vec<MarketOrder>>().await?);
 
         for page in 2..=pages {
             let next_page = self
@@ -110,7 +110,7 @@ impl EveClient {
                     id, type_id, order_type, page
                 ))
                 .await?
-                .json::<Vec<MarketOrder>>()
+                .body_json::<Vec<MarketOrder>>()
                 .await
                 .map_err(EveApiError::ReqwestError)?;
 

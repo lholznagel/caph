@@ -1,0 +1,10 @@
+#!/bin/sh
+
+set -e
+
+USER=nobody
+GROUP=nobody
+
+BIN=/usr/local/bin/eve_server
+
+exec chpst -u$USER:$GROUP env MORGAN_COLOR=false ENABLE_METRICS=true $BIN

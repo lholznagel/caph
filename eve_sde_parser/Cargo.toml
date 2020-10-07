@@ -1,11 +1,11 @@
 [package]
-name = "sde_parser"
+name = "eve_sde_parser"
 version = "0.1.0"
 authors = ["Lars Holznagel <contact@lholznagel.info>"]
 edition = "2018"
 
 [dependencies]
 eve_online_api = { path = "../eve_api" }
-miniz_oxide = "0.4.2"
+miniz_oxide = "0.4.3"
 serde = { version = "1.0.116", features = ["derive"] }
 serde_yaml = "0.8.13"

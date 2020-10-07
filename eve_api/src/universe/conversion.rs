@@ -2,8 +2,8 @@ use crate::conversion_model;
 use crate::error::*;
 use crate::eve_client::*;
 
-use reqwest::Client;
 use serde::Deserialize;
+use surf::Client;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct IdToName {
@@ -32,7 +32,7 @@ pub struct NameToId {
 }
 
 impl EveClient {
-    pub async fn resolve_id_to_name(&self, ids: Vec<Box<dyn Id>>) -> Result<Vec<IdToName>> {
+    /*pub async fn resolve_id_to_name(&self, ids: Vec<Box<dyn Id>>) -> Result<Vec<IdToName>> {
         let mut ids = ids.into_iter().map(|x| x.id()).collect::<Vec<u32>>();
         ids.sort();
         ids.dedup();
@@ -40,10 +40,10 @@ impl EveClient {
         let url = format!("{}/universe/names", EveClient::BASE_ADDR);
         Client::new()
             .post(&url)
-            .json(&ids)
+            .body(ids)
             .send()
             .await?
-            .json()
+            .body_json()
             .await
             .map_err(EveApiError::ReqwestError)
     }
@@ -58,5 +58,5 @@ impl EveClient {
             .json()
             .await
             .map_err(EveApiError::ReqwestError)
-    }
+    }*/
 }

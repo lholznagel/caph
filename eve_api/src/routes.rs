@@ -6,7 +6,7 @@ impl EveClient {
         origin: SystemId,
         destination: SystemId,
     ) -> crate::error::Result<Vec<SystemId>> {
-        let response = self
+        let mut response = self
             .fetch(&format!("route/{}/{}", origin.0, destination.0))
             .await?;
 
@@ -14,6 +14,6 @@ impl EveClient {
             return Ok(Vec::new());
         }
 
-        Ok(response.json().await?)
+        Ok(response.body_json().await?)
     }
 }

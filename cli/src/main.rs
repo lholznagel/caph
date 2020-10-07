@@ -16,14 +16,14 @@ enum SubCommand {
     Misc,
 }
 
-#[tokio::main]
+#[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opts: Opts = Opts::parse();
     let database = Arc::new(Mutex::new(Database::default()));
 
     match opts.subcmd {
         SubCommand::Sell(x) => match x.subcmd {
-            SellSubcommand::Ore(y) => {
+            Some(SellSubcommand::Ore(y)) => {
                 SellOre::new(database.clone())
                     .collect_and_print(y.include, x.entries)
                     .await?

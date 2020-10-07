@@ -3,7 +3,7 @@ use crate::fetch;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Default, Debug, Deserialize, Serialize)]
 pub struct Type {
     pub description: String,
     pub group_id: GroupId,

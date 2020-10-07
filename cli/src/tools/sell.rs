@@ -295,7 +295,7 @@ pub struct SellCli {
     // region min sec
     // min sell price
     #[clap(subcommand)]
-    pub subcmd: SellSubcommand,
+    pub subcmd: Option<SellSubcommand>,
 }
 
 #[derive(Clap)]

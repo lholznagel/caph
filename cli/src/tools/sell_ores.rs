@@ -80,7 +80,6 @@ impl SellOre {
         ]);
 
         let mut ores = Vec::new();
-        dbg!(&include);
         for x in include {
             if x.ends_with('*') {
                 let ore = &x[..x.len() - 1];
