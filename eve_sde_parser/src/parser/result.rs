@@ -5,11 +5,16 @@ use std::collections::{BTreeSet, HashMap};
 
 #[derive(Debug)]
 pub struct ParserResult {
+    pub(crate) blueprints: Vec<Blueprint>,
     pub(crate) materials: HashMap<TypeId, TypeMaterial>,
     pub(crate) type_data: HashMap<TypeId, TypeIdData>,
 }
 
 impl ParserResult {
+    pub fn blueprints(&self) -> Vec<Blueprint> {
+        self.blueprints.clone()
+    }
+
     pub fn items(&self) -> Vec<Type> {
         let mut type_ids = BTreeSet::new();
         let mut items = Vec::with_capacity(self.type_data.len());

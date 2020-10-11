@@ -1,3 +1,4 @@
+mod blueprint;
 mod error;
 mod reader;
 mod result;
@@ -6,6 +7,7 @@ mod type_material;
 
 use self::error::Result;
 
+pub use self::blueprint::*;
 pub use self::error::EveSdeParserError;
 pub use self::reader::ByteReader;
 pub use self::result::ParserResult;
@@ -20,14 +22,11 @@ pub struct EveSdeParser;
 
 impl EveSdeParser {
     pub fn parse<R: reader::ByteReader>(reader: &mut R) -> Result<ParserResult> {
-        let materials;
+        let mut blueprints = Vec::new();
+        let mut materials = HashMap::new();
         let mut type_data = HashMap::new();
 
-        loop {
-            if reader.read_u32be()? != 0x50_4b_03_04 {
-                return Err(EveSdeParserError::InvalidFileFormat);
-            }
-
+        while reader.read_u32be()? == 0x50_4b_03_04 {
             // Skip version
             reader.read_u16le()?;
             // Skip flags
@@ -63,7 +62,10 @@ impl EveSdeParser {
                 let data = reader.read_length(data_length as usize)?;
                 let data = miniz_oxide::inflate::decompress_to_vec(&data).unwrap();
                 materials = serde_yaml::from_slice(&data).unwrap();
-                break;
+            } else if filename == "sde/fsd/blueprints.yaml" {
+                let data = reader.read_length(data_length as usize)?;
+                let data = miniz_oxide::inflate::decompress_to_vec(&data).unwrap();
+                blueprints = BlueprintYamlParser::parse(data);
             } else {
                 reader.skip(data_length as usize)?;
                 continue;
@@ -71,8 +73,9 @@ impl EveSdeParser {
         }
 
         Ok(ParserResult {
-            type_data,
+            blueprints,
             materials,
+            type_data,
         })
     }
 }
