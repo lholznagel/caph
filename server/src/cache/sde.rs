@@ -5,13 +5,13 @@ use eve_online_api::Type;
 use std::io::Cursor;
 use std::time::Instant;
 
-pub struct ItemCache {
+pub struct SdeCache {
     checksum: Mutex<Vec<u8>>,
     items: Mutex<Vec<Type>>,
     metrics: Option<Metrics>,
 }
 
-impl ItemCache {
+impl SdeCache {
     pub fn new(metrics: Option<Metrics>) -> Self {
         Self {
             checksum: Mutex::new(Vec::with_capacity(32)),
