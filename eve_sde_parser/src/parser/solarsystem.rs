@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct Solarsystem {
     pub border: bool,
     pub center: Vec<f32>,
@@ -45,7 +44,6 @@ pub struct Solarsystem {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct Planet {
     #[serde(rename = "asteroidBelts")]
     pub asteroid_belts: Option<HashMap<u32, AsteroidBelt>>,
@@ -66,7 +64,6 @@ pub struct Planet {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct Moon {
     #[serde(rename = "moonNameID")]
     pub moon_name_id: Option<u32>,
@@ -82,7 +79,6 @@ pub struct Moon {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct NpcStation {
     #[serde(rename = "graphicID")]
     pub graphic_id: u32,
@@ -106,7 +102,6 @@ pub struct NpcStation {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct AsteroidBelt {
     #[serde(rename = "asteroidBeltNameID")]
     pub asteroid_belt_name_id: Option<u32>,
@@ -117,7 +112,6 @@ pub struct AsteroidBelt {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct PlanetAttributes {
     #[serde(rename = "heightMap1")]
     pub height_map1: usize,
@@ -129,7 +123,6 @@ pub struct PlanetAttributes {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct PlanetStatistics {
     pub density: f64,
     pub eccentricity: f64,
@@ -158,7 +151,6 @@ pub struct PlanetStatistics {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct Star {
     pub id: u32,
     pub radius: usize,
@@ -168,7 +160,6 @@ pub struct Star {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct StarStatistic {
     pub age: f64,
     pub life: f64,
@@ -181,7 +172,6 @@ pub struct StarStatistic {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct Stargate {
     pub destination: u32,
     pub position: Vec<f32>,
@@ -190,7 +180,6 @@ pub struct Stargate {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct SecondarySun {
     #[serde(rename = "effectBeaconTypeID")]
     pub effect_beacon_type_id: u32,

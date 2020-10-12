@@ -85,7 +85,7 @@ impl SdeCache {
                     .unwrap_or_default()
                     .clone(),
                 group_id: GroupId(v.group_id),
-                name: v.name.get("en".into()).unwrap().clone(),
+                name: v.name.get("en".into()).unwrap_or(&String::new()).clone(),
                 published: v.published,
                 type_id: TypeId(k),
                 mass: v.mass,

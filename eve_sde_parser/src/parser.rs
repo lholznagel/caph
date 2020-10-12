@@ -1,15 +1,19 @@
 mod blueprint;
+mod constellation;
+mod region;
+mod solarsystem;
 mod type_ids;
 mod type_material;
-mod solarsystem;
 
 use crate::error::*;
 use crate::reader::*;
 
 pub use self::blueprint::*;
-pub use self::type_ids::TypeIds;
-pub use self::type_material::TypeMaterial;
-pub use self::solarsystem::Solarsystem;
+pub use self::constellation::*;
+pub use self::region::*;
+pub use self::solarsystem::*;
+pub use self::type_ids::*;
+pub use self::type_material::*;
 
 use std::collections::HashMap;
 
@@ -53,9 +57,12 @@ impl EveSdeParser {
             let data = miniz_oxide::inflate::decompress_to_vec(&data).unwrap();
 
             for x in &requests {
-                if x.path() == filename {
+                if filename.contains(&x.path()) {
                     let parsed = match x {
                         ParseRequest::Blueprints => ParseResult::Blueprints(serde_yaml::from_slice(&data).unwrap()),
+                        ParseRequest::Constellation => ParseResult::Constellation(serde_yaml::from_slice(&data).unwrap()),
+                        ParseRequest::Region => ParseResult::Region(serde_yaml::from_slice(&data).unwrap()),
+                        ParseRequest::Solarsystem => ParseResult::Solarsystem(serde_yaml::from_slice(&data).unwrap()),
                         ParseRequest::TypeIds => ParseResult::TypeIds(serde_yaml::from_slice(&data).unwrap()),
                         ParseRequest::TypeMaterials => ParseResult::TypeMaterials(serde_yaml::from_slice(&data).unwrap()),
                     };
@@ -71,20 +78,29 @@ impl EveSdeParser {
 
 pub enum ParseResult {
     Blueprints(HashMap<u32, Blueprint>),
+    Constellation(Constellation),
+    Region(Region),
+    Solarsystem(Solarsystem),
     TypeIds(HashMap<u32, TypeIds>),
     TypeMaterials(HashMap<u32, TypeMaterial>)
 }
 
 pub enum ParseRequest {
     Blueprints,
+    Constellation,
+    Region,
+    Solarsystem,
     TypeIds,
-    TypeMaterials
+    TypeMaterials,
 }
 
 impl ParseRequest {
     pub fn path(&self) -> String {
         match self {
             Self::Blueprints => "sde/fsd/blueprints.yaml".into(),
+            Self::Constellation => "constellation.staticdata".into(),
+            Self::Region => "region.staticdata".into(),
+            Self::Solarsystem => "solarsystem.staticdata".into(),
             Self::TypeIds => "sde/fsd/typeIDs.yaml".into(),
             Self::TypeMaterials => "sde/fsd/typeMaterials.yaml".into(),
         }
