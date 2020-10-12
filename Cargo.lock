@@ -650,7 +650,6 @@ dependencies = [
 name = "eve_sde_parser"
 version = "0.1.0"
 dependencies = [
- "eve_online_api",
  "miniz_oxide",
  "serde",
  "serde_yaml",

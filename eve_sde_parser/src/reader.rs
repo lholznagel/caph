@@ -1,4 +1,4 @@
-use crate::parser::error::*;
+use crate::error::*;
 
 pub trait ByteReader: std::io::Read {
     /// Reads one byte from the byte array and returns it as u8 value

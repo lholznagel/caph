@@ -1,7 +1,9 @@
 use crate::metrics::Metrics;
 
 use async_std::sync::Mutex;
-use eve_online_api::Type;
+use eve_online_api::{GroupId, Type, TypeId};
+use eve_sde_parser::{ParseRequest, ParseResult};
+use std::collections::HashMap;
 use std::io::Cursor;
 use std::time::Instant;
 
@@ -58,8 +60,13 @@ impl SdeCache {
         log::debug!("Fetched sde zip");
 
         log::debug!("Parsing sde zip");
-        let result = eve_sde_parser::from_reader(&mut Cursor::new(result)).unwrap();
-        let items = result.items();
+        let parse_requests = vec![ParseRequest::TypeIds];
+
+        let result = eve_sde_parser::from_reader(&mut Cursor::new(result), parse_requests).unwrap();
+        let items = match result.get(0).unwrap() {
+            ParseResult::TypeIds(x) => x.clone(),
+            _ => HashMap::new()
+        };
         log::debug!("Parsed sde zip");
 
         let request_time = start.elapsed().as_millis();
@@ -68,6 +75,24 @@ impl SdeCache {
         }
 
         *self.checksum.lock().await = fetched_checksum;
-        *self.items.lock().await = items;
+
+        let mut transformed_items = Vec::with_capacity(items.len());
+        for (k, v) in items {
+            transformed_items.push(Type {
+                description: v
+                    .description
+                    .map(|x| x.get("en".into()).unwrap_or(&String::new()).clone())
+                    .unwrap_or_default()
+                    .clone(),
+                group_id: GroupId(v.group_id),
+                name: v.name.get("en".into()).unwrap().clone(),
+                published: v.published,
+                type_id: TypeId(k),
+                mass: v.mass,
+                volume: v.volume,
+                ..Default::default()
+            })
+        }
+        *self.items.lock().await = transformed_items;
     }
 }
