@@ -1,14 +1,14 @@
 use crate::metrics::Metrics;
 
 use async_std::sync::Mutex;
-use eve_online_api::{EveClient, MarketOrder, TypeId};
+use eve_online_api::{EveClient, MarketOrder};
 use futures::stream::{FuturesUnordered, StreamExt};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::time::Instant;
 
 pub struct MarketCache {
-    data: Mutex<HashMap<TypeId, Vec<MarketCacheEntry>>>,
+    data: Mutex<HashMap<u32, Vec<MarketCacheEntry>>>,
     metrics: Option<Metrics>,
 }
 
@@ -20,7 +20,7 @@ impl MarketCache {
         }
     }
 
-    pub async fn fetch(&self) -> HashMap<TypeId, Vec<MarketCacheEntry>> {
+    pub async fn fetch(&self) -> HashMap<u32, Vec<MarketCacheEntry>> {
         self.data.lock().await.clone()
     }
 
@@ -66,7 +66,7 @@ impl From<MarketOrder> for MarketCacheEntry {
 struct MarketCacheCollector;
 
 impl MarketCacheCollector {
-    pub async fn collect(&self) -> HashMap<TypeId, Vec<MarketCacheEntry>> {
+    pub async fn collect(&self) -> HashMap<u32, Vec<MarketCacheEntry>> {
         log::debug!("Fetching regions");
         let client = EveClient::default();
         let mut requests = FuturesUnordered::new();
@@ -77,13 +77,13 @@ impl MarketCacheCollector {
         }
         log::debug!("Fetched regions");
 
-        let mut orders: HashMap<TypeId, Vec<MarketCacheEntry>> = HashMap::new();
+        let mut orders: HashMap<u32, Vec<MarketCacheEntry>> = HashMap::new();
         while let Some(return_val) = requests.next().await {
             match return_val {
                 Ok(result) => {
                     for order in result.unwrap_or_default() {
                         orders
-                            .entry(order.type_id)
+                            .entry(order.type_id.0)
                             .and_modify(|x| x.push(MarketCacheEntry::from(order.clone())))
                             .or_insert(vec![MarketCacheEntry::from(order)]);
                     }

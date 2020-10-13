@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut app = tide::with_state(state);
     log::info!("Starting server");
-    app.at("/market/raw").get(api::market::fetch_raw);
+    app.at("/market/raw").post(api::market::fetch_raw);
     app.at("/sde/raw").get(api::sde::fetch_raw);
     app.listen("0.0.0.0:9000").await?;
 
