@@ -1,11 +1,8 @@
 use crate::database::Database;
 use crate::error::*;
 
-use eve_online_api::{EveClient, MarketOrder, RegionId, SystemId, TypeId};
 use num_format::{Locale, ToFormattedString};
 use prettytable::{cell, row, Table};
-use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 macro_rules! resource {
@@ -62,7 +59,7 @@ impl Misc {
             .await?;
 
         let _ = crate::SellItem::new(self.database.clone())
-            .collect_raw(names, 1, None)
+            .collect_raw(names, 1)
             .await?
             .into_iter()
             .for_each(|x| {

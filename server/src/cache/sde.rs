@@ -1,98 +1,150 @@
 use crate::metrics::Metrics;
 
-use async_std::sync::Mutex;
-use eve_online_api::{GroupId, Type, TypeId};
-use eve_sde_parser::{ParseRequest, ParseResult};
-use std::collections::HashMap;
+use eve_sde_parser::{ParseRequest, ParseResult, UniqueName};
+use serde::Serialize;
 use std::io::Cursor;
-use std::time::Instant;
 
-pub struct SdeCache {
-    checksum: Mutex<Vec<u8>>,
-    items: Mutex<Vec<Type>>,
-    metrics: Option<Metrics>,
+const SDE_CHECKSUM_URL: &'static str =
+    "https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/checksum";
+const SDE_ZIP_URL: &'static str =
+    "https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/sde.zip";
+
+pub enum SdeCacheResult {
+    ItemInfos(Vec<ItemCacheEntry>),
+    Regions(Vec<RegionCacheEntry>),
+    UniqueNames(Vec<NameCacheEntry>)
 }
 
+pub struct SdeCache;
+
 impl SdeCache {
-    pub fn new(metrics: Option<Metrics>) -> Self {
-        Self {
-            checksum: Mutex::new(Vec::with_capacity(32)),
-            items: Default::default(),
-            metrics,
-        }
-    }
-
-    pub async fn fetch(&self) -> Vec<Type> {
-        self.items.lock().await.clone()
-    }
-
-    pub async fn refresh(&self) {
-        let start = Instant::now();
-
+    pub async fn refresh(
+        checksum: Vec<u8>,
+        _metrics: Option<Metrics>,
+    ) -> Option<(Vec<SdeCacheResult>, Vec<u8>)> {
         log::debug!("Fetching checksum");
-        let fetched_checksum = surf::get(
-            "https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/checksum",
-        )
-        .await
-        .unwrap()
-        .body_bytes()
-        .await
-        .unwrap()
-        .to_vec();
+        let fetched_checksum = Self::fetch_checksum().await;
         log::debug!("Fetched checksum");
 
         // checks if the fetched checksum equals the stored checksum
-        if fetched_checksum == self.checksum.lock().await.clone() {
+        if fetched_checksum == checksum {
             // early return if both checksums are the same
-            return;
+            return None;
         }
 
         log::debug!("Fetching sde zip");
-        let result = surf::get(
-            "https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/sde.zip",
-        )
-        .await
-        .unwrap()
-        .body_bytes()
-        .await
-        .unwrap()
-        .to_vec();
+        let zip = Self::fetch_zip().await;
         log::debug!("Fetched sde zip");
 
         log::debug!("Parsing sde zip");
-        let parse_requests = vec![ParseRequest::TypeIds];
+        let parse_requests = vec![
+            ParseRequest::TypeIds,
+            ParseRequest::UniqueNames,
+            ParseRequest::Region,
+        ];
 
-        let result = eve_sde_parser::from_reader(&mut Cursor::new(result), parse_requests).unwrap();
-        let items = match result.get(0).unwrap() {
-            ParseResult::TypeIds(x) => x.clone(),
-            _ => HashMap::new()
-        };
+        let mut unique_names: Vec<NameCacheEntry> = Vec::new();
+        let mut regions = Vec::new();
+
+        let mut results = Vec::new();
+        let parse_results =
+            eve_sde_parser::from_reader(&mut Cursor::new(zip), parse_requests).unwrap();
+        for parse_result in parse_results {
+            match parse_result {
+                ParseResult::TypeIds(x) => {
+                    let mut transformed_items = Vec::with_capacity(x.len());
+                    for (k, v) in x {
+                        transformed_items.push(ItemCacheEntry {
+                            description: v
+                                .description
+                                .map(|x| x.get("en".into()).unwrap_or(&String::new()).clone())
+                                .unwrap_or_default()
+                                .clone(),
+                            group_id: v.group_id,
+                            name: v.name.get("en".into()).unwrap_or(&String::new()).clone(),
+                            id: k,
+                            volume: v.volume,
+                        })
+                    }
+                    results.push(SdeCacheResult::ItemInfos(transformed_items));
+                }
+                ParseResult::Region(x) => {
+                    regions.push(RegionCacheEntry {
+                        name: unique_names
+                            .clone()
+                            .into_iter()
+                            .find(|y| y.item_id == x.region_id)
+                            .map(|y| y.item_name)
+                            .unwrap_or_default(),
+                        region_id: x.region_id,
+                    });
+                }
+                ParseResult::UniqueNames(x) => {
+                    for name in x {
+                        unique_names.push(NameCacheEntry::from(name));
+                    }
+                }
+                _ => (),
+            }
+        }
+        results.push(SdeCacheResult::Regions(regions));
+        results.push(SdeCacheResult::UniqueNames(unique_names));
+
         log::debug!("Parsed sde zip");
 
-        let request_time = start.elapsed().as_millis();
-        if let Some(x) = self.metrics.as_ref() {
-            x.put_sde_metris(items.len(), request_time).await;
-        }
+        Some((results, fetched_checksum))
+    }
 
-        *self.checksum.lock().await = fetched_checksum;
+    async fn fetch_checksum() -> Vec<u8> {
+        surf::get(SDE_CHECKSUM_URL)
+            .await
+            .unwrap()
+            .body_bytes()
+            .await
+            .unwrap()
+            .to_vec()
+    }
 
-        let mut transformed_items = Vec::with_capacity(items.len());
-        for (k, v) in items {
-            transformed_items.push(Type {
-                description: v
-                    .description
-                    .map(|x| x.get("en".into()).unwrap_or(&String::new()).clone())
-                    .unwrap_or_default()
-                    .clone(),
-                group_id: GroupId(v.group_id),
-                name: v.name.get("en".into()).unwrap_or(&String::new()).clone(),
-                published: v.published,
-                type_id: TypeId(k),
-                mass: v.mass,
-                volume: v.volume,
-                ..Default::default()
-            })
+    async fn fetch_zip() -> Vec<u8> {
+        surf::get(SDE_ZIP_URL)
+            .await
+            .unwrap()
+            .body_bytes()
+            .await
+            .unwrap()
+            .to_vec()
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ItemCacheEntry {
+    pub description: String,
+    pub group_id: u32,
+    pub id: u32,
+    pub name: String,
+
+    pub volume: Option<f32>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct RegionCacheEntry {
+    pub name: String,
+    pub region_id: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct NameCacheEntry {
+    pub group_id: u32,
+    pub item_id: u32,
+    pub item_name: String
+}
+
+impl From<UniqueName> for NameCacheEntry {
+    fn from(x: UniqueName) -> Self {
+        Self {
+            group_id: x.group_id,
+            item_id: x.item_id,
+            item_name: x.item_name,
         }
-        *self.items.lock().await = transformed_items;
     }
 }

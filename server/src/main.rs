@@ -19,20 +19,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or(None);
 
     log::info!("Preparing caches");
-    let market_cache = MarketCache::new(metrics.clone());
-    market_cache.refresh().await;
-    let market_cache = Arc::new(market_cache);
-
-    let sde_cache = SdeCache::new(metrics.clone());
-    sde_cache.refresh().await;
-    let sde_cache = Arc::new(sde_cache);
+    let cache = Cache::new(metrics.clone());
+    cache.refresh().await;
+    let cache = Arc::new(cache);
     log::info!("Done preparing caches");
 
-    let market_cache_copy = market_cache.clone();
-    let sde_cache_copy = sde_cache.clone();
+    let cache_copy = cache.clone();
     async_std::task::spawn(async {
-        let market_cache = market_cache_copy;
-        let sde_cache = sde_cache_copy;
+        let cache = cache_copy;
 
         loop {
             future::ready(1u32)
@@ -40,21 +34,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .await;
 
             log::info!("Updating caches");
-            sde_cache.refresh().await;
-            market_cache.refresh().await;
+            cache.refresh().await;
             log::info!("Updated caches");
         }
     });
 
-    let state = State {
-        sde_cache,
-        market_cache,
-    };
+    let state = State { cache };
 
-    let mut app = tide::with_state(state);
+    let mut app = tide::with_state(state.clone());
     log::info!("Starting server");
-    app.at("/market/raw").post(api::market::fetch_raw);
-    app.at("/sde/raw").get(api::sde::fetch_raw);
+
+    app
+        .at("/api")
+        .nest({
+            let mut market = tide::with_state(state.clone());
+            market
+                .at("/items")
+                .get(api::item::fetch_items)
+                .at("/:id")
+                .get(api::item::fetch_item);
+            market
+                .at("/market")
+                .post(api::market::fetch)
+                .at("/count")
+                .get(api::market::count);
+            market
+                .at("/regions")
+                .get(api::region::fetch_regions);
+            market
+        });
+
     app.listen("0.0.0.0:9000").await?;
 
     Ok(())
@@ -62,6 +71,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[derive(Clone)]
 pub struct State {
-    pub market_cache: Arc<MarketCache>,
-    pub sde_cache: Arc<SdeCache>,
+    pub cache: Arc<Cache>,
 }

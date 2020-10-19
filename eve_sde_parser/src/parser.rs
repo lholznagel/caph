@@ -4,6 +4,7 @@ mod region;
 mod solarsystem;
 mod type_ids;
 mod type_material;
+mod unique_name;
 
 use crate::error::*;
 use crate::reader::*;
@@ -14,6 +15,7 @@ pub use self::region::*;
 pub use self::solarsystem::*;
 pub use self::type_ids::*;
 pub use self::type_material::*;
+pub use self::unique_name::*;
 
 use std::collections::HashMap;
 
@@ -58,16 +60,15 @@ impl EveSdeParser {
 
             for x in &requests {
                 if filename.contains(&x.path()) {
-                    let parsed = match x {
-                        ParseRequest::Blueprints => ParseResult::Blueprints(serde_yaml::from_slice(&data).unwrap()),
-                        ParseRequest::Constellation => ParseResult::Constellation(serde_yaml::from_slice(&data).unwrap()),
-                        ParseRequest::Region => ParseResult::Region(serde_yaml::from_slice(&data).unwrap()),
-                        ParseRequest::Solarsystem => ParseResult::Solarsystem(serde_yaml::from_slice(&data).unwrap()),
-                        ParseRequest::TypeIds => ParseResult::TypeIds(serde_yaml::from_slice(&data).unwrap()),
-                        ParseRequest::TypeMaterials => ParseResult::TypeMaterials(serde_yaml::from_slice(&data).unwrap()),
+                    match x {
+                        ParseRequest::Blueprints => results.push(ParseResult::Blueprints(serde_yaml::from_slice(&data).unwrap())),
+                        ParseRequest::Constellation => results.push(ParseResult::Constellation(serde_yaml::from_slice(&data).unwrap())),
+                        ParseRequest::Region => results.push(ParseResult::Region(serde_yaml::from_slice(&data).unwrap())),
+                        ParseRequest::Solarsystem => results.push(ParseResult::Solarsystem(serde_yaml::from_slice(&data).unwrap())),
+                        ParseRequest::TypeIds => results.push(ParseResult::TypeIds(serde_yaml::from_slice(&data).unwrap())),
+                        ParseRequest::TypeMaterials => results.push(ParseResult::TypeMaterials(serde_yaml::from_slice(&data).unwrap())),
+                        ParseRequest::UniqueNames => results.push(ParseResult::UniqueNames(serde_yaml::from_slice(&data).unwrap())),
                     };
-
-                    results.push(parsed);
                 }
             }
         }
@@ -82,7 +83,8 @@ pub enum ParseResult {
     Region(Region),
     Solarsystem(Solarsystem),
     TypeIds(HashMap<u32, TypeIds>),
-    TypeMaterials(HashMap<u32, TypeMaterial>)
+    TypeMaterials(HashMap<u32, TypeMaterial>),
+    UniqueNames(Vec<UniqueName>)
 }
 
 pub enum ParseRequest {
@@ -92,6 +94,7 @@ pub enum ParseRequest {
     Solarsystem,
     TypeIds,
     TypeMaterials,
+    UniqueNames,
 }
 
 impl ParseRequest {
@@ -103,6 +106,7 @@ impl ParseRequest {
             Self::Solarsystem => "solarsystem.staticdata".into(),
             Self::TypeIds => "sde/fsd/typeIDs.yaml".into(),
             Self::TypeMaterials => "sde/fsd/typeMaterials.yaml".into(),
+            Self::UniqueNames => "sde/bsd/invUniqueNames".into(),
         }
     }
 }

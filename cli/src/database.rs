@@ -15,7 +15,7 @@ pub struct Database {
 }
 
 impl Database {
-    /*pub async fn resolve_item_ids(&mut self, names: Vec<String>) -> Result<Vec<TypeId>> {
+    pub async fn resolve_item_ids(&mut self, names: Vec<String>) -> Result<Vec<TypeId>> {
         let ids = EveClient::default()
             .resolve_name_to_id(names)
             .await?
@@ -56,7 +56,7 @@ impl Database {
         }
 
         Ok(ids)
-    }*/
+    }
 
     pub async fn fetch_constellation(&mut self, id: &ConstellationId) -> Result<Constellation> {
         if !self.constellations.contains_key(&id) {

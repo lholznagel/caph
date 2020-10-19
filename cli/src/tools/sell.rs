@@ -6,6 +6,8 @@ use clap::Clap;
 use eve_online_api::{AttributeId, EveClient, MarketOrder, RegionId, SystemId, TypeId};
 use num_format::{Locale, ToFormattedString};
 use prettytable::{cell, row, Cell, Row, Table};
+use serde_json::json;
+use serde::Deserialize;
 use std::cmp::Ordering;
 use std::sync::{Arc, Mutex};
 
@@ -40,6 +42,16 @@ pub struct SellItemRawEntry {
     pub region_id: RegionId,
 }
 
+#[derive(Copy, Clone, Debug, Deserialize)]
+pub struct MarketCacheEntry {
+    pub is_buy_order: bool,
+    pub location_id: u64,
+    pub price: f32,
+    pub system_id: SystemId,
+    pub type_id: TypeId,
+    pub volume_remain: u32,
+}
+
 pub struct SellItem {
     database: Arc<Mutex<Database>>,
 }
@@ -55,7 +67,7 @@ impl SellItem {
         count: usize,
         regions: Option<Vec<String>>,
     ) -> Result<Vec<SellItemResult>> {
-        let raw_data = self.collect_raw(items, count, regions).await?;
+        let raw_data = self.collect_raw(items, count).await?;
         let mut results = Vec::with_capacity(raw_data.len());
 
         for raw in raw_data {
@@ -97,12 +109,10 @@ impl SellItem {
         &self,
         items: Vec<String>,
         count: usize,
-        regions: Option<Vec<String>>,
     ) -> Result<Vec<SellItemRawResult>> {
         let items = crate::resolve_items(self.database.clone(), items).await?;
-        let region_ids = crate::resolve_regions(self.database.clone(), regions).await?;
 
-        let mut market_orders = self.fetch_market_orders(items.clone(), region_ids).await?;
+        let mut market_orders = self.fetch_market_orders(items.clone()).await?;
         market_orders.sort_by(|x, y| y.price.partial_cmp(&x.price).unwrap_or(Ordering::Equal));
 
         let progress = crate::new_progress_bar();
@@ -115,13 +125,13 @@ impl SellItem {
                     .into_iter()
                     .filter(|x| x.type_id == type_id)
                     .take(count)
-                    .collect::<Vec<MarketOrder>>()
+                    .collect::<Vec<MarketCacheEntry>>()
             })
             .map(|mut x| {
                 x.sort_by(|x, y| y.price.partial_cmp(&x.price).unwrap_or(Ordering::Equal));
                 x
             })
-            .collect::<Vec<Vec<MarketOrder>>>();
+            .collect::<Vec<Vec<MarketCacheEntry>>>();
 
         let mut results = Vec::with_capacity(orders.len());
         for order in orders {
@@ -230,53 +240,19 @@ impl SellItem {
     async fn fetch_market_orders(
         &self,
         type_ids: Vec<TypeId>,
-        region_ids: Vec<RegionId>,
-    ) -> Result<Vec<MarketOrder>> {
-        let mut result = Vec::with_capacity(type_ids.len() * region_ids.len());
-        for region_id in region_ids {
-            result.extend(
-                self.fetch_market_order_for_region(type_ids.clone(), region_id)
-                    .await?,
-            );
-        }
-        Ok(result)
-    }
-
-    async fn fetch_market_order_for_region(
-        &self,
-        type_ids: Vec<TypeId>,
-        region_id: RegionId,
-    ) -> Result<Vec<MarketOrder>> {
-        let progress = crate::new_progress_bar();
-        let mut market_orders = Vec::new();
-
-        for type_id in type_ids {
-            {
-                let mut db = self.database.lock().unwrap();
-                progress.set_message(&format!(
-                    "Fetching market orders for {} in region {}",
-                    db.fetch_item(&type_id).await?.name,
-                    db.fetch_region(&region_id).await?.name
-                ));
-            }
-
-            market_orders.extend(
-                EveClient::default()
-                    .fetch_market_orders_by_id(&region_id, &type_id, "buy")
-                    .await?
-                    .unwrap_or_default(),
-            );
-        }
-
-        {
-            let mut db = self.database.lock().unwrap();
-            progress.finish_with_message(&format!(
-                "Fetched market orders for region {}",
-                db.fetch_region(&region_id).await?.name
-            ));
-        }
-
-        Ok(market_orders)
+    ) -> Result<Vec<MarketCacheEntry>> {
+        surf::client()
+            .post("http://localhost:9000/api/market")
+            .body(json!({
+                "ids": type_ids,
+                "onlyBuyOrders": true
+            }))
+            .send()
+            .await
+            .unwrap()
+            .body_json::<Vec<MarketCacheEntry>>()
+            .await
+            .map_err(EveError::SurfError)
     }
 }
 

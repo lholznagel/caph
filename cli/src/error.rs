@@ -6,6 +6,7 @@ pub(crate) type Result<T> = std::result::Result<T, EveError>;
 #[derive(Debug)]
 pub enum EveError {
     ApiError(eve_online_api::EveApiError),
+    SurfError(surf::Error)
 }
 
 impl Error for EveError {}
