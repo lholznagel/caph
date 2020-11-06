@@ -62,7 +62,8 @@ impl Cache {
         log::debug!("Done refreshing sde cache");
 
         log::debug!("Refreshing market cache");
-        for (k, v) in MarketCache::refresh(self.metrics.clone()).await {
+        let regions = self.regions.lock().await.clone();
+        for (k, v) in MarketCache::refresh(regions, self.metrics.clone()).await {
             self.data.lock().await.entry(k).and_modify(|x| x.market = v);
         }
         log::debug!("Done refreshing market cache");

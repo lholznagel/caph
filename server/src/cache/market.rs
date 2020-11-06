@@ -1,7 +1,8 @@
 use crate::Cache;
+use crate::cache::RegionCacheEntry;
 use crate::metrics::Metrics;
 
-use eve_online_api::{EveClient, MarketOrder};
+use eve_online_api::{EveClient, MarketOrder, RegionId};
 use futures::stream::{FuturesUnordered, StreamExt};
 use serde::Deserialize;
 use serde::Serialize;
@@ -11,18 +12,16 @@ use std::time::Instant;
 pub struct MarketCache;
 
 impl MarketCache {
-    pub async fn refresh(metrics: Option<Metrics>) -> HashMap<u32, Vec<MarketCacheEntry>> {
+    pub async fn refresh(regions: Vec<RegionCacheEntry>, metrics: Option<Metrics>) -> HashMap<u32, Vec<MarketCacheEntry>> {
         let start = Instant::now();
 
-        log::debug!("Fetching regions");
+        log::debug!("Fetching market orders");
         let client = EveClient::default();
         let mut requests = FuturesUnordered::new();
 
-        let regions = client.fetch_region_ids().await.unwrap_or_default();
         for region in regions {
-            requests.push(client.fetch_market_orders(region));
+            requests.push(client.fetch_market_orders(RegionId(region.region_id)));
         }
-        log::debug!("Fetched regions");
 
         let mut orders: HashMap<u32, Vec<MarketCacheEntry>> = HashMap::new();
         while let Some(return_val) = requests.next().await {
@@ -152,11 +151,9 @@ impl Cache {
             .clone()
             .into_iter()
             .map(|(_, k)| k.market)
-            .fold(Vec::new(), |mut acc, v| {
-                acc.extend(v);
+            .fold(0usize, |mut acc, _| {
+                acc += 1;
                 acc
             })
-            .into_iter()
-            .count()
     }
 }

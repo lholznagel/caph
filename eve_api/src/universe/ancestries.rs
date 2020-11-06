@@ -14,7 +14,7 @@ pub struct AncestryId(pub u32);
 pub struct Ancestry {
     pub bloodline_id: BloodlineId,
     pub description: String,
-    pub id: u32,
+    pub id: AncestryId,
     pub name: String,
 
     pub icon_id: Option<IconId>,
