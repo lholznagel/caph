@@ -3,7 +3,7 @@ use crate::error::*;
 use crate::SellOreCli;
 
 use clap::Clap;
-use eve_online_api::{AttributeId, EveClient, MarketOrder, RegionId, SystemId, TypeId};
+use caph_eve_online_api::{AttributeId, EveClient, MarketOrder, RegionId, SystemId, TypeId};
 use num_format::{Locale, ToFormattedString};
 use prettytable::{cell, row, Cell, Row, Table};
 use serde_json::json;

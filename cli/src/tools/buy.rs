@@ -1,7 +1,7 @@
 use crate::database::Database;
 use crate::error::*;
 
-use eve_online_api::{EveClient, MarketOrder, RegionId, SystemId, TypeId};
+use caph_eve_online_api::{EveClient, MarketOrder, RegionId, SystemId, TypeId};
 use prettytable::{cell, row, Table};
 use std::cmp::Ordering;
 use std::sync::{Arc, Mutex};

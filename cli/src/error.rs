@@ -5,7 +5,7 @@ pub(crate) type Result<T> = std::result::Result<T, EveError>;
 
 #[derive(Debug)]
 pub enum EveError {
-    ApiError(eve_online_api::EveApiError),
+    ApiError(caph_eve_online_api::EveApiError),
     SurfError(surf::Error)
 }
 
@@ -17,8 +17,8 @@ impl fmt::Display for EveError {
     }
 }
 
-impl From<eve_online_api::EveApiError> for EveError {
-    fn from(x: eve_online_api::EveApiError) -> Self {
+impl From<caph_eve_online_api::EveApiError> for EveError {
+    fn from(x: caph_eve_online_api::EveApiError) -> Self {
         Self::ApiError(x)
     }
 }

@@ -1,17 +1,17 @@
 [package]
-name = "eve_server"
+name = "caph_server"
 version = "0.1.0"
 authors = ["lholznagel <contact@lholznagel.info>"]
 edition = "2018"
 
 [dependencies]
-async-std = { version = "1.6.5", features = ["attributes", "tokio02"] }
-eve_online_api = { path = "../eve_api" }
-eve_sde_parser = { path = "../eve_sde_parser" }
-futures = "0.3.7"
+async-std = { version = "1.7.0", features = ["attributes"] }
+caph_eve_online_api = { path = "../eve_api" }
+caph_eve_sde_parser = { path = "../eve_sde_parser" }
+futures = "0.3.8"
 log = "0.4.11"
 morgan = { path = "../morgan" }
-rusoto_cloudwatch = { version = "0.45.0", default-features = false, features = ["rustls"] }
 serde = { version = "1.0.117", features = ["derive"] }
+sqlx = { version = "0.4.1", default-featues = false, features = ["runtime-async-std-rustls", "sqlite"] }
 surf = "2.1.0"
-tide = "0.14.0"
+tide = "0.15.0"

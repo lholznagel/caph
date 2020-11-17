@@ -1,6 +1,6 @@
 use crate::error::*;
 
-use eve_online_api::{
+use caph_eve_online_api::{
     Constellation, ConstellationId, EveClient, Region, RegionId, System, SystemId, Type, TypeId,
 };
 

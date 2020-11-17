@@ -1,13 +1,13 @@
 [package]
-name = "eve_online_cli"
+name = "caph_cli"
 version = "0.1.0"
 authors = ["Lars Holznagel <contact@lholznagel.info>"]
 edition = "2018"
 
 [dependencies]
-async-std = { version = "1.6.5", features = ["attributes"] }
+async-std = { version = "1.7.0", features = ["attributes"] }
 clap = "3.0.0-beta.1"
-eve_online_api = { path = "../eve_api" }
+caph_eve_online_api = { path = "../eve_api" }
 indicatif = "0.15.0"
 log = "0.4.11"
 loggify = "1.4.0"

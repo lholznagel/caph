@@ -11,7 +11,7 @@ pub use self::sell_ores::*;
 use crate::error::*;
 use crate::Database;
 
-use eve_online_api::{RegionId, TypeId};
+use caph_eve_online_api::{RegionId, TypeId};
 use std::sync::{Arc, Mutex};
 
 pub(crate) async fn resolve_items(

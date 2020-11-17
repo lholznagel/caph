@@ -1,7 +1,6 @@
-use crate::metrics::Metrics;
-
-use eve_sde_parser::{ParseRequest, ParseResult, UniqueName};
+use caph_eve_sde_parser::{Blueprint, BlueprintAdditional, ParseRequest, ParseResult, UniqueName};
 use serde::Serialize;
+use std::collections::HashMap;
 use std::io::Cursor;
 
 const SDE_CHECKSUM_URL: &'static str =
@@ -12,7 +11,9 @@ const SDE_ZIP_URL: &'static str =
 pub enum SdeCacheResult {
     ItemInfos(Vec<ItemCacheEntry>),
     Regions(Vec<RegionCacheEntry>),
-    UniqueNames(Vec<NameCacheEntry>)
+    UniqueNames(Vec<NameCacheEntry>),
+    Blueprints(Vec<BlueprintCacheEntry>),
+    Schematics(Vec<SchematicCacheEntry>),
 }
 
 pub struct SdeCache;
@@ -20,7 +21,6 @@ pub struct SdeCache;
 impl SdeCache {
     pub async fn refresh(
         checksum: Vec<u8>,
-        _metrics: Option<Metrics>,
     ) -> Option<(Vec<SdeCacheResult>, Vec<u8>)> {
         log::debug!("Fetching checksum");
         let fetched_checksum = Self::fetch_checksum().await;
@@ -40,15 +40,17 @@ impl SdeCache {
         let parse_requests = vec![
             ParseRequest::TypeIds,
             ParseRequest::UniqueNames,
+            ParseRequest::Blueprints,
+            ParseRequest::Schematics,
             ParseRequest::Region,
         ];
 
-        let mut unique_names: Vec<NameCacheEntry> = Vec::new();
+        let mut unique_names = Vec::new();
         let mut regions = Vec::new();
 
         let mut results = Vec::new();
         let parse_results =
-            eve_sde_parser::from_reader(&mut Cursor::new(zip), parse_requests).unwrap();
+            caph_eve_sde_parser::from_reader(&mut Cursor::new(zip), parse_requests).unwrap();
         for parse_result in parse_results {
             match parse_result {
                 ParseResult::TypeIds(x) => {
@@ -68,6 +70,41 @@ impl SdeCache {
                     }
                     results.push(SdeCacheResult::ItemInfos(transformed_items));
                 }
+                ParseResult::Schematic(x) => {
+                    let mut schematics = Vec::with_capacity(x.len());
+                    for (id, x) in x {
+                        let mut inputs = HashMap::new();
+                        let mut outputs = HashMap::new();
+    
+                        for (type_id, y) in x.types {
+                            if y.is_input {
+                                inputs.insert(type_id, y.quantity);
+                            } else {
+                                outputs.insert(type_id, y.quantity);
+                            }
+                        }
+
+                        schematics.push(SchematicCacheEntry {
+                            id,
+                            inputs,
+                            outputs,
+                            time: x.cycle_time,
+                        });
+                    }
+                    results.push(SdeCacheResult::Schematics(schematics));
+                }
+                ParseResult::UniqueNames(x) => {
+                    for name in x {
+                        unique_names.push(NameCacheEntry::from(name));
+                    }
+                }
+                ParseResult::Blueprints(x) => {
+                    let mut blueprints = Vec::new();
+                    for (_, blueprint) in x {
+                        blueprints.push(BlueprintCacheEntry::from(blueprint));
+                    }
+                    results.push(SdeCacheResult::Blueprints(blueprints));
+                }
                 ParseResult::Region(x) => {
                     regions.push(RegionCacheEntry {
                         name: unique_names
@@ -78,11 +115,6 @@ impl SdeCache {
                             .unwrap_or_default(),
                         region_id: x.region_id,
                     });
-                }
-                ParseResult::UniqueNames(x) => {
-                    for name in x {
-                        unique_names.push(NameCacheEntry::from(name));
-                    }
                 }
                 _ => (),
             }
@@ -147,4 +179,37 @@ impl From<UniqueName> for NameCacheEntry {
             item_name: x.item_name,
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct BlueprintCacheEntry {
+    pub id: u32,
+    pub copying: Option<BlueprintAdditional>,
+    pub invention: Option<BlueprintAdditional>,
+    pub manufacturing: Option<BlueprintAdditional>,
+    pub reaction: Option<BlueprintAdditional>,
+    pub research_material: Option<BlueprintAdditional>,
+    pub research_time: Option<BlueprintAdditional>,
+}
+
+impl From<Blueprint> for BlueprintCacheEntry {
+    fn from(x: Blueprint) -> Self {
+        Self {
+            id: x.blueprint_type_id,
+            copying: x.activities.copying,
+            invention: x.activities.invention,
+            manufacturing: x.activities.manufacturing,
+            reaction: x.activities.reaction,
+            research_material: x.activities.research_material,
+            research_time: x.activities.research_time,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct SchematicCacheEntry {
+    pub id: u32,
+    pub inputs: HashMap<u32, u32>,
+    pub outputs: HashMap<u32, u32>,
+    pub time: u32,
 }

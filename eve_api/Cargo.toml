@@ -1,5 +1,5 @@
 [package]
-name = "eve_online_api"
+name = "caph_eve_online_api"
 version = "0.1.0"
 authors = ["lholznagel"]
 edition = "2018"

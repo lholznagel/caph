@@ -55,7 +55,6 @@ impl EveClient {
                 .send()
                 .await
                 .map_err(EveApiError::ReqwestError)?;
-            dbg!(response.status());
 
             // status 200 and 404 are ok
             if response.status() != 200 && response.status() != 404 {

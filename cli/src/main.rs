@@ -1,5 +1,5 @@
 use clap::{crate_authors, crate_version, Clap};
-use eve_online_cli::*;
+use caph_eve_online_cli::*;
 use std::sync::{Arc, Mutex};
 
 #[derive(Clap)]

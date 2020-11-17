@@ -1,6 +1,7 @@
 mod blueprint;
 mod constellation;
 mod region;
+mod schematic;
 mod solarsystem;
 mod type_ids;
 mod type_material;
@@ -12,6 +13,7 @@ use crate::reader::*;
 pub use self::blueprint::*;
 pub use self::constellation::*;
 pub use self::region::*;
+pub use self::schematic::*;
 pub use self::solarsystem::*;
 pub use self::type_ids::*;
 pub use self::type_material::*;
@@ -64,6 +66,7 @@ impl EveSdeParser {
                         ParseRequest::Blueprints => results.push(ParseResult::Blueprints(serde_yaml::from_slice(&data).unwrap())),
                         ParseRequest::Constellation => results.push(ParseResult::Constellation(serde_yaml::from_slice(&data).unwrap())),
                         ParseRequest::Region => results.push(ParseResult::Region(serde_yaml::from_slice(&data).unwrap())),
+                        ParseRequest::Schematics => results.push(ParseResult::Schematic(serde_yaml::from_slice(&data).unwrap())),
                         ParseRequest::Solarsystem => results.push(ParseResult::Solarsystem(serde_yaml::from_slice(&data).unwrap())),
                         ParseRequest::TypeIds => results.push(ParseResult::TypeIds(serde_yaml::from_slice(&data).unwrap())),
                         ParseRequest::TypeMaterials => results.push(ParseResult::TypeMaterials(serde_yaml::from_slice(&data).unwrap())),
@@ -81,6 +84,7 @@ pub enum ParseResult {
     Blueprints(HashMap<u32, Blueprint>),
     Constellation(Constellation),
     Region(Region),
+    Schematic(HashMap<u32, Schematic>),
     Solarsystem(Solarsystem),
     TypeIds(HashMap<u32, TypeIds>),
     TypeMaterials(HashMap<u32, TypeMaterial>),
@@ -91,6 +95,7 @@ pub enum ParseRequest {
     Blueprints,
     Constellation,
     Region,
+    Schematics,
     Solarsystem,
     TypeIds,
     TypeMaterials,
@@ -103,6 +108,7 @@ impl ParseRequest {
             Self::Blueprints => "sde/fsd/blueprints.yaml".into(),
             Self::Constellation => "constellation.staticdata".into(),
             Self::Region => "region.staticdata".into(),
+            Self::Schematics => "sde/fsd/planetSchematics.yaml".into(),
             Self::Solarsystem => "solarsystem.staticdata".into(),
             Self::TypeIds => "sde/fsd/typeIDs.yaml".into(),
             Self::TypeMaterials => "sde/fsd/typeMaterials.yaml".into(),
