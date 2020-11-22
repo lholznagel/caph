@@ -8,3 +8,4 @@ edition = "2018"
 miniz_oxide = "0.4.3"
 serde = { version = "1.0.117", features = ["derive"] }
 serde_yaml = "0.8.14"
+surf = "2.1.0"

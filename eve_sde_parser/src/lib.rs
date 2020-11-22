@@ -25,3 +25,25 @@ pub fn from_reader<R: ByteReader>(
 
     parser::EveSdeParser::parse(reader, requests)
 }
+
+pub async fn fetch_checksum() -> Result<String, ()> {
+    let x = surf::get("https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/checksum")
+        .await
+        .unwrap()
+        .body_bytes()
+        .await
+        .unwrap()
+        .to_vec();
+    Ok(String::from_utf8(x).unwrap())
+}
+
+pub async fn fetch_zip() -> Result<Vec<u8>, ()> {
+    let x = surf::get("https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/sde.zip")
+        .await
+        .unwrap()
+        .body_bytes()
+        .await
+        .unwrap()
+        .to_vec();
+    Ok(x)
+}

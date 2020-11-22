@@ -1,8 +1,7 @@
-use crate::cache::MarketCacheEntry;
-use crate::services::{CacheService, ItemService};
+use crate::services::ItemService;
 
-use async_std::sync::Arc;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use sqlx::{Pool, Postgres};
 
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct MarketFilter {
@@ -21,76 +20,89 @@ pub struct MarketFilter {
     /// Filters by type ids
     pub ids: Option<Vec<u32>>,
     /// Resoves the item names to id
-    pub names: Option<Vec<String>>
+    pub names: Option<Vec<String>>,
+    /// Filters by security group. If Max = 0.5 then all market orders above 0.5 will be returned
+    pub max_security: Option<f32>,
 }
 
 #[derive(Clone)]
 pub struct MarketService {
-    cache: Arc<CacheService>,
-    item_service: ItemService
+    db: Pool<Postgres>,
+    item_service: ItemService,
 }
 
 impl MarketService {
-    pub fn new(cache: Arc<CacheService>, item_service: ItemService) -> Self {
-        Self { cache, item_service }
+    pub fn new(db: Pool<Postgres>, item_service: ItemService) -> Self {
+        Self { db, item_service }
     }
 
-    pub async fn all(&self, filter: MarketFilter) -> Vec<MarketCacheEntry> {
-        let resolved_ids = if let Some(x) = filter.names.clone() {
-            Some(
-                self
-                    .item_service
-                    .bulk_search(true, x)
-                    .await
-                    .into_iter()
-                    .map(|(_, x)| x[0].clone())
-                    .map(|x| x.id)
-                    .collect::<Vec<u32>>()
-                )
-        } else {
-            None
-        };
+    pub async fn all(&self, filter: MarketFilter) -> Vec<Market> {
+        let mut query = Vec::new();
+        query.push(r#"
+            SELECT location_id, type_id, system_id, is_buy_order, volume_remain, price, stations.security, stations.region_id
+            FROM market
+            JOIN stations
+            ON stations.solar_system_id = market.system_id
+        "#);
 
-        self.cache
-            .fetch_markets()
+        let mut filters = Vec::new();
+        if let Some(x) = filter.names.clone() {
+            let ids = self.item_service
+                .bulk_search(true, x)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(_, x)| x[0].clone())
+                .map(|x| x.id as u32)
+                .collect::<Vec<u32>>();
+            filters.push(format!("type_id = ANY(ARRAY{:?})", ids));
+        }
+
+        if let Some(x) = filter.max_security {
+            filters.push(format!("security >= {}", x));
+        }
+
+        if let Some(_) = filter.only_buy_orders {
+            filters.push("is_buy_order = true".into());
+        } else if let Some(_) = filter.only_sell_orders {
+            filters.push("is_buy_order = false".into());
+        }
+
+        if let Some(x) = filter.ids {
+            filters.push(format!("type_id = ANY(ARRAY{:?})", x));
+        }
+
+        if let Some(x) = filter.location_ids {
+            filters.push(format!("location_id = ANY(ARRAY{:?})", x));
+        }
+
+        if let Some(x) = filter.system_ids {
+            filters.push(format!("location_id = ANY(ARRAY{:?})", x));
+        }
+
+        let filter = filters.join(" AND ");
+        if !filters.is_empty() {
+            query.push("WHERE".into());
+            query.push(&filter);
+        }
+
+        let query = query.join(" ");
+        let mut conn = self.db.acquire().await.unwrap();
+        sqlx::query_as::<_, Market>(&query)
+            .fetch_all(&mut conn)
             .await
-            .into_iter()
-            .filter(|x| {
-                if let Some(ids) = filter.ids.clone() {
-                    ids.contains(&x.type_id)
-                } else if let Some(ids) = resolved_ids.clone() {
-                    ids.contains(&x.type_id)
-                } else {
-                    true
-                }
-            })
-            // filters only buy orders
-            .filter(|x| match filter.only_buy_orders {
-                Some(_) => x.is_buy_order == true,
-                None => true,
-            })
-            // filters only sell orders
-            .filter(|x| match filter.only_sell_orders {
-                Some(_) => x.is_buy_order == false,
-                None => true,
-            })
-            // filters by location id
-            .filter(|x| match filter.location_ids.clone() {
-                Some(l) => l.contains(&x.location_id),
-                None => true,
-            })
-            // filters by system id
-            .filter(|x| match filter.system_ids.clone() {
-                Some(l) => l.contains(&x.system_id),
-                None => true,
-            })
-            .collect::<Vec<MarketCacheEntry>>()
+            .unwrap()
     }
+}
 
-    pub async fn count(&self) -> usize {
-        self.cache
-            .fetch_markets()
-            .await
-            .len()
-    }
+#[derive(Clone, Debug, Serialize, sqlx::FromRow)]
+pub struct Market {
+    pub is_buy_order: bool,
+    pub location_id: i64,
+    pub price: f32,
+    pub region_id: i32,
+    pub system_id: i32,
+    pub security: f32,
+    pub type_id: i32,
+    pub volume_remain: i32,
 }

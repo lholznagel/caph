@@ -1,6 +1,7 @@
 mod api;
 mod cache;
 mod error;
+mod reprocessing;
 mod services;
 
 use self::services::*;
@@ -9,14 +10,20 @@ use async_std::future;
 use async_std::prelude::*;
 use async_std::sync::Arc;
 use std::time::Duration;
+use sqlx::postgres::PgPoolOptions;
 
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     morgan::Morgan::init().unwrap();
 
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect("postgres://caph:caph@cygnus.local:5432/caph_eve")
+        .await?;
+
     log::info!("Preparing caches");
     let cache = CacheService::new();
-    cache.refresh().await;
+    //cache.refresh().await;
     let cache = Arc::new(cache);
     log::info!("Done preparing caches");
 
@@ -35,15 +42,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let item_service = ItemService::new(cache.clone());
-    let region_service = RegionService::new(cache.clone());
-    let market_service = MarketService::new(cache.clone(), item_service.clone());
-    let blueprint_service = BlueprintService::new(cache.clone(), market_service.clone());
+    let blueprint_service = BlueprintService::new(cache.clone());
+    let item_service = ItemService::new(pool.clone());
+    let market_service = MarketService::new(pool.clone(), item_service.clone());
+    let region_service = RegionService::new(pool.clone());
+    let resolve_service = ResolveService::new(pool.clone());
+
     let state = State {
         blueprint_service,
         item_service,
         market_service,
         region_service,
+        resolve_service,
     };
 
     let mut app = tide::with_state(state.clone());
@@ -51,25 +61,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     app.at("/api").nest({
         let mut market = tide::with_state(state.clone());
-        market.at("/items").get(api::item::fetch_items).nest({
+        market.at("/items").get(api::item::fetch_items).post(api::item::bulk_ids).nest({
             let mut server = tide::with_state(state.clone());
-            server.at("/bulk").post(api::item::bulk_ids);
+            server.at("/reprocessing").post(api::item::bulk_reprocessing);
             server
                 .at("/search")
                 .get(api::item::search)
                 .post(api::item::bulk_search);
-            server.at("/:id").get(api::item::fetch_item);
+            server
+                .at("/:id")
+                .get(api::item::fetch_item)
+                .at("/reprocessing")
+                .get(api::item::reprocessing);
+            server
+        });
+        market.at("/resolve").post(api::resolve::bulk_resolve).nest({
+            let mut server = tide::with_state(state.clone());
+            server.at("/:id").get(api::resolve::resolve);
             server
         });
         market
-            .at("/market")
-            .post(api::market::fetch)
-            .at("/count")
-            .get(api::market::count);
+            .at("/market").post(api::market::fetch);
         market.at("/regions").get(api::region::fetch_regions);
         market.at("/blueprints").nest({
             let mut server = tide::with_state(state.clone());
-            server.at("/good").get(api::blueprint::good);
             server.at("/:id").get(api::blueprint::blueprint_cost);
             server
         });
@@ -88,4 +103,5 @@ pub struct State {
     pub item_service: ItemService,
     pub market_service: MarketService,
     pub region_service: RegionService,
+    pub resolve_service: ResolveService,
 }

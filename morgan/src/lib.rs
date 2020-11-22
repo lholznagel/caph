@@ -51,8 +51,7 @@ impl Morgan {
 
 impl Log for Morgan {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        let exclude = ["surf", "tracing", "isahc", "tide", "hyper", "rusoto_core"];
-
+        let exclude = ["surf", "tracing", "isahc", "hyper", "tide", "sqlx"];
         let base = metadata.target().split(':').next().unwrap_or_default();
         !exclude.contains(&base)
     }

@@ -7,8 +7,3 @@ pub async fn blueprint_cost(req: Request<State>) -> Result<Body> {
     let result = req.state().blueprint_service.calc_bp_cost(id).await;
     Ok(Body::from_json(&result).unwrap())
 }
-
-pub async fn good(req: Request<State>) -> Result<Body> {
-    req.state().blueprint_service.get_good_blueprint().await;
-    Ok(Body::from_string("".into()))
-}

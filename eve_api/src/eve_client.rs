@@ -49,12 +49,16 @@ impl EveClient {
 
         loop {
             let url = format!("{}/{}", EveClient::BASE_ADDR, path);
+            if retry_counter == 3 {
+                log::error!("Too many retries requesting {}.", url);
+                return Err(EveApiError::TooManyRetries(url));
+            }
 
             let response = Client::new()
                 .get(&url)
                 .send()
-                .await
-                .map_err(EveApiError::ReqwestError)?;
+                .await;
+            let response = response.map_err(EveApiError::ReqwestError)?;
 
             // status 200 and 404 are ok
             if response.status() != 200 && response.status() != 404 {
@@ -64,11 +68,6 @@ impl EveClient {
                     response.status()
                 );
                 continue;
-            }
-
-            if retry_counter == 3 {
-                log::error!("Too many retries requesting {}.", url);
-                return Err(EveApiError::TooManyRetries(url));
             }
 
             return Ok(response);

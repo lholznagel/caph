@@ -1,5 +1,4 @@
-use crate::cache::MarketCacheEntry;
-use crate::services::MarketFilter;
+use crate::services::{MarketFilter, Market};
 use crate::State;
 
 use std::cmp::Ordering;
@@ -27,15 +26,15 @@ pub async fn fetch(mut req: Request<State>) -> Result<Body> {
     let query_params: QueryParams = req.query()?;
 
     let results = req.state().market_service.all(filter).await;
-    let mut grouped: HashMap<u32, Vec<MarketCacheEntry>> = HashMap::new();
+    let mut grouped: HashMap<u32, Vec<Market>> = HashMap::new();
     for result in results {
         grouped
-            .entry(result.type_id)
-            .and_modify(|x| x.push(result))
+            .entry(result.type_id as u32)
+            .and_modify(|x| x.push(result.clone()))
             .or_insert(vec![result]);
     }
 
-    let mut results: HashMap<u32, Vec<MarketCacheEntry>> = HashMap::new();
+    let mut results: HashMap<u32, Vec<Market>> = HashMap::new();
     for (id, entries) in grouped.iter_mut() {
         if let Some(x) = query_params.sort_price.clone() {
             match x {
@@ -45,20 +44,9 @@ pub async fn fetch(mut req: Request<State>) -> Result<Body> {
         };
 
         if let Some(x) = query_params.max_items {
-            results.insert(*id, entries.clone().into_iter().take(x).collect::<Vec<MarketCacheEntry>>());
+            results.insert(*id, entries.clone().into_iter().take(x).collect::<Vec<Market>>());
         }
     }
 
     Ok(Body::from_json(&results).unwrap())
-}
-
-pub async fn count(req: Request<State>) -> Result<Body> {
-    let count = req.state().market_service.count().await;
-
-    #[derive(serde::Serialize)]
-    struct CountResult {
-        count: usize,
-    }
-
-    Ok(Body::from_json(&CountResult { count }).unwrap())
 }

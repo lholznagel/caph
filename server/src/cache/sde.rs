@@ -9,9 +9,6 @@ const SDE_ZIP_URL: &'static str =
     "https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/sde.zip";
 
 pub enum SdeCacheResult {
-    ItemInfos(Vec<ItemCacheEntry>),
-    Regions(Vec<RegionCacheEntry>),
-    UniqueNames(Vec<NameCacheEntry>),
     Blueprints(Vec<BlueprintCacheEntry>),
     Schematics(Vec<SchematicCacheEntry>),
 }
@@ -38,44 +35,21 @@ impl SdeCache {
 
         log::debug!("Parsing sde zip");
         let parse_requests = vec![
-            ParseRequest::TypeIds,
-            ParseRequest::UniqueNames,
             ParseRequest::Blueprints,
             ParseRequest::Schematics,
-            ParseRequest::Region,
         ];
-
-        let mut unique_names = Vec::new();
-        let mut regions = Vec::new();
 
         let mut results = Vec::new();
         let parse_results =
             caph_eve_sde_parser::from_reader(&mut Cursor::new(zip), parse_requests).unwrap();
         for parse_result in parse_results {
             match parse_result {
-                ParseResult::TypeIds(x) => {
-                    let mut transformed_items = Vec::with_capacity(x.len());
-                    for (k, v) in x {
-                        transformed_items.push(ItemCacheEntry {
-                            description: v
-                                .description
-                                .map(|x| x.get("en".into()).unwrap_or(&String::new()).clone())
-                                .unwrap_or_default()
-                                .clone(),
-                            group_id: v.group_id,
-                            name: v.name.get("en".into()).unwrap_or(&String::new()).clone(),
-                            id: k,
-                            volume: v.volume,
-                        })
-                    }
-                    results.push(SdeCacheResult::ItemInfos(transformed_items));
-                }
                 ParseResult::Schematic(x) => {
                     let mut schematics = Vec::with_capacity(x.len());
                     for (id, x) in x {
                         let mut inputs = HashMap::new();
                         let mut outputs = HashMap::new();
-    
+
                         for (type_id, y) in x.types {
                             if y.is_input {
                                 inputs.insert(type_id, y.quantity);
@@ -93,11 +67,6 @@ impl SdeCache {
                     }
                     results.push(SdeCacheResult::Schematics(schematics));
                 }
-                ParseResult::UniqueNames(x) => {
-                    for name in x {
-                        unique_names.push(NameCacheEntry::from(name));
-                    }
-                }
                 ParseResult::Blueprints(x) => {
                     let mut blueprints = Vec::new();
                     for (_, blueprint) in x {
@@ -105,22 +74,9 @@ impl SdeCache {
                     }
                     results.push(SdeCacheResult::Blueprints(blueprints));
                 }
-                ParseResult::Region(x) => {
-                    regions.push(RegionCacheEntry {
-                        name: unique_names
-                            .clone()
-                            .into_iter()
-                            .find(|y| y.item_id == x.region_id)
-                            .map(|y| y.item_name)
-                            .unwrap_or_default(),
-                        region_id: x.region_id,
-                    });
-                }
                 _ => (),
             }
         }
-        results.push(SdeCacheResult::Regions(regions));
-        results.push(SdeCacheResult::UniqueNames(unique_names));
 
         log::debug!("Parsed sde zip");
 
@@ -154,8 +110,6 @@ pub struct ItemCacheEntry {
     pub group_id: u32,
     pub id: u32,
     pub name: String,
-
-    pub volume: Option<f32>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -212,4 +166,12 @@ pub struct SchematicCacheEntry {
     pub inputs: HashMap<u32, u32>,
     pub outputs: HashMap<u32, u32>,
     pub time: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct SolarsystemCacheEntry {
+    pub name: String,
+    pub id: u32,
+    pub security: f64,
+    pub security_class: Option<String>,
 }

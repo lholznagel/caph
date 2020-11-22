@@ -14,7 +14,8 @@ FROM                alpine:latest as server
 RUN                 apk update && \
                     apk add --no-cache sudo tini runit htop curl
 
-COPY                --from=builder /home/rust/src/target/x86_64-unknown-linux-musl/release/eve_server /usr/local/bin/eve_server
+COPY                --from=builder /home/rust/src/target/x86_64-unknown-linux-musl/release/caph_server /usr/local/bin/caph_server
+COPY                --from=builder /home/rust/src/target/x86_64-unknown-linux-musl/release/caph_collector /usr/local/bin/caph_collector
 
 COPY                docker/init.sh /etc/init.sh
 COPY                docker/sv/server /etc/sv/server

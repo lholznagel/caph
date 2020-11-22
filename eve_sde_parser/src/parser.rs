@@ -1,8 +1,6 @@
 mod blueprint;
-mod constellation;
-mod region;
 mod schematic;
-mod solarsystem;
+mod station;
 mod type_ids;
 mod type_material;
 mod unique_name;
@@ -11,10 +9,8 @@ use crate::error::*;
 use crate::reader::*;
 
 pub use self::blueprint::*;
-pub use self::constellation::*;
-pub use self::region::*;
 pub use self::schematic::*;
-pub use self::solarsystem::*;
+pub use self::station::*;
 pub use self::type_ids::*;
 pub use self::type_material::*;
 pub use self::unique_name::*;
@@ -64,10 +60,8 @@ impl EveSdeParser {
                 if filename.contains(&x.path()) {
                     match x {
                         ParseRequest::Blueprints => results.push(ParseResult::Blueprints(serde_yaml::from_slice(&data).unwrap())),
-                        ParseRequest::Constellation => results.push(ParseResult::Constellation(serde_yaml::from_slice(&data).unwrap())),
-                        ParseRequest::Region => results.push(ParseResult::Region(serde_yaml::from_slice(&data).unwrap())),
                         ParseRequest::Schematics => results.push(ParseResult::Schematic(serde_yaml::from_slice(&data).unwrap())),
-                        ParseRequest::Solarsystem => results.push(ParseResult::Solarsystem(serde_yaml::from_slice(&data).unwrap())),
+                        ParseRequest::Stations => results.push(ParseResult::Stations(serde_yaml::from_slice(&data).unwrap())),
                         ParseRequest::TypeIds => results.push(ParseResult::TypeIds(serde_yaml::from_slice(&data).unwrap())),
                         ParseRequest::TypeMaterials => results.push(ParseResult::TypeMaterials(serde_yaml::from_slice(&data).unwrap())),
                         ParseRequest::UniqueNames => results.push(ParseResult::UniqueNames(serde_yaml::from_slice(&data).unwrap())),
@@ -82,21 +76,17 @@ impl EveSdeParser {
 
 pub enum ParseResult {
     Blueprints(HashMap<u32, Blueprint>),
-    Constellation(Constellation),
-    Region(Region),
     Schematic(HashMap<u32, Schematic>),
-    Solarsystem(Solarsystem),
     TypeIds(HashMap<u32, TypeIds>),
     TypeMaterials(HashMap<u32, TypeMaterial>),
-    UniqueNames(Vec<UniqueName>)
+    UniqueNames(Vec<UniqueName>),
+    Stations(Vec<Station>)
 }
 
 pub enum ParseRequest {
     Blueprints,
-    Constellation,
-    Region,
     Schematics,
-    Solarsystem,
+    Stations,
     TypeIds,
     TypeMaterials,
     UniqueNames,
@@ -106,10 +96,8 @@ impl ParseRequest {
     pub fn path(&self) -> String {
         match self {
             Self::Blueprints => "sde/fsd/blueprints.yaml".into(),
-            Self::Constellation => "constellation.staticdata".into(),
-            Self::Region => "region.staticdata".into(),
             Self::Schematics => "sde/fsd/planetSchematics.yaml".into(),
-            Self::Solarsystem => "solarsystem.staticdata".into(),
+            Self::Stations => "sde/bsd/staStations.yaml".into(),
             Self::TypeIds => "sde/fsd/typeIDs.yaml".into(),
             Self::TypeMaterials => "sde/fsd/typeMaterials.yaml".into(),
             Self::UniqueNames => "sde/bsd/invUniqueNames".into(),

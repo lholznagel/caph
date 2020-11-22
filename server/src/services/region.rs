@@ -1,21 +1,24 @@
-use crate::cache::RegionCacheEntry;
-use crate::services::CacheService;
-
-use async_std::sync::Arc;
+use sqlx::{Pool, Postgres};
 
 #[derive(Clone)]
-pub struct RegionService {
-    cache: Arc<CacheService>,
-}
+pub struct RegionService(Pool<Postgres>);
 
 impl RegionService {
-    pub fn new(cache: Arc<CacheService>) -> Self {
-        Self { cache }
+    pub fn new(db: Pool<Postgres>) -> Self {
+        Self(db)
     }
 
-    pub async fn all(&self) -> Vec<RegionCacheEntry> {
-        self.cache
-            .fetch_regions()
+    pub async fn all(&self) -> Result<Vec<u32>, Box<dyn std::error::Error>> {
+        let mut conn = self.0.acquire().await?;
+        sqlx::query_as::<_, RegionId>("SELECT DISTINCT region_id FROM stations")
+            .fetch_all(&mut conn)
             .await
+            .map(|x| x.into_iter().map(|y| y.region_id as u32).collect::<Vec<u32>>())
+            .map_err(|x| x.into())
     }
+}
+
+#[derive(Clone, Debug, sqlx::FromRow)]
+pub struct RegionId {
+    pub region_id: i32,
 }

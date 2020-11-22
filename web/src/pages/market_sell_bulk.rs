@@ -13,7 +13,14 @@ pub struct MarketEntry {
     system_id: u32,
     type_id: u32,
     volume_remain: u32,
-    amount: Option<u32>
+    security: f32,
+    amount: Option<u32>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Resolve {
+    id: u32,
+    name: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -26,13 +33,15 @@ pub enum Msg {
     UpdatedItems(String),
     ResolvedItems(HashMap<u32, String>),
     FetchedMarket(HashMap<u32, Vec<MarketEntry>>),
+    ResolvedSystems(Vec<Resolve>),
     ResolveItems,
 }
 
 pub struct State {
     items: String,
     resolved_items: HashMap<u32, String>,
-    market_entries: HashMap<u32, Vec<MarketEntry>>
+    resolved_systems: Vec<Resolve>,
+    market_entries: HashMap<u32, Vec<MarketEntry>>,
 }
 
 pub struct MarketSellBulkComponent {
@@ -43,10 +52,18 @@ pub struct MarketSellBulkComponent {
 
 impl MarketSellBulkComponent {
     fn render_table_entry(&self, market: &MarketEntry) -> Html {
+        let solar = self
+            .state
+            .resolved_systems
+            .clone()
+            .into_iter()
+            .find(|x| x.id == market.system_id)
+            .unwrap();
+
         html! {
             <tr>
-                <td>{ market.system_id }</td>
-                <td>{ "Unknown" }</td>
+                <td>{ solar.name }</td>
+                <td>{ format!("{:.1}", market.security) }</td>
                 <td>{ market.price }</td>
                 <td>{ market.volume_remain }</td>
             </tr>
@@ -63,7 +80,7 @@ impl MarketSellBulkComponent {
                     <table class="table table-striped table-hover">
                         <thead>
                             <tr>
-                                <th>{ "System" }</th>
+                                <th>{ "Location" }</th>
                                 <th>{ "Security" }</th>
                                 <th>{ "Price" }</th>
                                 <th>{ "Volume remaining" }</th>
@@ -86,7 +103,7 @@ impl MarketSellBulkComponent {
     fn render_item(&self) -> Html {
         if self.state.market_entries.len() > 0 {
             html! {
-                { 
+                {
                     self
                         .state
                         .market_entries
@@ -126,9 +143,43 @@ impl MarketSellBulkComponent {
         self.fetch_task = Some(task);
     }
 
+    fn resolve_system_ids(&mut self) {
+        let ids = self
+            .state
+            .market_entries
+            .clone()
+            .into_iter()
+            .fold(Vec::new(), |mut acc, (_, entries)| {
+                let system_ids = entries.into_iter().map(|x| x.system_id).collect::<Vec<u32>>();
+                acc.extend(system_ids);
+                acc
+            });
+
+        let request = Request::post("/api/resolve")
+            .header("Content-Type", "application/json")
+            .body(Json(&ids))
+            .expect("Could not build request");
+
+        let callback = self.link.callback(
+            |response: Response<Json<Result<Vec<Resolve>, anyhow::Error>>>| {
+                let Json(data) = response.into_body();
+                Msg::ResolvedSystems(data.unwrap_or_default())
+            },
+        );
+
+        let task = FetchService::fetch(request, callback).expect("Failed to start request");
+        self.fetch_task = Some(task);
+    }
+
     fn fetch_market(&mut self) {
-        let ids = self.state.resolved_items.clone().into_iter().map(|(x, _)| x).collect::<Vec<u32>>();
-        let request = json!({ "ids": ids, "onlyBuyOrders": true });
+        let ids = self
+            .state
+            .resolved_items
+            .clone()
+            .into_iter()
+            .map(|(x, _)| x)
+            .collect::<Vec<u32>>();
+        let request = json!({ "ids": ids, "onlyBuyOrders": true, "max_sec": 0.5 });
 
         let request = Request::post("/api/market?sort_price=DESC&max_items=5")
             .header("Content-Type", "application/json")
@@ -136,7 +187,9 @@ impl MarketSellBulkComponent {
             .expect("Could not build request");
 
         let callback = self.link.callback(
-            move |response: Response<Json<Result<HashMap<u32, Vec<MarketEntry>>, anyhow::Error>>>| {
+            move |response: Response<
+                Json<Result<HashMap<u32, Vec<MarketEntry>>, anyhow::Error>>,
+            >| {
                 let Json(data) = response.into_body();
                 if let Ok(x) = &data {
                     Msg::FetchedMarket(x.clone())
@@ -180,6 +233,7 @@ impl Component for MarketSellBulkComponent {
             state: State {
                 items: String::new(),
                 resolved_items: HashMap::new(),
+                resolved_systems: Vec::new(),
                 market_entries: HashMap::new(),
             },
         }
@@ -191,11 +245,6 @@ impl Component for MarketSellBulkComponent {
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
-            Msg::FetchedMarket(x) => {
-                self.fetch_task = None;
-                self.state.market_entries = x;
-                true
-            }
             Msg::ResolveItems => {
                 self.fetch_task = None;
                 let items = self.parse_input();
@@ -206,6 +255,17 @@ impl Component for MarketSellBulkComponent {
                 self.fetch_task = None;
                 self.state.resolved_items = x;
                 self.fetch_market();
+                true
+            }
+            Msg::FetchedMarket(x) => {
+                self.fetch_task = None;
+                self.state.market_entries = x;
+                self.resolve_system_ids();
+                false
+            }
+            Msg::ResolvedSystems(x) => {
+                self.fetch_task = None;
+                self.state.resolved_systems = x;
                 true
             }
             Msg::UpdatedItems(x) => {
