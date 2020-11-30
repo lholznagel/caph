@@ -52,12 +52,12 @@ impl PostgresService {
         self.metrics
             .set(PostgresMetrics::TABLE_SCHEMATIC_RESOURCES, count, size);
 
-        let count = self.count("market").await?;
-        let size = self.size("market").await?;
+        let count = self.count("market_current").await?;
+        let size = self.size("market_current").await?;
         self.metrics.set(PostgresMetrics::TABLE_MARKET, count, size);
 
-        let count = self.count("market_order_info").await?;
-        let size = self.size("market_order_info").await?;
+        let count = self.count("market_orders").await?;
+        let size = self.size("market_orders").await?;
         self.metrics
             .set(PostgresMetrics::TABLE_MARKET_ORDER_INFO, count, size);
 
@@ -76,14 +76,7 @@ impl PostgresService {
         }
 
         let mut conn = self.db.acquire().await?;
-        let result = sqlx::query_as::<_, Count>(
-            r#"
-            SELECT reltuples::bigint AS count
-            FROM pg_catalog.pg_class
-            WHERE relname = $1;
-        "#,
-        )
-        .bind(table)
+        let result = sqlx::query_as::<_, Count>(&format!("SELECT COUNT(*) as count FROM {};", table))
         .fetch_one(&mut conn)
         .await?
         .count;

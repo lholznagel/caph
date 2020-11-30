@@ -70,10 +70,10 @@ impl ItemService {
         &self,
         exact: bool,
         names: Vec<String>,
-    ) -> Result<HashMap<String, Vec<Item>>, Box<dyn std::error::Error>> {
-        let mut results = HashMap::new();
+    ) -> Result<Vec<Item>, Box<dyn std::error::Error>> {
+        let mut results = Vec::new();
         for name in names {
-            results.insert(name.clone(), self.search(exact, &name).await?);
+            results.extend(self.search(exact, &name).await?);
         }
         Ok(results)
     }
@@ -103,6 +103,46 @@ impl ItemService {
         }
         Ok(results)
     }
+
+    pub async fn fetch_my_items(&self) -> Result<Vec<MyItems>, Box<dyn std::error::Error>> {
+        let mut conn = self.0.acquire().await?;
+        sqlx::query_as::<_, MyItems>(
+            "SELECT id, quantity FROM user_items",
+        )
+        .fetch_all(&mut conn)
+        .await
+        .map_err(|x| x.into())
+    }
+
+    pub async fn push_my_items(&self, items: HashMap<u32, u64>) -> Result<(), Box<dyn std::error::Error>> {
+        let mut conn = self.0.acquire().await?;
+
+        let ids = items
+            .clone()
+            .into_iter()
+            .map(|(x, _)| x as i32)
+            .collect::<Vec<i32>>();
+        let quantities = items
+            .into_iter()
+            .map(|(_, x)| x as i64)
+            .collect::<Vec<i64>>();
+
+        sqlx::query(&format!("DELETE FROM user_items WHERE id = ANY(ARRAY {:?})", ids))
+            .execute(&mut conn)
+            .await?;
+
+        sqlx::query(
+            r#"INSERT INTO user_items (id, quantity)
+            SELECT * FROM UNNEST($1, $2)
+            RETURNING id, quantity"#,
+        )
+        .bind(&ids)
+        .bind(&quantities)
+        .execute(&mut *conn)
+        .await?;
+
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Serialize, sqlx::FromRow)]
@@ -116,4 +156,10 @@ pub struct ItemReprocessing {
     pub id: i32,
     pub material_id: i32,
     pub quantity: i32,
+}
+
+#[derive(Clone, Debug, Serialize, sqlx::FromRow)]
+pub struct MyItems {
+    pub id: i32,
+    pub quantity: i64,
 }

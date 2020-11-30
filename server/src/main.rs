@@ -6,6 +6,7 @@ mod services;
 use self::services::*;
 
 use sqlx::postgres::PgPoolOptions;
+use sqlx::Executor;
 
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -15,6 +16,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .max_connections(5)
         .connect("postgres://caph:caph@cygnus.local:5432/caph_eve")
         .await?;
+
+    // Make sure the database has the newest scripts applied
+    let mut conn = pool.acquire().await?;
+    conn.execute(include_str!("./tables.sql")).await?;
 
     let blueprint_service = BlueprintService::new(pool.clone());
     let item_service = ItemService::new(pool.clone());
@@ -33,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = tide::with_state(state.clone());
     log::info!("Starting server");
 
-    app.at("/api").nest({
+    app.at("/api/v1").nest({
         let mut market = tide::with_state(state.clone());
         market
             .at("/items")
@@ -41,6 +46,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .post(api::item::bulk_ids)
             .nest({
                 let mut server = tide::with_state(state.clone());
+                server
+                    .at("/my")
+                    .get(api::item::fetch_my_items)
+                    .post(api::item::push_my_items);
                 server
                     .at("/reprocessing")
                     .post(api::item::bulk_reprocessing);
@@ -63,8 +72,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 server.at("/:id").get(api::resolve::resolve);
                 server
             });
-        market.at("/market").post(api::market::fetch);
-        market.at("/regions").get(api::region::fetch_regions);
+        market
+            .at("/market")
+            .post(api::market::fetch)
+            .at("/:id")
+            .get(api::market::fetch_by_item_id)
+            .nest({
+                let mut server = tide::with_state(state.clone());
+                server.at("buy/stats").get(api::market::buy_stats);
+                server.at("sell/stats").get(api::market::sell_stats);
+                server
+            });
+        market
+            .at("/regions")
+            .get(api::region::fetch_regions)
+            .at("/route")
+            .get(api::region::route);
         market.at("/blueprints").nest({
             let mut server = tide::with_state(state.clone());
             server.at("/:id").get(api::blueprint::blueprint_cost);
@@ -74,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         market
     });
 
-    app.listen("0.0.0.0:9000").await?;
+    app.listen("0.0.0.0:10101").await?;
 
     Ok(())
 }

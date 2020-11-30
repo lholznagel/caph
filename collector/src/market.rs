@@ -6,16 +6,19 @@ use futures::stream::{FuturesUnordered, StreamExt};
 use sqlx::{pool::PoolConnection, Executor, Pool, Postgres};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-const BATCH_SIZE: usize = 25000;
+const BATCH_SIZE: usize = 500_000;
 
 pub struct Market {
     db: Pool<Postgres>,
     metrics: MarketMetrics,
+
+    values_order: Vec<String>,
+    values_market: Vec<String>,
 }
 
 impl Market {
     pub fn new(db: Pool<Postgres>, metrics: MarketMetrics) -> Self {
-        Self { db, metrics }
+        Self { db, metrics, values_order: Vec::with_capacity(BATCH_SIZE), values_market: Vec::with_capacity(BATCH_SIZE) }
     }
 
     pub async fn background(&mut self) -> Result<(), CollectorError> {
@@ -37,10 +40,6 @@ impl Market {
             requests.push(client.fetch_market_orders(RegionId(region)));
         }
 
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|_| CollectorError::ClockRunsBackwards)?
-            .as_secs();
         let mut results = Vec::new();
         while let Some(return_val) = requests.next().await {
             match return_val {
@@ -55,6 +54,10 @@ impl Market {
             .set_timing(MarketMetrics::EVE_DOWNLOAD_TIME, start);
 
         let start = Instant::now();
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| CollectorError::ClockRunsBackwards)?
+            .as_millis() as u64;
         conn.execute("BEGIN").await?;
         self.clear_market(&mut conn).await?;
         self.insert_market(&mut conn, results, timestamp)
@@ -79,12 +82,10 @@ impl Market {
         let start = Instant::now();
 
         let mut skip = 0;
-        let mut values_order = Vec::with_capacity(BATCH_SIZE);
-        let mut values_market = Vec::with_capacity(BATCH_SIZE);
         let entries_len = entries.len();
         while skip <= entries_len {
             for x in entries.clone().into_iter().skip(skip).take(BATCH_SIZE) {
-                values_order.push(format!(
+                self.values_order.push(format!(
                     "({}, {}, {}, {}, {}, {}, {}, '{}')",
                     x.volume_total,
                     x.system_id.0,
@@ -96,39 +97,39 @@ impl Market {
                     x.issued,
                 ));
 
-                values_market.push(format!(
+                self.values_market.push(format!(
                     "({}, {}, {})",
                     x.volume_remain, x.order_id, timestamp
                 ));
             }
 
-            if !values_order.is_empty() {
+            if !self.values_order.is_empty() {
                 sqlx::query(&format!(r#"
-                    INSERT INTO market_order_info
+                    INSERT INTO market_orders
                     (volume_total, system_id, type_id, order_id, location_id, price, is_buy_order, issued)
                     VALUES {}
                     ON CONFLICT DO NOTHING
-                "#, values_order.join(", ")))
+                "#, self.values_order.join(", ")))
                     .execute(&mut *conn)
                     .await?;
             }
 
-            if !values_market.is_empty() {
+            if !self.values_market.is_empty() {
                 sqlx::query(&format!(
                     r#"
-                    INSERT INTO market
+                    INSERT INTO market_current
                     (volume_remain, order_id, timestamp)
                     VALUES {}
                 "#,
-                    values_market.join(", ")
+                    self.values_market.join(", ")
                 ))
                 .execute(&mut *conn)
                 .await?;
             }
 
             skip += BATCH_SIZE;
-            values_order.clear();
-            values_market.clear();
+            self.values_order.clear();
+            self.values_market.clear();
             log::debug!(
                 "[market_import] {} from {} {}",
                 skip,
@@ -151,7 +152,7 @@ impl Market {
         let start = Instant::now();
 
         sqlx::query(
-            "INSERT INTO market_history SELECT volume_remain, timestamp, order_id FROM market ON CONFLICT DO NOTHING",
+            "INSERT INTO market_history SELECT volume_remain, timestamp, order_id FROM market_current ON CONFLICT DO NOTHING",
         )
         .execute(&mut *conn)
         .await?;
@@ -169,7 +170,7 @@ impl Market {
         log::debug!("Removing all unlocked market entries");
         let start = Instant::now();
 
-        sqlx::query("DELETE FROM market")
+        sqlx::query("DELETE FROM market_current")
             .execute(&mut *conn)
             .await?;
 

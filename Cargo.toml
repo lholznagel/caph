@@ -9,6 +9,5 @@ members = [
   'collector',
   'eve_api',
   'eve_sde_parser',
-  'server',
-  'web'
+  'server'
 ]

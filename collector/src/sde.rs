@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use std::time::Instant;
 
-const BATCH_SIZE: usize = 5000;
+const BATCH_SIZE: usize = 10_000;
 
 pub struct Sde {
     db: Pool<Postgres>,

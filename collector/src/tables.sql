@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS schematic_resources (
 
 CREATE INDEX IF NOT EXISTS schematic_resources_id ON schematic_resources(schematic_id);
 
-CREATE TABLE IF NOT EXISTS market (
+CREATE TABLE IF NOT EXISTS market_current (
   volume_remain       INTEGER   NOT NULL,
   timestamp           INTEGER   NOT NULL,
   order_id            BIGINT    NOT NULL
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS market_history (
 
 CREATE UNIQUE INDEX IF NOT EXISTS market_history_vol_id ON market_history(volume_remain, order_id);
 
-CREATE TABLE IF NOT EXISTS market_order_info (
+CREATE TABLE IF NOT EXISTS market_orders (
   issued              TEXT      NOT NULL,
   volume_total        INTEGER   NOT NULL,
   system_id           INTEGER   NOT NULL,

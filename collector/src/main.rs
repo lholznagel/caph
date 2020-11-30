@@ -52,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             future::ready(1u32)
-                .delay(std::time::Duration::from_secs(15 * 60)) // 15 minutes
+                .delay(std::time::Duration::from_secs(30 * 60)) // 30 minutes
                 .await;
         }
     });
