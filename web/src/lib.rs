@@ -2,8 +2,8 @@
 
 mod app;
 mod pages;
-mod utils;
 mod switch;
+mod utils;
 
 use wasm_bindgen::prelude::*;
 

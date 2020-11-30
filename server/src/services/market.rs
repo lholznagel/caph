@@ -47,7 +47,8 @@ impl MarketService {
 
         let mut filters = Vec::new();
         if let Some(x) = filter.names.clone() {
-            let ids = self.item_service
+            let ids = self
+                .item_service
                 .bulk_search(true, x)
                 .await
                 .unwrap_or_default()

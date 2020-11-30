@@ -18,19 +18,19 @@ pub struct MarketEntry {
 
 pub enum Msg {
     Loaded(Result<Vec<MarketEntry>, anyhow::Error>),
-    Search
+    Search,
 }
 
 pub struct State {
     item_name: String,
-    entries: Vec<MarketEntry>
+    entries: Vec<MarketEntry>,
 }
 
 pub struct MarketComponent {
     link: ComponentLink<Self>,
     fetch_task: Option<FetchTask>,
     error: Option<String>,
-    state: State
+    state: State,
 }
 
 impl MarketComponent {
@@ -84,17 +84,21 @@ impl MarketComponent {
             .body(Json(&request))
             .expect("Could not build request");
 
-        let callback =
-            self.link
-                .callback(|response: Response<Json<Result<Vec<MarketEntry>, anyhow::Error>>>| {
-                    let Json(mut data) = response.into_body();
-                    if let Ok(mut x) = data {
-                        x.sort_by(|a, b| b.price.partial_cmp(&a.price).unwrap_or(std::cmp::Ordering::Equal));
-                        data = Ok(x);
-                    };
+        let callback = self.link.callback(
+            |response: Response<Json<Result<Vec<MarketEntry>, anyhow::Error>>>| {
+                let Json(mut data) = response.into_body();
+                if let Ok(mut x) = data {
+                    x.sort_by(|a, b| {
+                        b.price
+                            .partial_cmp(&a.price)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    });
+                    data = Ok(x);
+                };
 
-                    Msg::Loaded(data)
-                });
+                Msg::Loaded(data)
+            },
+        );
 
         let task = FetchService::fetch(request, callback).expect("Failed to start request");
         self.fetch_task = Some(task);
@@ -112,8 +116,8 @@ impl Component for MarketComponent {
             error: None,
             state: State {
                 entries: Vec::new(),
-                item_name: String::new()
-            }
+                item_name: String::new(),
+            },
         }
     }
 
@@ -128,13 +132,11 @@ impl Component for MarketComponent {
                     Ok(entries) => {
                         self.state.entries = entries;
                     }
-                    Err(error) => {
-                        self.error = Some(error.to_string())
-                    }
+                    Err(error) => self.error = Some(error.to_string()),
                 }
                 self.fetch_task = None;
                 true
-            },
+            }
             Msg::Search => {
                 self.search();
                 false
@@ -146,7 +148,7 @@ impl Component for MarketComponent {
         html! {
             <div class="card">
                 <div class="input-group">
-                    <input 
+                    <input
                         class="form-control"
                         placeholder="Item name"
                         value=&self.state.item_name />

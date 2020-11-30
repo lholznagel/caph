@@ -6,8 +6,6 @@ edition = "2018"
 
 [dependencies]
 async-std = { version = "1.7.0", features = ["attributes"] }
-caph_eve_online_api = { path = "../eve_api" }
-caph_eve_sde_parser = { path = "../eve_sde_parser" }
 futures = "0.3.8"
 log = "0.4.11"
 morgan = { path = "../morgan" }

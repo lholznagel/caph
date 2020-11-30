@@ -1,5 +1,5 @@
-use crate::switch::AppRoute;
 use crate::pages::*;
+use crate::switch::AppRoute;
 
 use yew::prelude::*;
 use yew_router::prelude::*;

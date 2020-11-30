@@ -144,16 +144,17 @@ impl MarketSellBulkComponent {
     }
 
     fn resolve_system_ids(&mut self) {
-        let ids = self
-            .state
-            .market_entries
-            .clone()
-            .into_iter()
-            .fold(Vec::new(), |mut acc, (_, entries)| {
-                let system_ids = entries.into_iter().map(|x| x.system_id).collect::<Vec<u32>>();
+        let ids = self.state.market_entries.clone().into_iter().fold(
+            Vec::new(),
+            |mut acc, (_, entries)| {
+                let system_ids = entries
+                    .into_iter()
+                    .map(|x| x.system_id)
+                    .collect::<Vec<u32>>();
                 acc.extend(system_ids);
                 acc
-            });
+            },
+        );
 
         let request = Request::post("/api/resolve")
             .header("Content-Type", "application/json")

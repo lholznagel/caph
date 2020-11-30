@@ -1,3 +1,4 @@
+mod error;
 mod market;
 mod metrics;
 mod postgres;
@@ -7,17 +8,18 @@ use async_std::future;
 use async_std::prelude::*;
 use futures::stream::FuturesUnordered;
 use metrics::*;
-use sqlx::Executor;
 use sqlx::postgres::PgPoolOptions;
+use sqlx::Executor;
 
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     morgan::Morgan::init()?;
-    
+
     let metrics = Metrics::default();
     let pool = PgPoolOptions::new()
         .max_connections(5)
-        .connect("postgres://caph:caph@cygnus.local:5432/caph_eve").await?;
+        .connect("postgres://caph:caph@cygnus.local:5432/caph_eve")
+        .await?;
 
     // Make sure the database has the newest scripts applied
     let mut conn = pool.acquire().await?;
@@ -29,10 +31,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut sde = sde::Sde::new(pool_copy, sde_metrics);
 
         loop {
-            sde.background().await.unwrap();
+            if let Err(e) = sde.background().await {
+                log::error!("Error running SDE task: {:?}", e);
+            }
 
             future::ready(1u32)
-                .delay(std::time::Duration::from_secs(24 * 60 * 60)) // 1 day
+                .delay(std::time::Duration::from_secs(24 * 60 * 60)) // 24 hours
                 .await;
         }
     });
@@ -43,7 +47,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut market = market::Market::new(pool_copy, market_metrics);
 
         loop {
-            market.background().await.unwrap();
+            if let Err(e) = market.background().await {
+                log::error!("Error running market task {:?}", e);
+            }
 
             future::ready(1u32)
                 .delay(std::time::Duration::from_secs(15 * 60)) // 15 minutes
@@ -57,7 +63,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut postgres = postgres::PostgresService::new(pool_copy, postgres_metrics);
 
         loop {
-            postgres.background().await.unwrap();
+            if let Err(e) = postgres.background().await {
+                log::error!("Error running postgres task {:?}", e);
+            }
 
             future::ready(1u32)
                 .delay(std::time::Duration::from_secs(15 * 60)) // 15 minutes

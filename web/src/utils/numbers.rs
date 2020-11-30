@@ -2,11 +2,11 @@ use yew::prelude::*;
 
 #[derive(Clone, Debug, Properties)]
 pub struct FormatNumberProps {
-    pub number: String
+    pub number: String,
 }
 
 pub struct FormatNumberComponent {
-    output: String
+    output: String,
 }
 
 impl FormatNumberComponent {
@@ -34,7 +34,7 @@ impl Component for FormatNumberComponent {
 
     fn create(props: Self::Properties, _: ComponentLink<Self>) -> Self {
         let mut x = FormatNumberComponent {
-            output: String::new()
+            output: String::new(),
         };
         x.format(props.number);
         x
@@ -55,7 +55,6 @@ impl Component for FormatNumberComponent {
     }
 }
 
-
 #[cfg(test)]
 mod format_number {
     use super::*;
@@ -64,7 +63,9 @@ mod format_number {
     fn format_001() {
         dbg!(1.to_string().chars().next().unwrap().to_digit(8).unwrap() as u8);
 
-        let mut instance = FormatNumberComponent { output: String::new() };
+        let mut instance = FormatNumberComponent {
+            output: String::new(),
+        };
         instance.format(1.to_string());
         assert_eq!(instance.output, "1");
 

@@ -54,10 +54,7 @@ impl EveClient {
                 return Err(EveApiError::TooManyRetries(url));
             }
 
-            let response = Client::new()
-                .get(&url)
-                .send()
-                .await;
+            let response = Client::new().get(&url).send().await;
             let response = response.map_err(EveApiError::ReqwestError)?;
 
             // status 200 and 404 are ok

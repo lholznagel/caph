@@ -1,3 +1,4 @@
+use crate::error::CollectorError;
 use crate::metrics::MarketMetrics;
 
 use caph_eve_online_api::{EveClient, MarketOrder, RegionId};
@@ -5,7 +6,7 @@ use futures::stream::{FuturesUnordered, StreamExt};
 use sqlx::{pool::PoolConnection, Executor, Pool, Postgres};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-const BATCH_SIZE: usize = 10000;
+const BATCH_SIZE: usize = 25000;
 
 pub struct Market {
     db: Pool<Postgres>,
@@ -17,12 +18,12 @@ impl Market {
         Self { db, metrics }
     }
 
-    pub async fn background(&mut self) -> Result<(), ()> {
+    pub async fn background(&mut self) -> Result<(), CollectorError> {
         let start = Instant::now();
         let client = EveClient::default();
 
         let mut requests = FuturesUnordered::new();
-        let mut conn = self.db.acquire().await.unwrap();
+        let mut conn = self.db.acquire().await?;
         let regions = sqlx::query_as::<_, Region>("SELECT DISTINCT region_id FROM stations")
             .fetch_all(&mut conn)
             .await
@@ -30,8 +31,7 @@ impl Market {
                 x.into_iter()
                     .map(|y| y.region_id as u32)
                     .collect::<Vec<u32>>()
-            })
-            .unwrap();
+            })?;
 
         for region in regions {
             requests.push(client.fetch_market_orders(RegionId(region)));
@@ -39,7 +39,7 @@ impl Market {
 
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .map_err(|_| CollectorError::ClockRunsBackwards)?
             .as_secs();
         let mut results = Vec::new();
         while let Some(return_val) = requests.next().await {
@@ -55,15 +55,16 @@ impl Market {
             .set_timing(MarketMetrics::EVE_DOWNLOAD_TIME, start);
 
         let start = Instant::now();
-        conn.execute("BEGIN").await.unwrap();
-        self.clear_market(&mut conn).await.unwrap();
+        conn.execute("BEGIN").await?;
+        self.clear_market(&mut conn).await?;
         self.insert_market(&mut conn, results, timestamp)
-            .await
-            .unwrap();
-        conn.execute("COMMIT").await.unwrap();
-        self.insert_market_history(&mut conn).await.unwrap();
+            .await?;
+        conn.execute("COMMIT").await?;
+        self.insert_market_history(&mut conn).await?;
         self.metrics
             .set_timing(MarketMetrics::TOTAL_DB_INSERT_TIME, start);
+        self.metrics
+            .current_time(MarketMetrics::LAST_COMPLETE_READOUT)?;
 
         Ok(())
     }
@@ -73,7 +74,7 @@ impl Market {
         conn: &mut PoolConnection<Postgres>,
         entries: Vec<MarketOrder>,
         timestamp: u64,
-    ) -> Result<(), ()> {
+    ) -> Result<(), CollectorError> {
         log::info!("Starting market import");
         let start = Instant::now();
 
@@ -109,8 +110,7 @@ impl Market {
                     ON CONFLICT DO NOTHING
                 "#, values_order.join(", ")))
                     .execute(&mut *conn)
-                    .await
-                    .unwrap();
+                    .await?;
             }
 
             if !values_market.is_empty() {
@@ -123,8 +123,7 @@ impl Market {
                     values_market.join(", ")
                 ))
                 .execute(&mut *conn)
-                .await
-                .unwrap();
+                .await?;
             }
 
             skip += BATCH_SIZE;
@@ -147,7 +146,7 @@ impl Market {
     async fn insert_market_history(
         &mut self,
         conn: &mut PoolConnection<Postgres>,
-    ) -> Result<(), ()> {
+    ) -> Result<(), CollectorError> {
         log::info!("Starting market history import");
         let start = Instant::now();
 
@@ -155,8 +154,7 @@ impl Market {
             "INSERT INTO market_history SELECT volume_remain, timestamp, order_id FROM market ON CONFLICT DO NOTHING",
         )
         .execute(&mut *conn)
-        .await
-        .unwrap();
+        .await?;
 
         log::info!(
             "Importing market history done. Took {}s",
@@ -167,14 +165,13 @@ impl Market {
         Ok(())
     }
 
-    async fn clear_market(&mut self, conn: &mut PoolConnection<Postgres>) -> Result<(), ()> {
+    async fn clear_market(&mut self, conn: &mut PoolConnection<Postgres>) -> Result<(), CollectorError> {
         log::debug!("Removing all unlocked market entries");
         let start = Instant::now();
 
         sqlx::query("DELETE FROM market")
             .execute(&mut *conn)
-            .await
-            .unwrap();
+            .await?;
 
         log::debug!("Removed all old market entries");
         self.metrics.set_timing(MarketMetrics::CLEANUP_TIME, start);

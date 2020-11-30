@@ -22,7 +22,10 @@ use std::collections::HashMap;
 pub struct EveSdeParser;
 
 impl EveSdeParser {
-    pub fn parse<R: ByteReader>(reader: &mut R, requests: Vec<ParseRequest>) -> Result<Vec<ParseResult>> {
+    pub fn parse<R: ByteReader>(
+        reader: &mut R,
+        requests: Vec<ParseRequest>,
+    ) -> Result<Vec<ParseResult>> {
         let mut results = Vec::new();
 
         while reader.read_u32be()? == 0x50_4b_03_04 {
@@ -59,12 +62,23 @@ impl EveSdeParser {
             for x in &requests {
                 if filename.contains(&x.path()) {
                     match x {
-                        ParseRequest::Blueprints => results.push(ParseResult::Blueprints(serde_yaml::from_slice(&data).unwrap())),
-                        ParseRequest::Schematics => results.push(ParseResult::Schematic(serde_yaml::from_slice(&data).unwrap())),
-                        ParseRequest::Stations => results.push(ParseResult::Stations(serde_yaml::from_slice(&data).unwrap())),
-                        ParseRequest::TypeIds => results.push(ParseResult::TypeIds(serde_yaml::from_slice(&data).unwrap())),
-                        ParseRequest::TypeMaterials => results.push(ParseResult::TypeMaterials(serde_yaml::from_slice(&data).unwrap())),
-                        ParseRequest::UniqueNames => results.push(ParseResult::UniqueNames(serde_yaml::from_slice(&data).unwrap())),
+                        ParseRequest::Blueprints => results.push(ParseResult::Blueprints(
+                            serde_yaml::from_slice(&data).unwrap(),
+                        )),
+                        ParseRequest::Schematics => results.push(ParseResult::Schematic(
+                            serde_yaml::from_slice(&data).unwrap(),
+                        )),
+                        ParseRequest::Stations => results.push(ParseResult::Stations(
+                            serde_yaml::from_slice(&data).unwrap(),
+                        )),
+                        ParseRequest::TypeIds => results
+                            .push(ParseResult::TypeIds(serde_yaml::from_slice(&data).unwrap())),
+                        ParseRequest::TypeMaterials => results.push(ParseResult::TypeMaterials(
+                            serde_yaml::from_slice(&data).unwrap(),
+                        )),
+                        ParseRequest::UniqueNames => results.push(ParseResult::UniqueNames(
+                            serde_yaml::from_slice(&data).unwrap(),
+                        )),
                     };
                 }
             }
@@ -80,7 +94,7 @@ pub enum ParseResult {
     TypeIds(HashMap<u32, TypeIds>),
     TypeMaterials(HashMap<u32, TypeMaterial>),
     UniqueNames(Vec<UniqueName>),
-    Stations(Vec<Station>)
+    Stations(Vec<Station>),
 }
 
 pub enum ParseRequest {

@@ -1,4 +1,4 @@
-use crate::services::{MarketFilter, Market};
+use crate::services::{Market, MarketFilter};
 use crate::State;
 
 use std::cmp::Ordering;
@@ -13,7 +13,7 @@ pub async fn fetch(mut req: Request<State>) -> Result<Body> {
         Asc,
         #[serde(alias = "desc")]
         #[serde(alias = "DESC")]
-        Desc
+        Desc,
     }
 
     #[derive(serde::Deserialize)]
@@ -38,13 +38,20 @@ pub async fn fetch(mut req: Request<State>) -> Result<Body> {
     for (id, entries) in grouped.iter_mut() {
         if let Some(x) = query_params.sort_price.clone() {
             match x {
-                Sort::Asc => entries.sort_by(|a, b| a.price.partial_cmp(&b.price).unwrap_or(Ordering::Equal)),
-                Sort::Desc => entries.sort_by(|a, b| b.price.partial_cmp(&a.price).unwrap_or(Ordering::Equal))
+                Sort::Asc => {
+                    entries.sort_by(|a, b| a.price.partial_cmp(&b.price).unwrap_or(Ordering::Equal))
+                }
+                Sort::Desc => {
+                    entries.sort_by(|a, b| b.price.partial_cmp(&a.price).unwrap_or(Ordering::Equal))
+                }
             }
         };
 
         if let Some(x) = query_params.max_items {
-            results.insert(*id, entries.clone().into_iter().take(x).collect::<Vec<Market>>());
+            results.insert(
+                *id,
+                entries.clone().into_iter().take(x).collect::<Vec<Market>>(),
+            );
         }
     }
 

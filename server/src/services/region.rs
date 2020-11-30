@@ -13,7 +13,11 @@ impl RegionService {
         sqlx::query_as::<_, RegionId>("SELECT DISTINCT region_id FROM stations")
             .fetch_all(&mut conn)
             .await
-            .map(|x| x.into_iter().map(|y| y.region_id as u32).collect::<Vec<u32>>())
+            .map(|x| {
+                x.into_iter()
+                    .map(|y| y.region_id as u32)
+                    .collect::<Vec<u32>>()
+            })
             .map_err(|x| x.into())
     }
 }

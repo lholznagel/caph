@@ -15,5 +15,5 @@ pub struct Schematic {
 pub struct SchematicType {
     #[serde(rename = "isInput")]
     pub is_input: bool,
-    pub quantity: u32
+    pub quantity: u32,
 }

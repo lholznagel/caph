@@ -2,6 +2,8 @@ use metrics_exporter_http_async_std::HttpExporter;
 use metrics_runtime::{observers::PrometheusBuilder, Controller, Receiver, Sink};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+use crate::error::CollectorError;
+
 pub struct Metrics {
     pub market: MarketMetrics,
     pub postgres: PostgresMetrics,
@@ -11,16 +13,20 @@ pub struct Metrics {
 }
 
 impl Metrics {
-    pub async fn task(&self) {
+    pub async fn task(&self) -> Result<(), CollectorError> {
         let exporter = HttpExporter::new(
             self.controller.clone(),
             PrometheusBuilder::new(),
-            "0.0.0.0:9000".parse().unwrap(),
+            "0.0.0.0:9000".parse().map_err(CollectorError::ParseError)?,
         );
 
         async_std::task::spawn(async move {
-            exporter.async_run().await.unwrap();
+            if let Err(e) = exporter.async_run().await {
+                log::error!("Error starting metric http exporter {:?}", e);
+            }
         });
+
+        Ok(())
     }
 }
 
@@ -45,6 +51,7 @@ pub struct MarketMetrics {
 }
 
 impl MarketMetrics {
+    pub const LAST_COMPLETE_READOUT: &'static str = "market_last_readout";
     pub const EVE_DOWNLOAD_TIME: &'static str = "market_eve_download_time";
     pub const TOTAL_DB_INSERT_TIME: &'static str = "market_total_db_insert_time";
     pub const MARKET_INFO_INSERT_TIME: &'static str = "market_info_insert_time";
@@ -59,6 +66,12 @@ impl MarketMetrics {
         self.sink
             .record_timing(name, 0, time.elapsed().as_millis() as u64);
     }
+
+    pub fn current_time(&mut self, name: &'static str) -> Result<(), CollectorError> {
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).map_err(|_| CollectorError::ClockRunsBackwards)?;
+        self.sink.update_gauge(name, timestamp.as_millis() as i64);
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -69,7 +82,6 @@ pub struct SdeMetrics {
 impl SdeMetrics {
     // Time of date since 1970 in milliseconds
     pub const LAST_COMPLETE_READOUT: &'static str = "sde_last_readout";
-    pub const LAST_CHECKSUM_CHECK: &'static str = "sde_last_checksum_check";
 
     // Duration in milliseconds from start to finish
     pub const DOWNLOAD_TIME: &'static str = "sde_ownload_time";
@@ -79,6 +91,8 @@ impl SdeMetrics {
     pub const ITEM_MATERIAL_INSERT_TIME: &'static str = "sde_item_masterial_insert_time";
     pub const NAME_INSERT_TIME: &'static str = "sde_name_insert_time";
     pub const STATION_INSERT_TIME: &'static str = "sde_station_insert_time";
+    pub const BLUEPRINT_INSERT_TIME: &'static str = "sde_blueprint_insert_time";
+    pub const SCHEMATIC_INSERT_TIME: &'static str = "sde_schematic_insert_time";
     pub const CLEANUP_TIME: &'static str = "sde_cleanup_time";
 
     pub fn new(sink: Sink) -> Self {
@@ -90,9 +104,10 @@ impl SdeMetrics {
             .record_timing(name, 0, time.elapsed().as_millis() as u64);
     }
 
-    pub fn current_time(&mut self, name: &'static str) {
-        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+    pub fn current_time(&mut self, name: &'static str) -> Result<(), CollectorError> {
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).map_err(|_| CollectorError::ClockRunsBackwards)?;
         self.sink.update_gauge(name, timestamp.as_millis() as i64);
+        Ok(())
     }
 }
 
@@ -106,6 +121,10 @@ impl PostgresMetrics {
     pub const TABLE_ITEM_MATERIALS: &'static str = "postgres_item_materials";
     pub const TABLE_NAMES: &'static str = "postgres_names";
     pub const TABLE_STATIONS: &'static str = "postgres_stations";
+    pub const TABLE_BLUEPRINTS: &'static str = "postgres_blueprints";
+    pub const TABLE_BLUEPRINT_RESOURCES: &'static str = "postgres_blueprint_resources";
+    pub const TABLE_SCHEMATICS: &'static str = "postgres_schematics";
+    pub const TABLE_SCHEMATIC_RESOURCES: &'static str = "postgres_schematic_resources";
     pub const TABLE_MARKET: &'static str = "postgres_market";
     pub const TABLE_MARKET_ORDER_INFO: &'static str = "postgres_market_order_info";
     pub const TABLE_MARKET_HISTORY: &'static str = "postgres_market_history";

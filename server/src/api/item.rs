@@ -61,6 +61,11 @@ pub async fn reprocessing(req: Request<State>) -> Result<Body> {
 
 pub async fn bulk_reprocessing(mut req: Request<State>) -> Result<Body> {
     let ids: Vec<u32> = req.body_json().await?;
-    let result = req.state().item_service.bulk_reprocessing(ids).await.unwrap();
+    let result = req
+        .state()
+        .item_service
+        .bulk_reprocessing(ids)
+        .await
+        .unwrap();
     Ok(Body::from_json(&result).unwrap())
 }

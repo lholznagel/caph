@@ -1,8 +1,8 @@
-use crate::cache::{BlueprintCacheEntry, SchematicCacheEntry};
-use crate::services::{CacheService, MarketService, MarketFilter};
+use crate::services::{MarketFilter, MarketService};
 
 use async_std::sync::Arc;
 use serde::Serialize;
+use sqlx::{Pool, Postgres};
 use std::collections::{HashMap, VecDeque};
 
 #[derive(Clone, Debug, Serialize)]
@@ -14,16 +14,16 @@ struct MaterialNeeded {
 
 #[derive(Clone)]
 pub struct BlueprintService {
-    cache: Arc<CacheService>,
+    db: Pool<Postgres>,
 }
 
 impl BlueprintService {
-    pub fn new(cache: Arc<CacheService>) -> Self {
-        Self { cache }
+    pub fn new(db: Pool<Postgres>) -> Self {
+        Self { db }
     }
 
     pub async fn calc_bp_cost(&self, id: u32) -> HashMap<u32, u64> {
-        let bps = self.cache.fetch_blueprints().await;
+        /*let bps = self.cache.fetch_blueprints().await;
         let schematics = self.cache.fetch_schematics().await;
 
         let mut all_materials = HashMap::new();
@@ -51,11 +51,12 @@ impl BlueprintService {
             }
         }
 
-        all_materials
+        all_materials*/
+        HashMap::new()
     }
 
-    /// If there is a blueprint or schematic that produces the given id, the materials needed are returned
-    fn production_materials(
+    // If there is a blueprint or schematic that produces the given id, the materials needed are returned
+    /*fn production_materials(
         &self,
         bps: &Vec<BlueprintCacheEntry>,
         schematics: &Vec<SchematicCacheEntry>,
@@ -97,7 +98,35 @@ impl BlueprintService {
         }
 
         None
-    }
+    }*/
+}
+
+#[derive(Clone, Debug, sqlx::FromRow)]
+pub struct Blueprint {
+    pub blueprint_id: i32,
+    pub time: i32,
+}
+
+#[derive(Clone, Debug, sqlx::FromRow)]
+pub struct BlueprintResource {
+    pub blueprint_id: i32,
+    pub material_id: i32,
+    pub quantity: i32,
+    pub is_product: bool,
+}
+
+#[derive(Clone, Debug, sqlx::FromRow)]
+pub struct Schematic {
+    pub schematic_id: i32,
+    pub time: i32,
+}
+
+#[derive(Clone, Debug, sqlx::FromRow)]
+pub struct SchematicResource {
+    pub blueprint_id: i32,
+    pub material_id: i32,
+    pub quantity: i32,
+    pub is_input: bool,
 }
 
 // FIXME:

@@ -36,24 +36,35 @@ CREATE INDEX IF NOT EXISTS stations_region ON stations(region_id);
 
 CREATE TABLE IF NOT EXISTS blueprints (
   blueprint_id        INTEGER   NOT NULL,
-  time                INTEGER   NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS blueprint_materials (
-  blueprint_id        INTEGER   NOT NULL,
-  material_id         INTEGER   NOT NULL,
-  quantity            INTEGER   NOT NULL,
+  time                INTEGER   NOT NULL,
 
   PRIMARY KEY(blueprint_id)
 );
 
-CREATE TABLE IF NOT EXISTS blueprint_products (
+CREATE TABLE IF NOT EXISTS blueprint_resources (
   blueprint_id        INTEGER   NOT NULL,
   material_id         INTEGER   NOT NULL,
   quantity            INTEGER   NOT NULL,
-
-  PRIMARY KEY(blueprint_id)
+  is_product          BOOL      NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS blueprint_resource_id ON blueprint_resources(blueprint_id);
+
+CREATE TABLE IF NOT EXISTS schematics (
+  schematic_id        INTEGER   NOT NULL,
+  time                INTEGER   NOT NULL,
+
+  PRIMARY KEY(schematic_id)
+);
+
+CREATE TABLE IF NOT EXISTS schematic_resources (
+  schematic_id        INTEGER   NOT NULL,
+  material_id         INTEGER   NOT NULL,
+  quantity            INTEGER   NOT NULL,
+  is_input            BOOL      NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS schematic_resources_id ON schematic_resources(schematic_id);
 
 CREATE TABLE IF NOT EXISTS market (
   volume_remain       INTEGER   NOT NULL,

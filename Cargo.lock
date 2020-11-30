@@ -507,8 +507,6 @@ name = "caph_server"
 version = "0.1.0"
 dependencies = [
  "async-std",
- "caph_eve_online_api",
- "caph_eve_sde_parser",
  "futures",
  "log",
  "morgan",

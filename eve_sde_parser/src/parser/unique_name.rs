@@ -7,5 +7,5 @@ pub struct UniqueName {
     #[serde(rename = "itemID")]
     pub item_id: u32,
     #[serde(rename = "itemName")]
-    pub item_name: String
+    pub item_name: String,
 }

@@ -26,7 +26,10 @@ impl ResolveService {
     }
 
     /// If a id does not exist, it will silently by ignored
-    pub async fn bulk_resolve(&self, ids: Vec<u32>) -> Result<Vec<Resolve>, Box<dyn std::error::Error>> {
+    pub async fn bulk_resolve(
+        &self,
+        ids: Vec<u32>,
+    ) -> Result<Vec<Resolve>, Box<dyn std::error::Error>> {
         let mut results = Vec::new();
         for id in ids {
             if let Some(x) = self.resolve(id).await? {

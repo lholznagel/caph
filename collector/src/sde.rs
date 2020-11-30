@@ -1,16 +1,15 @@
+use crate::error::CollectorError;
 use crate::metrics::SdeMetrics;
 
-use async_std::fs;
-use async_std::fs::File;
-use async_std::io::prelude::*;
-use caph_eve_sde_parser::{ParseRequest, ParseResult, Station, TypeIds, TypeMaterial, UniqueName};
+use caph_eve_sde_parser::{
+    Blueprint, ParseRequest, ParseResult, Schematic, Station, TypeIds, TypeMaterial, UniqueName,
+};
 use sqlx::{pool::PoolConnection, Executor, Pool, Postgres};
 use std::collections::HashMap;
 use std::io::Cursor;
-use std::path::Path;
 use std::time::Instant;
 
-const BATCH_SIZE: usize = 1000;
+const BATCH_SIZE: usize = 5000;
 
 pub struct Sde {
     db: Pool<Postgres>,
@@ -22,18 +21,10 @@ impl Sde {
         Self { db, metrics }
     }
 
-    pub async fn background(&mut self) -> Result<(), ()> {
-        // when ther is no new checksum return early
-        if !self.has_new_checksum().await.unwrap() {
-            self.metrics.current_time(SdeMetrics::LAST_CHECKSUM_CHECK);
-            log::debug!("No new sde.zip available.");
-            return Ok(());
-        }
-        self.metrics.current_time(SdeMetrics::LAST_CHECKSUM_CHECK);
-
+    pub async fn background(&mut self) -> Result<(), CollectorError> {
         log::debug!("Fetching sde zip");
         let start = Instant::now();
-        let zip = caph_eve_sde_parser::fetch_zip().await.unwrap();
+        let zip = caph_eve_sde_parser::fetch_zip().await.map_err(|_| CollectorError::DownloadSdeZip)?;
         self.metrics.set_timing(SdeMetrics::DOWNLOAD_TIME, start);
         log::debug!("Fetched sde zip");
 
@@ -46,37 +37,41 @@ impl Sde {
                 ParseRequest::TypeMaterials,
                 ParseRequest::UniqueNames,
                 ParseRequest::Stations,
+                ParseRequest::Blueprints,
+                ParseRequest::Schematics,
             ],
         )
-        .unwrap();
+        .map_err(CollectorError::SdeParserError)?;
         self.metrics.set_timing(SdeMetrics::PARSE_TIME, start);
         log::debug!("Parsed sde zip");
 
-        let mut conn = self.db.acquire().await.unwrap();
-        conn.execute("BEGIN").await.unwrap();
+        let mut conn = self.db.acquire().await?;
+        conn.execute("BEGIN").await?;
 
-        self.remove_old("items".into()).await.unwrap();
-        self.remove_old("item_materials".into()).await.unwrap();
-        self.remove_old("names".into()).await.unwrap();
-        self.remove_old("stations".into()).await.unwrap();
+        self.remove_old("items").await?;
+        self.remove_old("item_materials").await?;
+        self.remove_old("names").await?;
+        self.remove_old("stations").await?;
+        self.remove_old("blueprints").await?;
+        self.remove_old("blueprint_resources").await?;
+        self.remove_old("schematics").await?;
 
         let start = Instant::now();
         for parse_result in parse_results {
             match parse_result {
-                ParseResult::TypeIds(x) => self.items(&mut conn, x).await.unwrap(),
-                ParseResult::TypeMaterials(x) => self.item_materials(&mut conn, x).await.unwrap(),
-                ParseResult::UniqueNames(x) => self.names(&mut conn, x).await.unwrap(),
-                ParseResult::Stations(x) => self.stations(&mut conn, x).await.unwrap(),
-                _ => (),
+                ParseResult::TypeIds(x) => self.items(&mut conn, x).await?,
+                ParseResult::TypeMaterials(x) => self.item_materials(&mut conn, x).await?,
+                ParseResult::UniqueNames(x) => self.names(&mut conn, x).await?,
+                ParseResult::Stations(x) => self.stations(&mut conn, x).await?,
+                ParseResult::Blueprints(x) => self.blueprints(&mut conn, x).await?,
+                ParseResult::Schematic(x) => self.schematics(&mut conn, x).await?,
             }
         }
 
         self.metrics
             .set_timing(SdeMetrics::TOTAL_DB_INSERT_TIME, start);
-        conn.execute("COMMIT").await.unwrap();
-
-        self.write_checksum().await.unwrap();
-        self.metrics.current_time(SdeMetrics::LAST_COMPLETE_READOUT);
+        conn.execute("COMMIT").await?;
+        self.metrics.current_time(SdeMetrics::LAST_COMPLETE_READOUT)?;
         Ok(())
     }
 
@@ -84,7 +79,7 @@ impl Sde {
         &mut self,
         conn: &mut PoolConnection<Postgres>,
         items: HashMap<u32, TypeIds>,
-    ) -> Result<(), ()> {
+    ) -> Result<(), CollectorError> {
         log::info!("Starting item import");
         let start = Instant::now();
 
@@ -118,8 +113,7 @@ impl Sde {
             .bind(&names)
             .bind(&descriptions)
             .execute(&mut *conn)
-            .await
-            .unwrap();
+            .await?;
 
             ids.clear();
             names.clear();
@@ -136,7 +130,7 @@ impl Sde {
         &mut self,
         conn: &mut PoolConnection<Postgres>,
         materials: HashMap<u32, TypeMaterial>,
-    ) -> Result<(), ()> {
+    ) -> Result<(), CollectorError> {
         log::info!("Starting item material import");
         let start = Instant::now();
 
@@ -166,8 +160,7 @@ impl Sde {
             .bind(&material_ids)
             .bind(&quantities)
             .execute(&mut *conn)
-            .await
-            .unwrap();
+            .await?;
 
             ids.clear();
             material_ids.clear();
@@ -188,7 +181,7 @@ impl Sde {
         &mut self,
         conn: &mut PoolConnection<Postgres>,
         names: Vec<UniqueName>,
-    ) -> Result<(), ()> {
+    ) -> Result<(), CollectorError> {
         log::info!("Starting name import");
         let start = Instant::now();
 
@@ -212,8 +205,7 @@ impl Sde {
             .bind(&ids)
             .bind(&names_db)
             .execute(&mut *conn)
-            .await
-            .unwrap();
+            .await?;
 
             ids.clear();
             names_db.clear();
@@ -229,7 +221,7 @@ impl Sde {
         &mut self,
         conn: &mut PoolConnection<Postgres>,
         stations: Vec<Station>,
-    ) -> Result<(), ()> {
+    ) -> Result<(), CollectorError> {
         log::info!("Starting station import");
         let start = Instant::now();
 
@@ -262,8 +254,7 @@ impl Sde {
             .bind(&solar_system_ids)
             .bind(&security)
             .execute(&mut *conn)
-            .await
-            .unwrap();
+            .await?;
 
             station_ids.clear();
             constellation_ids.clear();
@@ -282,47 +273,106 @@ impl Sde {
         Ok(())
     }
 
-    async fn remove_old(&mut self, table: String) -> Result<(), ()> {
+    async fn blueprints(
+        &mut self,
+        conn: &mut PoolConnection<Postgres>,
+        blueprints: HashMap<u32, Blueprint>,
+    ) -> Result<(), CollectorError> {
         let start = Instant::now();
-        log::debug!("Removing all unlocked items in {}", table);
+        let blueprints = blueprints
+            .into_iter()
+            .map(|(_, b)| b)
+            .collect::<Vec<Blueprint>>();
 
-        let mut conn = self.db.acquire().await.unwrap();
-        sqlx::query(&format!("DELETE FROM {}", table))
-            .execute(&mut conn)
-            .await
-            .unwrap();
+        for blueprint in blueprints {
+            if let Some(x) = blueprint.activities.manufacturing {
+                sqlx::query("INSERT INTO blueprints (blueprint_id, time) VALUES ($1, $2)")
+                    .bind(blueprint.blueprint_type_id)
+                    .bind(x.time as i32)
+                    .execute(&mut *conn)
+                    .await?;
 
-        log::debug!("Removed all unlocked items");
-        self.metrics.set_timing(SdeMetrics::CLEANUP_TIME, start);
+                for material in x.materials.unwrap_or_default() {
+                    sqlx::query(r#"INSERT INTO blueprint_resources (blueprint_id, material_id, quantity, is_product) VALUES ($1, $2, $3, false)"#)
+                        .bind(blueprint.blueprint_type_id)
+                        .bind(material.type_id)
+                        .bind(material.quantity)
+                        .execute(&mut *conn)
+                        .await?;
+                }
+
+                for product in x.products.unwrap_or_default() {
+                    sqlx::query(r#"INSERT INTO blueprint_resources (blueprint_id, material_id, quantity, is_product) VALUES ($1, $2, $3, true)"#)
+                        .bind(blueprint.blueprint_type_id)
+                        .bind(product.type_id)
+                        .bind(product.quantity)
+                        .execute(&mut *conn)
+                        .await?;
+                }
+            }
+        }
+
+        self.metrics
+            .set_timing(SdeMetrics::BLUEPRINT_INSERT_TIME, start);
+        log::info!(
+            "Importing blueprints done. Took {}s",
+            start.elapsed().as_secs()
+        );
+
         Ok(())
     }
 
-    async fn has_new_checksum(&self) -> Result<bool, ()> {
-        let path = Path::new("sde.checksum");
+    async fn schematics(
+        &mut self,
+        conn: &mut PoolConnection<Postgres>,
+        schematics: HashMap<u32, Schematic>,
+    ) -> Result<(), CollectorError> {
+        let start = Instant::now();
 
-        let checksum = if path.exists() {
-            fs::read_to_string(path).await.unwrap()
-        } else {
-            String::new()
-        };
+        for (id, x) in schematics {
+            sqlx::query("INSERT INTO schematics (schematic_id, time) VALUES ($1, $2)")
+                .bind(id)
+                .bind(x.cycle_time)
+                .execute(&mut *conn)
+                .await?;
 
-        if checksum == caph_eve_sde_parser::fetch_checksum().await.unwrap() {
-            Ok(false)
-        } else {
-            Ok(true)
+            for (type_id, y) in x.types {
+                sqlx::query(
+                    r#"
+                INSERT INTO schematic_resources (schematic_id, material_id, quantity, is_input)
+                VALUES ($1, $2, $3, $4)
+                "#,
+                )
+                .bind(id)
+                .bind(type_id)
+                .bind(y.quantity)
+                .bind(y.is_input)
+                .execute(&mut *conn)
+                .await?;
+            }
         }
+
+        self.metrics
+            .set_timing(SdeMetrics::SCHEMATIC_INSERT_TIME, start);
+        log::info!(
+            "Importing schematics done. Took {}s",
+            start.elapsed().as_secs()
+        );
+
+        Ok(())
     }
 
-    async fn write_checksum(&self) -> Result<(), ()> {
-        let mut file = File::create("sde.checksum").await.unwrap();
-        file.write_all(
-            caph_eve_sde_parser::fetch_checksum()
-                .await
-                .unwrap()
-                .as_bytes(),
-        )
-        .await
-        .unwrap();
+    async fn remove_old(&mut self, table: &str) -> Result<(), CollectorError> {
+        let start = Instant::now();
+        log::debug!("Removing all unlocked items in {}", table);
+
+        let mut conn = self.db.acquire().await?;
+        sqlx::query(&format!("DELETE FROM {}", table))
+            .execute(&mut conn)
+            .await?;
+
+        log::debug!("Removed all unlocked items");
+        self.metrics.set_timing(SdeMetrics::CLEANUP_TIME, start);
         Ok(())
     }
 }

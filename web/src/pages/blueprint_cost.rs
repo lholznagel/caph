@@ -21,20 +21,20 @@ pub enum Msg {
     LoadBlueprintCost,
     LoadedBlueprintCost(HashMap<u32, u32>),
     LoadedItemNames(Vec<ItemInfo>),
-    UpdateSearch(String)
+    UpdateSearch(String),
 }
 
 #[derive(Debug, Default)]
 pub struct State {
     blueprint_id: u32,
     blueprint_cost: HashMap<u32, u32>,
-    item_infos: Vec<ItemInfo>
+    item_infos: Vec<ItemInfo>,
 }
 
 pub struct BlueprintCostComponent {
     link: ComponentLink<Self>,
     fetch_task: Option<FetchTask>,
-    state: State
+    state: State,
 }
 
 impl BlueprintCostComponent {
@@ -100,7 +100,7 @@ impl BlueprintCostComponent {
             .into_iter()
             .map(|(x, _)| x)
             .collect::<Vec<u32>>();
-            blueprints.sort_by(|a, b| a.cmp(b));
+        blueprints.sort_by(|a, b| a.cmp(b));
 
         html! {
             <table class="table">
@@ -132,7 +132,7 @@ impl Component for BlueprintCostComponent {
         Self {
             link,
             fetch_task: None,
-            state: State::default()
+            state: State::default(),
         }
     }
 
@@ -145,16 +145,16 @@ impl Component for BlueprintCostComponent {
             Msg::LoadBlueprintCost => {
                 self.fetch_blueprint_cost();
                 true
-            },
+            }
             Msg::LoadedBlueprintCost(x) => {
                 self.state.blueprint_cost = x;
                 self.fetch_item_names();
                 false
-            },
+            }
             Msg::LoadedItemNames(x) => {
                 self.state.item_infos = x;
                 true
-            },
+            }
             Msg::UpdateSearch(x) => {
                 self.state.blueprint_id = x.parse().unwrap_or_default();
                 false
@@ -166,7 +166,7 @@ impl Component for BlueprintCostComponent {
         html! {
             <div class="card">
                 <div class="input-group">
-                    <input 
+                    <input
                         class="form-control"
                         placeholder="Blueprint ID"
                         value=&self.state.blueprint_id
