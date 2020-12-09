@@ -89,6 +89,8 @@ impl Sde {
         let mut ids = Vec::with_capacity(BATCH_SIZE);
         let mut names = Vec::with_capacity(BATCH_SIZE);
         let mut descriptions = Vec::with_capacity(BATCH_SIZE);
+        let mut icon_ids = Vec::with_capacity(BATCH_SIZE);
+        let mut volumes = Vec::with_capacity(BATCH_SIZE);
 
         while skip <= items_len {
             for (id, item) in items.iter().skip(skip).take(BATCH_SIZE) {
@@ -102,22 +104,28 @@ impl Sde {
                 ids.push(*id as i32);
                 names.push(name);
                 descriptions.push(description);
+                icon_ids.push(item.icon_id);
+                volumes.push(item.volume.unwrap_or(0f32));
             }
 
             sqlx::query(
-                r#"INSERT INTO items (id, name, description)
-                SELECT * FROM UNNEST($1, $2, $3)
+                r#"INSERT INTO items (id, name, description, icon_id, volume)
+                SELECT * FROM UNNEST($1, $2, $3, $4, $5)
                 RETURNING id, name, description"#,
             )
             .bind(&ids)
             .bind(&names)
             .bind(&descriptions)
+            .bind(&icon_ids)
+            .bind(&volumes)
             .execute(&mut *conn)
             .await?;
 
             ids.clear();
             names.clear();
             descriptions.clear();
+            icon_ids.clear();
+            volumes.clear();
             skip += BATCH_SIZE;
         }
 

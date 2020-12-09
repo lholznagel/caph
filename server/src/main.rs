@@ -13,7 +13,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     morgan::Morgan::init().unwrap();
 
     let pool = PgPoolOptions::new()
-        .max_connections(5)
+        .max_connections(25)
         .connect("postgres://caph:caph@cygnus.local:5432/caph_eve")
         .await?;
 
@@ -49,7 +49,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 server
                     .at("/my")
                     .get(api::item::fetch_my_items)
-                    .post(api::item::push_my_items);
+                    .post(api::item::push_my_items)
+                    .at("/:id")
+                    .get(api::item::fetch_my_item);
                 server
                     .at("/reprocessing")
                     .post(api::item::bulk_reprocessing);

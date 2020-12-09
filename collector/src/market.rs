@@ -1,7 +1,7 @@
 use crate::error::CollectorError;
 use crate::metrics::MarketMetrics;
 
-use caph_eve_online_api::{EveClient, MarketOrder, RegionId};
+use caph_eve_online_api::{EveClient, MarketOrder};
 use futures::stream::{FuturesUnordered, StreamExt};
 use sqlx::{pool::PoolConnection, Executor, Pool, Postgres};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -37,7 +37,7 @@ impl Market {
             })?;
 
         for region in regions {
-            requests.push(client.fetch_market_orders(RegionId(region)));
+            requests.push(client.fetch_market_orders(region));
         }
 
         let mut results = Vec::new();
@@ -88,8 +88,8 @@ impl Market {
                 self.values_order.push(format!(
                     "({}, {}, {}, {}, {}, {}, {}, '{}')",
                     x.volume_total,
-                    x.system_id.0,
-                    x.type_id.0,
+                    x.system_id,
+                    x.type_id,
                     x.order_id,
                     x.location_id,
                     x.price,

@@ -1,4 +1,4 @@
-use caph_eve_online_api::{EveClient, RouteFlag, SystemId};
+use caph_eve_online_api::{EveClient, RouteFlag};
 use serde::Serialize;
 use sqlx::{Pool, Postgres};
 
@@ -56,14 +56,14 @@ impl RegionService {
         let client = EveClient::default();
         let route = client
             .fetch_route(
-                SystemId(origin),
-                SystemId(destination),
+                origin,
+                destination,
                 Some(flag.clone()),
             )
             .await
             .unwrap()
             .into_iter()
-            .map(|x| x.0 as i32)
+            .map(|x| x as i32)
             .collect::<Vec<i32>>();
 
         let mut conn = self.0.acquire().await?;

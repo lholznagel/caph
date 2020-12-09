@@ -6,6 +6,6 @@ edition = "2018"
 
 [dependencies]
 miniz_oxide = "0.4.3"
-serde = { version = "1.0.117", features = ["derive"] }
+reqwest = { version = "0.10.9", default-features = false, features = ["rustls-tls"] }
+serde = { version = "1.0.118", features = ["derive"] }
 serde_yaml = "0.8.14"
-surf = "2.1.0"

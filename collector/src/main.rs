@@ -16,9 +16,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     morgan::Morgan::init()?;
 
     let metrics = Metrics::default();
+
+    let db_uri = std::env::var("DB").unwrap_or("postgres://caph:caph@cygnus.local:5432/caph_test".into());
     let pool = PgPoolOptions::new()
         .max_connections(5)
-        .connect("postgres://caph:caph@cygnus.local:5432/caph_eve")
+        .connect(&db_uri)
         .await?;
 
     // Make sure the database has the newest scripts applied

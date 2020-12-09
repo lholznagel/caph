@@ -1,6 +1,8 @@
 CREATE TABLE IF NOT EXISTS items (
   id                  INTEGER   NOT NULL,
+  volume              REAL      NOT NULL,
   name                TEXT      NOT NULL,
+  icon_id             INTEGER,
   description         TEXT
 );
 
@@ -68,13 +70,13 @@ CREATE INDEX IF NOT EXISTS schematic_resources_id ON schematic_resources(schemat
 
 CREATE TABLE IF NOT EXISTS market_current (
   volume_remain       INTEGER   NOT NULL,
-  timestamp           INTEGER   NOT NULL,
+  timestamp           BIGINT    NOT NULL,
   order_id            BIGINT    NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS market_history (
   volume_remain       INTEGER   NOT NULL,
-  timestamp           INTEGER   NOT NULL,
+  timestamp           BIGINT    NOT NULL,
   order_id            BIGINT    NOT NULL
 );
 

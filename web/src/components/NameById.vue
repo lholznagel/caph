@@ -1,5 +1,5 @@
 <template>
-  <div v-if="name !== ''">{{ name }}</div>
+  <div>{{ name || '' }}</div>
 </template>
 
 <script lang="ts">

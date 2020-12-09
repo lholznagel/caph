@@ -6,6 +6,7 @@
 import axios from 'axios';
 
 import { Component, Prop, Vue } from 'vue-property-decorator';
+import { HOME_SYSTEM } from '../main';
 
 @Component
 export default class Route extends Vue {
@@ -15,7 +16,7 @@ export default class Route extends Vue {
   public routes: IRoute[] = [];
 
   public async created() {
-    this.routes = (await axios.get(`/api/v1/regions/route?origin=30002755&destination=${this.destination}`))
+    this.routes = (await axios.get(`/api/v1/regions/route?origin=${HOME_SYSTEM}&destination=${this.destination}`))
       .data
       .filter(x => x.flag === 'shortest');
   }

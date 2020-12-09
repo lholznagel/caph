@@ -81,6 +81,17 @@ pub async fn fetch_my_items(req: Request<State>) -> Result<Body> {
     Ok(Body::from_json(&items).unwrap())
 }
 
+pub async fn fetch_my_item(req: Request<State>) -> Result<Body> {
+    let id = req.param("id").map(|x| x.parse::<u32>().unwrap())?;
+    let items = req
+        .state()
+        .item_service
+        .fetch_my_item(id)
+        .await
+        .unwrap();
+    Ok(Body::from_json(&items).unwrap())
+}
+
 pub async fn push_my_items(mut req: Request<State>) -> Result<Body> {
     let items: HashMap<u32, u64> = req.body_json().await?;
     req

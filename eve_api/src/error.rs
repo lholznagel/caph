@@ -5,7 +5,7 @@ pub(crate) type Result<T> = std::result::Result<T, EveApiError>;
 
 #[derive(Debug)]
 pub enum EveApiError {
-    ReqwestError(surf::Error),
+    ReqwestError(reqwest::Error),
     TooManyRetries(String),
 }
 
@@ -17,8 +17,8 @@ impl fmt::Display for EveApiError {
     }
 }
 
-impl From<surf::Error> for EveApiError {
-    fn from(x: surf::Error) -> Self {
+impl From<reqwest::Error> for EveApiError {
+    fn from(x: reqwest::Error) -> Self {
         EveApiError::ReqwestError(x)
     }
 }

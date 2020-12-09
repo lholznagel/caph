@@ -2,6 +2,8 @@ use serde::Serialize;
 use sqlx::{Pool, Postgres};
 use std::collections::HashMap;
 
+use crate::reprocessing::calc_reprocessing;
+
 #[derive(Clone)]
 pub struct ItemService(Pool<Postgres>);
 
@@ -81,22 +83,34 @@ impl ItemService {
     pub async fn reprocessing(
         &self,
         id: u32,
-    ) -> Result<Vec<ItemReprocessing>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<ItemReprocessingResult>, Box<dyn std::error::Error>> {
         let mut conn = self.0.acquire().await?;
 
-        sqlx::query_as::<_, ItemReprocessing>(
+        let result = sqlx::query_as::<_, ItemReprocessing>(
             "SELECT id, material_id, quantity FROM item_materials WHERE id = $1",
         )
         .bind(id)
         .fetch_all(&mut conn)
         .await
-        .map_err(|x| x.into())
+        .unwrap()
+        .iter()
+        .map(|x| {
+            let modifier = calc_reprocessing(50, 0, 0, 0);
+            ItemReprocessingResult {
+                id: x.id,
+                material_id: x.material_id,
+                quantity: x.quantity,
+                reprocessed: x.quantity as f32 * (modifier / 100f32)
+            }
+        })
+        .collect::<Vec<ItemReprocessingResult>>();
+        Ok(result)
     }
 
     pub async fn bulk_reprocessing(
         &self,
         ids: Vec<u32>,
-    ) -> Result<HashMap<u32, Vec<ItemReprocessing>>, Box<dyn std::error::Error>> {
+    ) -> Result<HashMap<u32, Vec<ItemReprocessingResult>>, Box<dyn std::error::Error>> {
         let mut results = HashMap::new();
         for id in ids {
             results.insert(id, self.reprocessing(id).await?);
@@ -104,12 +118,23 @@ impl ItemService {
         Ok(results)
     }
 
-    pub async fn fetch_my_items(&self) -> Result<Vec<MyItems>, Box<dyn std::error::Error>> {
+    pub async fn fetch_my_items(&self) -> Result<Vec<MyItem>, Box<dyn std::error::Error>> {
         let mut conn = self.0.acquire().await?;
-        sqlx::query_as::<_, MyItems>(
+        sqlx::query_as::<_, MyItem>(
             "SELECT id, quantity FROM user_items",
         )
         .fetch_all(&mut conn)
+        .await
+        .map_err(|x| x.into())
+    }
+
+    pub async fn fetch_my_item(&self, id: u32) -> Result<MyItem, Box<dyn std::error::Error>> {
+        let mut conn = self.0.acquire().await?;
+        sqlx::query_as::<_, MyItem>(
+            "SELECT id, quantity FROM user_items WHERE id = $1",
+        )
+        .bind(id as i32)
+        .fetch_one(&mut conn)
         .await
         .map_err(|x| x.into())
     }
@@ -159,7 +184,15 @@ pub struct ItemReprocessing {
 }
 
 #[derive(Clone, Debug, Serialize, sqlx::FromRow)]
-pub struct MyItems {
+pub struct ItemReprocessingResult {
+    pub id: i32,
+    pub material_id: i32,
+    pub quantity: i32,
+    pub reprocessed: f32,
+}
+
+#[derive(Clone, Debug, Serialize, sqlx::FromRow)]
+pub struct MyItem {
     pub id: i32,
     pub quantity: i64,
 }
