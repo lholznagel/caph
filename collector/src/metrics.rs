@@ -1,4 +1,4 @@
-use metrics_exporter_http_async_std::HttpExporter;
+use metrics_exporter_http::HttpExporter;
 use metrics_runtime::{observers::PrometheusBuilder, Controller, Receiver, Sink};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
@@ -20,7 +20,7 @@ impl Metrics {
             "0.0.0.0:9000".parse().map_err(CollectorError::ParseError)?,
         );
 
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             if let Err(e) = exporter.async_run().await {
                 log::error!("Error starting metric http exporter {:?}", e);
             }

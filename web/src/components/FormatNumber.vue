@@ -1,5 +1,5 @@
 <template>
-  <div>{{ format() }}</div>
+  <label>{{ format() }}</label>
 </template>
 
 <script lang="ts">

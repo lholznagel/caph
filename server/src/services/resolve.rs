@@ -25,20 +25,6 @@ impl ResolveService {
         }
     }
 
-    /// If a id does not exist, it will silently by ignored
-    pub async fn bulk_resolve(
-        &self,
-        ids: Vec<u32>,
-    ) -> Result<Vec<Resolve>, Box<dyn std::error::Error>> {
-        let mut results = Vec::new();
-        for id in ids {
-            if let Some(x) = self.resolve(id).await? {
-                results.push(x);
-            }
-        }
-        Ok(results)
-    }
-
     async fn find_in_items(&self, id: u32) -> Option<Resolve> {
         let mut conn = self.0.acquire().await.unwrap();
         let query = sqlx::query_as::<_, Resolve>("SELECT id, name FROM items WHERE id = $1")

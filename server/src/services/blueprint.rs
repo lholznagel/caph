@@ -1,6 +1,3 @@
-use crate::services::{MarketFilter, MarketService};
-
-use async_std::sync::Arc;
 use serde::Serialize;
 use sqlx::{Pool, Postgres};
 use std::collections::{HashMap, VecDeque};
@@ -22,9 +19,59 @@ impl BlueprintService {
         Self { db }
     }
 
+    pub async fn fetch_blueprints(&self) -> HashMap<u32, Vec<BlueprintResource>> {
+        let mut conn = self.db.acquire().await.unwrap();
+
+        let mut blueprints = HashMap::new();
+        sqlx::query_as::<_, Blueprint>("SELECT blueprint_id FROM blueprints")
+            .fetch_all(&mut conn)
+            .await
+            .unwrap()
+            .into_iter()
+            .for_each(|x| { blueprints.insert(x.blueprint_id as u32, Vec::new()); });
+
+        sqlx::query_as::<_, BlueprintResource>("SELECT blueprint_id, material_id, quantity, is_product FROM blueprint_resources")
+            .fetch_all(&mut conn)
+            .await
+            .unwrap()
+            .into_iter()
+            .for_each(|x| {
+                blueprints
+                    .entry(x.blueprint_id as u32)
+                    .and_modify(|y| y.push(x));
+            });
+
+        blueprints
+    }
+
+    pub async fn fetch_schematics(&self) -> HashMap<u32, Vec<SchematicResource>> {
+        let mut conn = self.db.acquire().await.unwrap();
+
+        let mut schematics = HashMap::new();
+        sqlx::query_as::<_, Schematic>("SELECT schematic_id FROM schematics")
+            .fetch_all(&mut conn)
+            .await
+            .unwrap()
+            .into_iter()
+            .for_each(|x| { schematics.insert(x.schematic_id as u32, Vec::new()); });
+
+        sqlx::query_as::<_, SchematicResource>("SELECT schematic_id, material_id, quantity, is_input FROM schematic_resources")
+            .fetch_all(&mut conn)
+            .await
+            .unwrap()
+            .into_iter()
+            .for_each(|x| {
+                schematics
+                    .entry(x.schematic_id as u32)
+                    .and_modify(|y| y.push(x));
+            });
+
+        schematics
+    }
+
     pub async fn calc_bp_cost(&self, id: u32) -> HashMap<u32, u64> {
-        /*let bps = self.cache.fetch_blueprints().await;
-        let schematics = self.cache.fetch_schematics().await;
+        let bps = self.fetch_blueprints().await;
+        let schematics = self.fetch_schematics().await;
 
         let mut all_materials = HashMap::new();
         let mut materials = VecDeque::new();
@@ -51,24 +98,24 @@ impl BlueprintService {
             }
         }
 
-        all_materials*/
+        //all_materials
         HashMap::new()
     }
 
     // If there is a blueprint or schematic that produces the given id, the materials needed are returned
-    /*fn production_materials(
+    fn production_materials(
         &self,
-        bps: &Vec<BlueprintCacheEntry>,
-        schematics: &Vec<SchematicCacheEntry>,
+        bps: &HashMap<u32, Vec<BlueprintResource>>,
+        schematics: &HashMap<u32, Vec<SchematicResource>>,
         requested_material: MaterialNeeded,
     ) -> Option<Vec<MaterialNeeded>> {
-        for schematic in schematics {
-            if schematic.outputs.get(&requested_material.id).is_some() {
+        for (id, resources) in schematics {
+            if resources.iter().find(|x| !x.is_input && x.material_id as u32 == requested_material.id).is_some() {
                 let mut needed_materials = Vec::new();
-                for (id, quantity) in schematic.inputs.clone() {
+                for r in resources.iter().filter(|x| x.is_input) {
                     needed_materials.push(MaterialNeeded {
-                        id,
-                        quantity: quantity as u64,
+                        id: *id,
+                        quantity: r.quantity as u64,
                         needed: requested_material.quantity,
                     });
                 }
@@ -77,18 +124,13 @@ impl BlueprintService {
             }
         }
 
-        for bp in bps {
-            if bp.manufacturing.is_none() || bp.manufacturing.clone().unwrap().products.is_none() {
-                continue;
-            }
-
-            let item = bp.clone().manufacturing.unwrap().products.unwrap()[0].clone();
-            if item.type_id == requested_material.id {
+        for (id, resources) in bps {
+            if resources.iter().find(|x| x.is_product && x.material_id as u32 == requested_material.id).is_some() {
                 let mut needed_materials = Vec::new();
-                for material in bp.manufacturing.clone().unwrap().materials.unwrap() {
+                for r in resources.iter().filter(|x| !x.is_product) {
                     needed_materials.push(MaterialNeeded {
-                        id: material.type_id,
-                        quantity: material.quantity as u64,
+                        id: *id,
+                        quantity: r.quantity as u64,
                         needed: requested_material.quantity,
                     });
                 }
@@ -98,13 +140,12 @@ impl BlueprintService {
         }
 
         None
-    }*/
+    }
 }
 
 #[derive(Clone, Debug, sqlx::FromRow)]
 pub struct Blueprint {
     pub blueprint_id: i32,
-    pub time: i32,
 }
 
 #[derive(Clone, Debug, sqlx::FromRow)]
@@ -112,18 +153,17 @@ pub struct BlueprintResource {
     pub blueprint_id: i32,
     pub material_id: i32,
     pub quantity: i32,
-    pub is_product: bool,
+    pub is_product: bool
 }
 
 #[derive(Clone, Debug, sqlx::FromRow)]
 pub struct Schematic {
     pub schematic_id: i32,
-    pub time: i32,
 }
 
 #[derive(Clone, Debug, sqlx::FromRow)]
 pub struct SchematicResource {
-    pub blueprint_id: i32,
+    pub schematic_id: i32,
     pub material_id: i32,
     pub quantity: i32,
     pub is_input: bool,

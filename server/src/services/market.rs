@@ -19,8 +19,6 @@ pub struct MarketFilter {
     pub system_ids: Option<Vec<u32>>,
     /// Filters by type ids
     pub ids: Option<Vec<u32>>,
-    /// Resoves the item names to id
-    pub names: Option<Vec<String>>,
     /// Filters by security group. If Max = 0.5 then all market orders above 0.5 will be returned
     #[serde(rename = "maxSecurity")]
     pub max_security: Option<f32>,
@@ -63,18 +61,6 @@ impl MarketService {
         "#);
 
         let mut filters = Vec::new();
-        if let Some(x) = filter.names.clone() {
-            let ids = self
-                .item_service
-                .bulk_search(true, x)
-                .await
-                .unwrap_or_default()
-                .into_iter()
-                .map(|x| x.id as u32)
-                .collect::<Vec<u32>>();
-            filters.push(format!("type_id = ANY(ARRAY{:?})", ids));
-        }
-
         if let Some(x) = filter.max_security {
             filters.push(format!("security >= {}", x));
         }

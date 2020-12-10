@@ -64,9 +64,9 @@ export default class ItemInfo extends Vue {
     this.busy = true;
 
     if (this.isBuyOrder) {
-      this.stats = (await axios.get(`/api/v1/market/${this.id}/buy/stats`)).data;
+      this.stats = (await axios.get(`/api/v1/market/${this.id}/stats/buy`)).data;
     } else {
-      this.stats = (await axios.get(`/api/v1/market/${this.id}/sell/stats`)).data;
+      this.stats = (await axios.get(`/api/v1/market/${this.id}/stats/sell`)).data;
     }
 
     this.busy = false;

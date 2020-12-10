@@ -14,7 +14,7 @@ impl ItemService {
 
     pub async fn all(&self) -> Result<Vec<Item>, Box<dyn std::error::Error>> {
         let mut conn = self.0.acquire().await?;
-        sqlx::query_as::<_, Item>("SELECT id, name FROM items")
+        sqlx::query_as::<_, Item>("SELECT id, name, volume FROM items")
             .fetch_all(&mut conn)
             .await
             .map_err(|x| x.into())
@@ -22,26 +22,11 @@ impl ItemService {
 
     pub async fn by_id(&self, id: u32) -> Result<Item, Box<dyn std::error::Error>> {
         let mut conn = self.0.acquire().await?;
-        sqlx::query_as::<_, Item>("SELECT id, name FROM items WHERE id = $1")
+        sqlx::query_as::<_, Item>("SELECT id, name, volume FROM items WHERE id = $1")
             .bind(id)
             .fetch_one(&mut conn)
             .await
             .map_err(|x| x.into())
-    }
-
-    /// If a id does not exist, it will silently by ignored
-    pub async fn bulk_item_by_id(
-        &self,
-        ids: Vec<u32>,
-    ) -> Result<Vec<Item>, Box<dyn std::error::Error>> {
-        let mut conn = self.0.acquire().await?;
-        sqlx::query_as::<_, Item>(&format!(
-            "SELECT id, name FROM items WHERE id = ANY(ARRAY {:?})",
-            ids
-        ))
-        .fetch_all(&mut conn)
-        .await
-        .map_err(|x| x.into())
     }
 
     pub async fn search(
@@ -52,7 +37,7 @@ impl ItemService {
         let mut conn = self.0.acquire().await?;
 
         if exact {
-            sqlx::query_as::<_, Item>("SELECT id, name FROM items WHERE name = $1")
+            sqlx::query_as::<_, Item>("SELECT id, name, volume FROM items WHERE name = $1")
                 .bind(name)
                 .fetch_all(&mut conn)
                 .await
@@ -66,18 +51,6 @@ impl ItemService {
             .await
             .map_err(|x| x.into())
         }
-    }
-
-    pub async fn bulk_search(
-        &self,
-        exact: bool,
-        names: Vec<String>,
-    ) -> Result<Vec<Item>, Box<dyn std::error::Error>> {
-        let mut results = Vec::new();
-        for name in names {
-            results.extend(self.search(exact, &name).await?);
-        }
-        Ok(results)
     }
 
     pub async fn reprocessing(
@@ -105,17 +78,6 @@ impl ItemService {
         })
         .collect::<Vec<ItemReprocessingResult>>();
         Ok(result)
-    }
-
-    pub async fn bulk_reprocessing(
-        &self,
-        ids: Vec<u32>,
-    ) -> Result<HashMap<u32, Vec<ItemReprocessingResult>>, Box<dyn std::error::Error>> {
-        let mut results = HashMap::new();
-        for id in ids {
-            results.insert(id, self.reprocessing(id).await?);
-        }
-        Ok(results)
     }
 
     pub async fn fetch_my_items(&self) -> Result<Vec<MyItem>, Box<dyn std::error::Error>> {
@@ -174,6 +136,7 @@ impl ItemService {
 pub struct Item {
     pub id: i32,
     pub name: String,
+    pub volume: f32,
 }
 
 #[derive(Clone, Debug, Serialize, sqlx::FromRow)]

@@ -43,7 +43,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         market
             .at("/items")
             .get(api::item::fetch_items)
-            .post(api::item::bulk_ids)
             .nest({
                 let mut server = tide::with_state(state.clone());
                 server
@@ -53,12 +52,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .at("/:id")
                     .get(api::item::fetch_my_item);
                 server
-                    .at("/reprocessing")
-                    .post(api::item::bulk_reprocessing);
-                server
                     .at("/search")
-                    .get(api::item::search)
-                    .post(api::item::bulk_search);
+                    .get(api::item::search);
                 server
                     .at("/:id")
                     .get(api::item::fetch_item)
@@ -67,13 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 server
             });
         market
-            .at("/resolve")
-            .post(api::resolve::bulk_resolve)
-            .nest({
-                let mut server = tide::with_state(state.clone());
-                server.at("/:id").get(api::resolve::resolve);
-                server
-            });
+            .at("/resolve/:id").get(api::resolve::resolve);
         market
             .at("/market")
             .post(api::market::fetch)
@@ -81,8 +70,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .get(api::market::fetch_by_item_id)
             .nest({
                 let mut server = tide::with_state(state.clone());
-                server.at("buy/stats").get(api::market::buy_stats);
-                server.at("sell/stats").get(api::market::sell_stats);
+                server.at("stats/buy").get(api::market::buy_stats);
+                server.at("stats/sell").get(api::market::sell_stats);
                 server
             });
         market

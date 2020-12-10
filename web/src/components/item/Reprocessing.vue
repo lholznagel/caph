@@ -6,14 +6,9 @@
       v-if="busy"
     ></v-skeleton-loader>
 
-    <v-simple-table v-if="!busy">
+    <v-simple-table v-if="!busy && reprocessed.length > 0">
       <template v-slot:default>
         <tbody>
-          <tr>
-            <th>Quantity</th>
-            <td><c-format-number :value="quantity" /></td>
-            <td></td>
-          </tr>
           <tr v-for="item in reprocessed" :key="item.material_id">
             <th><c-name-by-id :id="item.material_id" /></th>
             <td>
@@ -26,6 +21,10 @@
         </tbody>
       </template>
     </v-simple-table>
+
+    <v-alert color="blue-grey" type="info" v-if="!busy && reprocessed.length === 0">
+      Reprocessing not available
+    </v-alert>
   </div>
 </template>
 

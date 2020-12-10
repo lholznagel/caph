@@ -6,26 +6,26 @@
       />"</v-card-title>
 
       <v-row dense>
-        <v-col cols="3">
-          <v-card>
+        <v-col cols="3" style="flex-direction:column">
+          <v-card elevation="5" style="height: 100%">
             <v-card-title>Item info</v-card-title>
-            <c-item-info :id="Number($route.params.id)" />
+            <c-item-info :id="Number($route.params.id)" :quantity="quantity" />
           </v-card>
         </v-col>
         <v-col cols="3">
-          <v-card elevation="5">
+          <v-card elevation="5" style="height: 100%">
             <v-card-title>Reprocessed</v-card-title>
             <c-item-reprocessing :id="Number($route.params.id)" :quantity="quantity" />
           </v-card>
         </v-col>
         <v-col cols="3">
-          <v-card elevation="5">
+          <v-card elevation="5" style="height: 100%">
             <v-card-title>Buy stats</v-card-title>
             <c-market-stats :id="Number($route.params.id)" :is-buy-order="true" />
           </v-card>
         </v-col>
         <v-col cols="3">
-          <v-card elevation="5">
+          <v-card elevation="5" style="height: 100%">
             <v-card-title>Sell stats</v-card-title>
             <c-market-stats :id="Number($route.params.id)" :is-buy-order="false" />
           </v-card>

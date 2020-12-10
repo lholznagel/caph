@@ -2,7 +2,6 @@ CREATE TABLE IF NOT EXISTS items (
   id                  INTEGER   NOT NULL,
   volume              REAL      NOT NULL,
   name                TEXT      NOT NULL,
-  icon_id             INTEGER,
   description         TEXT
 );
 

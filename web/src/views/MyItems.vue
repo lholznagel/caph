@@ -48,9 +48,13 @@
             <tbody>
               <tr v-for="item in myItems" :key="item.id">
                 <td>{{ names.find((x) => x.id === item.id).name }}</td>
-                <td>{{ item.quantity }}</td>
+                <td><c-format-number :value="item.quantity" /></td>
                 <td>
-                  <v-btn icon color="blue" :to="{ name: 'ItemInfo', params: { id: item.id } }">
+                  <v-btn
+                    icon
+                    color="blue"
+                    :to="{ name: 'MarketInfo', params: { id: item.id } }"
+                  >
                     <v-icon>mdi-open-in-new</v-icon>
                   </v-btn>
                 </td>

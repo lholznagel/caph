@@ -5,12 +5,12 @@ authors = ["lholznagel <contact@lholznagel.info>"]
 edition = "2018"
 
 [dependencies]
-async-std = { version = "1.8.0", features = ["attributes", "tokio02"] }
 caph_eve_online_api = { path = "../eve_api" }
 caph_eve_sde_parser = { path = "../eve_sde_parser" }
 futures = "0.3.8"
 log = "0.4.11"
-metrics-exporter-http-async_std = "0.1.0"
+metrics-exporter-http = "0.3.0"
 metrics-runtime = "0.13.1"
 morgan = { path = "../morgan" }
-sqlx = { version = "0.4.1", default-features = false, features = ["macros", "runtime-async-std-rustls", "postgres"] }
+sqlx = { version = "0.4.1", default-features = false, features = ["macros", "runtime-tokio-rustls", "postgres"] }
+tokio = { version = "0.2.24", features = ["macros", "rt-threaded", "time", "stream"] }
