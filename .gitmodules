@@ -1,0 +1,6 @@
+[submodule "morgan"]
+	path = morgan
+	url = git@github.com:lholznagel/morgan.git
+[submodule "metrix"]
+	path = metrix
+	url = git@github.com:lholznagel/metrix.git

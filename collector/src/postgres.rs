@@ -1,72 +1,102 @@
-use crate::error::CollectorError;
 use crate::metrics::PostgresMetrics;
+use crate::error::CollectorError;
 
+use metrix::Metrics;
 use sqlx::{Pool, Postgres};
+
+macro_rules! table_stats {
+    ($self:ident, $table:expr, $name_count:ident, $name_size:ident) => {
+        if let Ok(count) = $self.count($table).await {
+            $self
+                .metrics
+                .set(PostgresMetrics::$name_count, count as u64)
+                .await;
+        } else {
+            log::error!("Error getting count of table {}", $table);
+        }
+        if let Ok(size) = $self.size($table).await {
+            $self
+                .metrics
+                .set(PostgresMetrics::$name_size, size as u64)
+                .await;
+        } else {
+            log::error!("Error getting size of table {}", $table);
+        }
+    };
+}
 
 pub struct PostgresService {
     db: Pool<Postgres>,
-    metrics: PostgresMetrics,
+    metrics: Metrics,
 }
 
 impl PostgresService {
-    pub fn new(db: Pool<Postgres>, metrics: PostgresMetrics) -> Self {
+    pub fn new(db: Pool<Postgres>, metrics: Metrics) -> Self {
         Self { db, metrics }
     }
 
-    pub async fn background(&mut self) -> Result<(), CollectorError> {
-        let count = self.count("items").await?;
-        let size = self.size("items").await?;
-        self.metrics.set(PostgresMetrics::TABLE_ITEMS, count, size);
+    pub async fn background(&mut self) {
+        table_stats!(self, "items", TABLE_ITEMS_COUNT, TABLE_ITEMS_SIZE);
 
-        let count = self.count("item_materials").await?;
-        let size = self.size("item_materials").await?;
-        self.metrics
-            .set(PostgresMetrics::TABLE_ITEM_MATERIALS, count, size);
+        table_stats!(self, "names", TABLE_NAMES_COUNT, TABLE_NAMES_SIZE);
 
-        let count = self.count("names").await?;
-        let size = self.size("names").await?;
-        self.metrics.set(PostgresMetrics::TABLE_NAMES, count, size);
+        table_stats!(self, "stations", TABLE_STATIONS_COUNT, TABLE_STATIONS_SIZE);
 
-        let count = self.count("stations").await?;
-        let size = self.size("stations").await?;
-        self.metrics
-            .set(PostgresMetrics::TABLE_STATIONS, count, size);
+        table_stats!(
+            self,
+            "item_materials",
+            TABLE_ITEM_MATERIALS_COUNT,
+            TABLE_ITEM_MATERIALS_SIZE
+        );
 
-        let count = self.count("blueprints").await?;
-        let size = self.size("blueprints").await?;
-        self.metrics
-            .set(PostgresMetrics::TABLE_BLUEPRINTS, count, size);
+        table_stats!(
+            self,
+            "blueprints",
+            TABLE_BLUEPRINTS_COUNT,
+            TABLE_BLUEPRINTS_SIZE
+        );
 
-        let count = self.count("blueprint_resources").await?;
-        let size = self.size("blueprint_resources").await?;
-        self.metrics
-            .set(PostgresMetrics::TABLE_BLUEPRINT_RESOURCES, count, size);
+        table_stats!(
+            self,
+            "blueprint_resources",
+            TABLE_BLUEPRINT_RESOURCES_COUNT,
+            TABLE_BLUEPRINT_RESOURCES_SIZE
+        );
 
-        let count = self.count("schematics").await?;
-        let size = self.size("schematics").await?;
-        self.metrics
-            .set(PostgresMetrics::TABLE_SCHEMATICS, count, size);
+        table_stats!(
+            self,
+            "schematics",
+            TABLE_SCHEMATICS_COUNT,
+            TABLE_SCHEMATICS_SIZE
+        );
 
-        let count = self.count("schematic_resources").await?;
-        let size = self.size("schematic_resources").await?;
-        self.metrics
-            .set(PostgresMetrics::TABLE_SCHEMATIC_RESOURCES, count, size);
+        table_stats!(
+            self,
+            "schematic_resources",
+            TABLE_SCHEMATIC_RESOURCES_COUNT,
+            TABLE_SCHEMATIC_RESOURCES_SIZE
+        );
 
-        let count = self.count("market_current").await?;
-        let size = self.size("market_current").await?;
-        self.metrics.set(PostgresMetrics::TABLE_MARKET, count, size);
+        table_stats!(
+            self,
+            "market_current",
+            TABLE_MARKET_CURRENT_COUNT,
+            TABLE_MARKET_CURRENT_SIZE
+        );
 
-        let count = self.count("market_orders").await?;
-        let size = self.size("market_orders").await?;
-        self.metrics
-            .set(PostgresMetrics::TABLE_MARKET_ORDER_INFO, count, size);
+        table_stats!(
+            self,
+            "market_orders",
+            TABLE_MARKET_ORDERS_COUNT,
+            TABLE_MARKET_ORDERS_SIZE
+        );
 
-        let count = self.count("market_history").await?;
-        let size = self.size("market_history").await?;
-        self.metrics
-            .set(PostgresMetrics::TABLE_MARKET_HISTORY, count, size);
-
-        Ok(())
+        table_stats!(
+            self,
+            "market_history",
+            TABLE_MARKET_HISTORY_COUNT,
+            TABLE_MARKET_HISTORY_SIZE
+        );
     }
 
     async fn count(&mut self, table: &str) -> Result<i64, CollectorError> {
@@ -76,10 +106,11 @@ impl PostgresService {
         }
 
         let mut conn = self.db.acquire().await?;
-        let result = sqlx::query_as::<_, Count>(&format!("SELECT COUNT(*) as count FROM {};", table))
-        .fetch_one(&mut conn)
-        .await?
-        .count;
+        let result =
+            sqlx::query_as::<_, Count>(&format!("SELECT COUNT(*) as count FROM {};", table))
+                .fetch_one(&mut conn)
+                .await?
+                .count;
         Ok(result)
     }
 

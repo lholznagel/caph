@@ -1,4 +1,4 @@
-use std::{net::AddrParseError, error::Error};
+use std::error::Error;
 use std::fmt;
 
 impl Error for CollectorError {}
@@ -7,7 +7,6 @@ impl Error for CollectorError {}
 pub enum CollectorError {
     ClockRunsBackwards,
     DownloadSdeZip,
-    ParseError(AddrParseError),
     SdeParserError(caph_eve_sde_parser::EveSdeParserError),
     SqlxError(sqlx::Error)
 }

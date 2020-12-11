@@ -1,8 +1,9 @@
-use crate::error::CollectorError;
 use crate::metrics::MarketMetrics;
+use crate::error::CollectorError;
 
 use caph_eve_online_api::{EveClient, MarketOrder};
 use futures::stream::{FuturesUnordered, StreamExt};
+use metrix::Metrics;
 use sqlx::{pool::PoolConnection, Executor, Pool, Postgres};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
@@ -10,15 +11,20 @@ const BATCH_SIZE: usize = 500_000;
 
 pub struct Market {
     db: Pool<Postgres>,
-    metrics: MarketMetrics,
+    metrics: Metrics,
 
     values_order: Vec<String>,
     values_market: Vec<String>,
 }
 
 impl Market {
-    pub fn new(db: Pool<Postgres>, metrics: MarketMetrics) -> Self {
-        Self { db, metrics, values_order: Vec::with_capacity(BATCH_SIZE), values_market: Vec::with_capacity(BATCH_SIZE) }
+    pub fn new(db: Pool<Postgres>, metrics: Metrics) -> Self {
+        Self {
+            db,
+            metrics,
+            values_order: Vec::with_capacity(BATCH_SIZE),
+            values_market: Vec::with_capacity(BATCH_SIZE),
+        }
     }
 
     pub async fn background(&mut self) -> Result<(), CollectorError> {
@@ -51,7 +57,8 @@ impl Market {
             }
         }
         self.metrics
-            .set_timing(MarketMetrics::EVE_DOWNLOAD_TIME, start);
+            .duration(MarketMetrics::EVE_DOWNLOAD_TIME, start)
+            .await;
 
         let start = Instant::now();
         let timestamp = SystemTime::now()
@@ -60,14 +67,15 @@ impl Market {
             .as_millis() as u64;
         conn.execute("BEGIN").await?;
         self.clear_market(&mut conn).await?;
-        self.insert_market(&mut conn, results, timestamp)
-            .await?;
+        self.insert_market(&mut conn, results, timestamp).await?;
         conn.execute("COMMIT").await?;
         self.insert_market_history(&mut conn).await?;
         self.metrics
-            .set_timing(MarketMetrics::TOTAL_DB_INSERT_TIME, start);
+            .duration(MarketMetrics::TOTAL_DB_INSERT_TIME, start)
+            .await;
         self.metrics
-            .current_time(MarketMetrics::LAST_COMPLETE_READOUT)?;
+            .current_timestamp(MarketMetrics::LAST_COMPLETE_READOUT)
+            .await;
 
         Ok(())
     }
@@ -140,7 +148,8 @@ impl Market {
 
         log::info!("Importing market done. Took {}s", start.elapsed().as_secs());
         self.metrics
-            .set_timing(MarketMetrics::MARKET_INFO_INSERT_TIME, start);
+            .duration(MarketMetrics::MARKET_INFO_INSERT_TIME, start)
+            .await;
         Ok(())
     }
 
@@ -162,11 +171,15 @@ impl Market {
             start.elapsed().as_secs()
         );
         self.metrics
-            .set_timing(MarketMetrics::MARKET_HISTORY_INSERT_TIME, start);
+            .duration(MarketMetrics::MARKET_HISTORY_INSERT_TIME, start)
+            .await;
         Ok(())
     }
 
-    async fn clear_market(&mut self, conn: &mut PoolConnection<Postgres>) -> Result<(), CollectorError> {
+    async fn clear_market(
+        &mut self,
+        conn: &mut PoolConnection<Postgres>,
+    ) -> Result<(), CollectorError> {
         log::debug!("Removing all unlocked market entries");
         let start = Instant::now();
 
@@ -175,7 +188,9 @@ impl Market {
             .await?;
 
         log::debug!("Removed all old market entries");
-        self.metrics.set_timing(MarketMetrics::CLEANUP_TIME, start);
+        self.metrics
+            .duration(MarketMetrics::CLEANUP_TIME, start)
+            .await;
         Ok(())
     }
 }

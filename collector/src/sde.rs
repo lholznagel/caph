@@ -1,9 +1,9 @@
-use crate::error::CollectorError;
-use crate::metrics::SdeMetrics;
+use crate::{error::CollectorError, metrics::SdeMetrics};
 
 use caph_eve_sde_parser::{
     Blueprint, ParseRequest, ParseResult, Schematic, Station, TypeIds, TypeMaterial, UniqueName,
 };
+use metrix::Metrics;
 use sqlx::{pool::PoolConnection, Executor, Pool, Postgres};
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -13,19 +13,24 @@ const BATCH_SIZE: usize = 10_000;
 
 pub struct Sde {
     db: Pool<Postgres>,
-    metrics: SdeMetrics,
+    metrics: Metrics,
 }
 
 impl Sde {
-    pub fn new(db: Pool<Postgres>, metrics: SdeMetrics) -> Self {
-        Self { db, metrics }
+    pub async fn new(db: Pool<Postgres>, metrics: Metrics) -> Self {
+        Self {
+            db,
+            metrics,
+        }
     }
 
     pub async fn background(&mut self) -> Result<(), CollectorError> {
         log::debug!("Fetching sde zip");
         let start = Instant::now();
-        let zip = caph_eve_sde_parser::fetch_zip().await.map_err(|_| CollectorError::DownloadSdeZip)?;
-        self.metrics.set_timing(SdeMetrics::DOWNLOAD_TIME, start);
+        let zip = caph_eve_sde_parser::fetch_zip()
+            .await
+            .map_err(|_| CollectorError::DownloadSdeZip)?;
+        self.metrics.duration(SdeMetrics::DOWNLOAD_TIME, start).await;
         log::debug!("Fetched sde zip");
 
         log::debug!("Parsing sde zip");
@@ -42,7 +47,7 @@ impl Sde {
             ],
         )
         .map_err(CollectorError::SdeParserError)?;
-        self.metrics.set_timing(SdeMetrics::PARSE_TIME, start);
+        self.metrics.duration(SdeMetrics::PARSE_TIME, start).await;
         log::debug!("Parsed sde zip");
 
         let mut conn = self.db.acquire().await?;
@@ -69,9 +74,12 @@ impl Sde {
         }
 
         self.metrics
-            .set_timing(SdeMetrics::TOTAL_DB_INSERT_TIME, start);
+            .duration(SdeMetrics::TOTAL_DB_INSERT_TIME, start)
+            .await;
         conn.execute("COMMIT").await?;
-        self.metrics.current_time(SdeMetrics::LAST_COMPLETE_READOUT)?;
+        self.metrics
+            .current_timestamp(SdeMetrics::LAST_COMPLETE_READOUT)
+            .await;
         Ok(())
     }
 
@@ -125,7 +133,7 @@ impl Sde {
             skip += BATCH_SIZE;
         }
 
-        self.metrics.set_timing(SdeMetrics::ITEM_INSERT_TIME, start);
+        self.metrics.duration(SdeMetrics::ITEM_INSERT_TIME, start).await;
         log::info!("Importing items done. Took {}s", start.elapsed().as_secs());
         Ok(())
     }
@@ -173,7 +181,8 @@ impl Sde {
         }
 
         self.metrics
-            .set_timing(SdeMetrics::ITEM_MATERIAL_INSERT_TIME, start);
+            .duration(SdeMetrics::ITEM_MATERIAL_INSERT_TIME, start)
+            .await;
         log::info!(
             "Importing item materials done. Took {}s",
             start.elapsed().as_secs()
@@ -216,7 +225,7 @@ impl Sde {
             skip += BATCH_SIZE;
         }
 
-        self.metrics.set_timing(SdeMetrics::NAME_INSERT_TIME, start);
+        self.metrics.duration(SdeMetrics::NAME_INSERT_TIME, start).await;
         log::info!("Importing names done. Took {}s", start.elapsed().as_secs());
         Ok(())
     }
@@ -269,7 +278,8 @@ impl Sde {
         }
 
         self.metrics
-            .set_timing(SdeMetrics::STATION_INSERT_TIME, start);
+            .duration(SdeMetrics::STATION_INSERT_TIME, start)
+            .await;
         log::info!(
             "Importing stations done. Took {}s",
             start.elapsed().as_secs()
@@ -317,7 +327,8 @@ impl Sde {
         }
 
         self.metrics
-            .set_timing(SdeMetrics::BLUEPRINT_INSERT_TIME, start);
+            .duration(SdeMetrics::BLUEPRINT_INSERT_TIME, start)
+            .await;
         log::info!(
             "Importing blueprints done. Took {}s",
             start.elapsed().as_secs()
@@ -357,7 +368,8 @@ impl Sde {
         }
 
         self.metrics
-            .set_timing(SdeMetrics::SCHEMATIC_INSERT_TIME, start);
+            .duration(SdeMetrics::SCHEMATIC_INSERT_TIME, start)
+            .await;
         log::info!(
             "Importing schematics done. Took {}s",
             start.elapsed().as_secs()
@@ -376,7 +388,7 @@ impl Sde {
             .await?;
 
         log::debug!("Removed all unlocked items");
-        self.metrics.set_timing(SdeMetrics::CLEANUP_TIME, start);
+        self.metrics.duration(SdeMetrics::CLEANUP_TIME, start).await;
         Ok(())
     }
 }
