@@ -1,4 +1,4 @@
-use crate::services::ItemService;
+use crate::{error::EveServerError, services::ItemService};
 
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Postgres};
@@ -49,7 +49,7 @@ impl MarketService {
         Self { db, item_service }
     }
 
-    pub async fn all(&self, filter: MarketFilter) -> Vec<Market> {
+    pub async fn all(&self, filter: MarketFilter) -> Result<Vec<Market>, EveServerError> {
         let mut query = Vec::new();
         query.push(r#"
         SELECT DISTINCT market_current.order_id, market_orders.location_id, market_orders.type_id, market_orders.system_id, market_orders.is_buy_order, market_orders.price, market_current.volume_remain, stations.security, stations.region_id
@@ -108,10 +108,10 @@ impl MarketService {
         sqlx::query_as::<_, Market>(&query)
             .fetch_all(&mut conn)
             .await
-            .unwrap()
+            .map_err(|x| x.into())
     }
 
-    pub async fn fetch_by_item_id(&self, item_id: u32) -> Vec<Market> {
+    pub async fn fetch_by_item_id(&self, item_id: u32) -> Result<Vec<Market>, EveServerError> {
         let mut conn = self.db.acquire().await.unwrap();
         sqlx::query_as::<_, Market>(r#"SELECT market_history.volume_remain, market_history.timestamp, market_history.order_id,
                 market_orders.price, market_orders.is_buy_order, stations.region_id, stations.system_id, stations.security
@@ -125,10 +125,10 @@ impl MarketService {
             .bind(item_id as i32)
             .fetch_all(&mut conn)
             .await
-            .unwrap()
+            .map_err(|x| x.into())
     }
 
-    pub async fn stats(&self, item_id: u32, is_buy_order: bool) -> MarketStats {
+    pub async fn stats(&self, item_id: u32, is_buy_order: bool) -> Result<MarketStats, EveServerError> {
         #[derive(sqlx::FromRow)]
         struct CountResult {
             count: i64
@@ -214,13 +214,13 @@ impl MarketService {
             .map(|x| x.count as u64)
             .sum();
 
-        MarketStats {
+        Ok(MarketStats {
             average_price,
             highest_price,
             lowest_price,
             order_count,
             total_volume,
-        }
+        })
     }
 }
 

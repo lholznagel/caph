@@ -1,6 +1,8 @@
 use serde::Serialize;
 use sqlx::{Pool, Postgres};
 
+use crate::error::EveServerError;
+
 #[derive(Clone, Debug, Serialize, sqlx::FromRow)]
 pub struct Resolve {
     pub id: i32,
@@ -15,7 +17,7 @@ impl ResolveService {
         Self(db)
     }
 
-    pub async fn resolve(&self, id: u32) -> Result<Option<Resolve>, Box<dyn std::error::Error>> {
+    pub async fn resolve(&self, id: u32) -> Result<Option<Resolve>, EveServerError> {
         if let Some(x) = self.find_in_items(id).await {
             return Ok(Some(x));
         } else if let Some(x) = self.find_in_names(id).await {

@@ -2,6 +2,8 @@ use serde::Serialize;
 use sqlx::{Pool, Postgres};
 use std::collections::{HashMap, VecDeque};
 
+use crate::error::EveServerError;
+
 #[derive(Clone, Debug, Serialize)]
 struct MaterialNeeded {
     id: u32,
@@ -69,7 +71,7 @@ impl BlueprintService {
         schematics
     }
 
-    pub async fn calc_bp_cost(&self, id: u32) -> HashMap<u32, u64> {
+    pub async fn calc_bp_cost(&self, id: u32) -> Result<HashMap<u32, u64>, EveServerError> {
         let bps = self.fetch_blueprints().await;
         let schematics = self.fetch_schematics().await;
 
@@ -98,8 +100,7 @@ impl BlueprintService {
             }
         }
 
-        //all_materials
-        HashMap::new()
+        Ok(all_materials)
     }
 
     // If there is a blueprint or schematic that produces the given id, the materials needed are returned

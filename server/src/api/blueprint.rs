@@ -1,9 +1,30 @@
-use crate::State;
+use crate::services::BlueprintService;
 
-use tide::{Body, Request, Result};
+use warp::{Filter, Rejection, Reply, filters::BoxedFilter, get, path};
 
-pub async fn blueprint_cost(req: Request<State>) -> Result<Body> {
-    let id = req.param("id").map(|x| x.parse::<u32>().unwrap()).unwrap();
-    let result = req.state().blueprint_service.calc_bp_cost(id).await;
-    Ok(Body::from_json(&result).unwrap())
+pub fn filter(service: BlueprintService, root: BoxedFilter<()>) -> BoxedFilter<(impl Reply,)> {
+    let root = root
+        .and(path!("blueprints" / ..))
+        .and(with_service(service.clone()));
+
+    let cost = root
+        .clone()
+        .and(path!(u32))
+        .and(get())
+        .and_then(cost)
+        .boxed();
+
+    cost
+}
+
+fn with_service(service: BlueprintService) -> BoxedFilter<(BlueprintService,)> {
+    warp::any().map(move || service.clone()).boxed()
+}
+
+async fn cost(service: BlueprintService, id: u32) -> Result<impl Reply, Rejection> {
+    service
+        .calc_bp_cost(id)
+        .await
+        .map(|x| warp::reply::json(&x))
+        .map_err(Rejection::from)
 }

@@ -119,6 +119,7 @@ export default class MyItems extends Vue {
       });
     }
 
+    // TODO: use resolve api
     const search: IName[] = (
       await axios.post(
         '/api/v1/items/search?exact=true',

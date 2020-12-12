@@ -1,29 +1,76 @@
-use crate::services::MarketFilter;
-use crate::State;
+use crate::services::{MarketFilter, MarketService};
 
-use tide::{Body, Request, Result};
+use warp::{Filter, Rejection, Reply, filters::BoxedFilter, get, post, path};
 
-pub async fn fetch(mut req: Request<State>) -> Result<Body> {
-    let filter: MarketFilter = req.body_json().await?;
+pub fn filter(service: MarketService, root: BoxedFilter<()>) -> BoxedFilter<(impl Reply,)> {
+    let root = root
+        .and(path!("market" / ..))
+        .and(with_service(service.clone()));
 
-    let results = req.state().market_service.all(filter).await;
-    Ok(Body::from_json(&results).unwrap())
+    let filter_market = root
+        .clone()
+        .and(warp::path::end())
+        .and(post())
+        .and(warp::body::json())
+        .and_then(filter_market);
+
+    let fetch_by_item_id= root
+        .clone()
+        .and(path!(u32))
+        .and(get())
+        .and_then(fetch_by_item_id);
+
+    let buy_stats= root
+        .clone()
+        .and(path!(u32 / "stats" / "buy"))
+        .and(get())
+        .and_then(buy_stats);
+
+    let sell_stats= root
+        .clone()
+        .and(path!(u32 / "stats" / "sell"))
+        .and(get())
+        .and_then(sell_stats);
+
+    filter_market
+        .or(fetch_by_item_id)
+        .or(buy_stats)
+        .or(sell_stats)
+        .boxed()
 }
 
-pub async fn fetch_by_item_id(req: Request<State>) -> Result<Body> {
-    let id = req.param("id").map(|x| x.parse::<u32>())??;
-    let results = req.state().market_service.fetch_by_item_id(id).await;
-    Ok(Body::from_json(&results).unwrap())
+fn with_service(service: MarketService) -> BoxedFilter<(MarketService,)> {
+    warp::any().map(move || service.clone()).boxed()
 }
 
-pub async fn buy_stats(req: Request<State>) -> Result<Body> {
-    let id = req.param("id").map(|x| x.parse::<u32>())??;
-    let results = req.state().market_service.stats(id, true).await;
-    Ok(Body::from_json(&results).unwrap())
+async fn filter_market(service: MarketService, filter: MarketFilter) -> Result<impl Reply, Rejection> {
+    service
+        .all(filter)
+        .await
+        .map(|x| warp::reply::json(&x))
+        .map_err(Rejection::from)
 }
 
-pub async fn sell_stats(req: Request<State>) -> Result<Body> {
-    let id = req.param("id").map(|x| x.parse::<u32>())??;
-    let results = req.state().market_service.stats(id, false).await;
-    Ok(Body::from_json(&results).unwrap())
+async fn fetch_by_item_id(service: MarketService, id: u32) -> Result<impl Reply, Rejection> {
+    service
+        .fetch_by_item_id(id)
+        .await
+        .map(|x| warp::reply::json(&x))
+        .map_err(Rejection::from)
+}
+
+async fn buy_stats(service: MarketService, id: u32) -> Result<impl Reply, Rejection> {
+    service
+        .stats(id, true)
+        .await
+        .map(|x| warp::reply::json(&x))
+        .map_err(Rejection::from)
+}
+
+async fn sell_stats(service: MarketService, id: u32) -> Result<impl Reply, Rejection> {
+    service
+        .stats(id, false)
+        .await
+        .map(|x| warp::reply::json(&x))
+        .map_err(Rejection::from)
 }

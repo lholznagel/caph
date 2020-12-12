@@ -2,6 +2,8 @@ use caph_eve_online_api::{EveClient, RouteFlag};
 use serde::Serialize;
 use sqlx::{Pool, Postgres};
 
+use crate::error::EveServerError;
+
 #[derive(Clone)]
 pub struct RegionService(Pool<Postgres>);
 
@@ -10,7 +12,7 @@ impl RegionService {
         Self(db)
     }
 
-    pub async fn all(&self) -> Result<Vec<u32>, Box<dyn std::error::Error>> {
+    pub async fn all(&self) -> Result<Vec<u32>, EveServerError> {
         let mut conn = self.0.acquire().await?;
         sqlx::query_as::<_, RegionId>("SELECT DISTINCT region_id FROM stations")
             .fetch_all(&mut conn)
@@ -27,7 +29,7 @@ impl RegionService {
         &self,
         origin: u32,
         destination: u32,
-    ) -> Result<Vec<Route>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<Route>, EveServerError> {
         let mut conn = self.0.acquire().await?;
         let routes = sqlx::query_as::<_, Route>(
             r#"
@@ -52,7 +54,7 @@ impl RegionService {
         }
     }
 
-    async fn fetch_and_insert_route(&self, origin: u32, destination: u32, flag: RouteFlag) -> Result<Route, Box<dyn std::error::Error>> {
+    async fn fetch_and_insert_route(&self, origin: u32, destination: u32, flag: RouteFlag) -> Result<Route, EveServerError> {
         let client = EveClient::default();
         let route = client
             .fetch_route(

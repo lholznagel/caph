@@ -7,8 +7,11 @@ use self::services::*;
 
 use sqlx::postgres::PgPoolOptions;
 use sqlx::Executor;
+use std::net::SocketAddr;
+use warp::Filter;
 
-#[async_std::main]
+
+#[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     morgan::Morgan::init(vec!["sqlx".into()]);
 
@@ -27,77 +30,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let region_service = RegionService::new(pool.clone());
     let resolve_service = ResolveService::new(pool.clone());
 
-    let state = State {
-        blueprint_service,
-        item_service,
-        market_service,
-        region_service,
-        resolve_service,
-    };
-
-    let mut app = tide::with_state(state.clone());
-    log::info!("Starting server");
-
-    app.at("/api/v1").nest({
-        let mut market = tide::with_state(state.clone());
-        market
-            .at("/items")
-            .get(api::item::fetch_items)
-            .nest({
-                let mut server = tide::with_state(state.clone());
-                server
-                    .at("/my")
-                    .get(api::item::fetch_my_items)
-                    .post(api::item::push_my_items)
-                    .at("/:id")
-                    .get(api::item::fetch_my_item);
-                server
-                    .at("/search")
-                    .get(api::item::search);
-                server
-                    .at("/:id")
-                    .get(api::item::fetch_item)
-                    .at("/reprocessing")
-                    .get(api::item::reprocessing);
-                server
-            });
-        market
-            .at("/resolve/:id").get(api::resolve::resolve);
-        market
-            .at("/market")
-            .post(api::market::fetch)
-            .at("/:id")
-            .get(api::market::fetch_by_item_id)
-            .nest({
-                let mut server = tide::with_state(state.clone());
-                server.at("stats/buy").get(api::market::buy_stats);
-                server.at("stats/sell").get(api::market::sell_stats);
-                server
-            });
-        market
-            .at("/regions")
-            .get(api::region::fetch_regions)
-            .at("/route")
-            .get(api::region::route);
-        market.at("/blueprints").nest({
-            let mut server = tide::with_state(state.clone());
-            server.at("/:id").get(api::blueprint::blueprint_cost);
-            server
-        });
-
-        market
-    });
-
-    app.listen("0.0.0.0:10101").await?;
+    let root = warp::any().and(warp::path!("v1" / ..)).boxed();
+    let combined = api::blueprint::filter(blueprint_service, root.clone())
+        .or(api::item::filter(item_service, root.clone()))
+        .or(api::market::filter(market_service, root.clone()))
+        .or(api::region::filter(region_service, root.clone()))
+        .or(api::resolve::filter(resolve_service, root.clone()))
+        .boxed();
+    warp::serve(combined)
+        .run("localhost:10101".parse::<SocketAddr>().unwrap())
+        .await;
 
     Ok(())
-}
-
-#[derive(Clone)]
-pub struct State {
-    pub blueprint_service: BlueprintService,
-    pub item_service: ItemService,
-    pub market_service: MarketService,
-    pub region_service: RegionService,
-    pub resolve_service: ResolveService,
 }
