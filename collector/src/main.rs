@@ -12,7 +12,7 @@ use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    morgan::Morgan::init()?;
+    morgan::Morgan::init(vec!["sqlx".into()]);
 
     let (metric_tx, metric_rx) = mpsc::channel::<(&str, MetricCommand)>(100);
     let metric_collector = MetricCollector::default();

@@ -11,3 +11,7 @@ deploy-collector: musl
 
 submodules:
 	git submodule update --init
+
+submodules-update:
+	cd metrix; git pull origin master --rebase
+	cd morgan; git pull origin master --rebase

@@ -10,7 +10,7 @@ use sqlx::Executor;
 
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    morgan::Morgan::init().unwrap();
+    morgan::Morgan::init(vec!["sqlx".into()]);
 
     let pool = PgPoolOptions::new()
         .max_connections(25)
