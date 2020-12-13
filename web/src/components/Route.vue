@@ -1,5 +1,5 @@
 <template>
-  <div v-if="routes.length > 0">{{ routes[0].systems.length }}</div>
+  <div v-if="routes.length > 0">{{ routes[0].systems.length - 1 }}</div>
 </template>
 
 <script lang="ts">
@@ -18,7 +18,7 @@ export default class Route extends Vue {
   public async created() {
     this.routes = (await axios.get(`/api/v1/regions/route?origin=${HOME_SYSTEM}&destination=${this.destination}`))
       .data
-      .filter(x => x.flag === 'shortest');
+      .filter(x => x.flag === 'secure');
   }
 }
 

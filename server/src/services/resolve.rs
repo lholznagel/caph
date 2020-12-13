@@ -17,17 +17,29 @@ impl ResolveService {
         Self(db)
     }
 
-    pub async fn resolve(&self, id: u32) -> Result<Option<Resolve>, EveServerError> {
-        if let Some(x) = self.find_in_items(id).await {
+    pub async fn resolve_to_name(&self, id: u32) -> Result<Option<Resolve>, EveServerError> {
+        if let Some(x) = self.find_in_items_by_id(id).await {
             return Ok(Some(x));
-        } else if let Some(x) = self.find_in_names(id).await {
+        } else if let Some(x) = self.find_in_names_by_id(id).await {
             return Ok(Some(x));
         } else {
             Ok(None)
         }
     }
 
-    async fn find_in_items(&self, id: u32) -> Option<Resolve> {
+    pub async fn bulk_resolve_to_name(&self, ids: Vec<u32>) -> Result<Vec<Resolve>, EveServerError> {
+        let mut results = Vec::with_capacity(ids.len());
+
+        for id in ids {
+            if let Ok(Some(x)) = self.resolve_to_name(id).await {
+                results.push(x);
+            }
+        }
+
+        Ok(results)
+    }
+
+    async fn find_in_items_by_id(&self, id: u32) -> Option<Resolve> {
         let mut conn = self.0.acquire().await.unwrap();
         let query = sqlx::query_as::<_, Resolve>("SELECT id, name FROM items WHERE id = $1")
             .bind(id)
@@ -40,7 +52,7 @@ impl ResolveService {
         }
     }
 
-    async fn find_in_names(&self, id: u32) -> Option<Resolve> {
+    async fn find_in_names_by_id(&self, id: u32) -> Option<Resolve> {
         let mut conn = self.0.acquire().await.unwrap();
         let query = sqlx::query_as::<_, Resolve>("SELECT id, name FROM names WHERE id = $1")
             .bind(id)

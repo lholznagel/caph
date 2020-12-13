@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let metric_collector = MetricCollector::default();
 
     let db_uri =
-        std::env::var("DB").unwrap_or("postgres://caph:caph@cygnus.local:5432/caph_test".into());
+        std::env::var("DB").unwrap_or("postgres://caph:caph@virgo:5432/caph_test".into());
     let pool = PgPoolOptions::new()
         .max_connections(25)
         .connect(&db_uri)
@@ -76,8 +76,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             sde,
             market,
             postgres,
-            metric_collector.metric_server("127.0.0.1:9000"),
-            metric_collector.background(metric_rx),
+            metric_collector.metric_server("127.0.0.1:8000"),
+            metric_collector.metric_listener(metric_rx),
         );
     }
 

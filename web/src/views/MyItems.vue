@@ -86,7 +86,7 @@ export default class MyItems extends Vue {
     const items = (await axios.get('/api/v1/items/my')).data;
     this.names = (
       await axios.post(
-        '/api/v1/items',
+        '/api/v1/resolve',
         items.map(x => x.id)
       )
     ).data;

@@ -65,9 +65,9 @@ impl MarketService {
             filters.push(format!("security >= {}", x));
         }
 
-        if let Some(_) = filter.only_buy_orders {
+        if let Some(true) = filter.only_buy_orders {
             filters.push("is_buy_order = true".into());
-        } else if let Some(_) = filter.only_sell_orders {
+        } else if let Some(true) = filter.only_sell_orders {
             filters.push("is_buy_order = false".into());
         }
 

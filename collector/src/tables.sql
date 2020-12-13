@@ -93,3 +93,14 @@ CREATE TABLE IF NOT EXISTS market_orders (
 
   PRIMARY KEY(order_id)
 );
+
+CREATE TABLE IF NOT EXISTS market_history_eve (
+  average             REAL      NOT NULL,
+  highest             REAL      NOT NULL,
+  lowest              REAL      NOT NULL,
+  date                TEXT      NOT NULL,
+  order_count         BIGINT    NOT NULL,
+  volume              BIGINT    NOT NULL,
+  type_id             INTEGER   NOT NULL,
+  region_id           INTEGER   NOT NULL
+);

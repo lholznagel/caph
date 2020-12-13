@@ -1,5 +1,6 @@
 use crate::services::ItemService;
 
+use serde::Deserialize;
 use std::collections::HashMap;
 use warp::{filters::BoxedFilter, get, path, post, Filter, Rejection, Reply};
 
@@ -45,12 +46,20 @@ pub fn filter(service: ItemService, root: BoxedFilter<()>) -> BoxedFilter<(impl 
         .and(warp::body::json())
         .and_then(push_my_items);
 
+    let search = root
+        .clone()
+        .and(path!("search"))
+        .and(get())
+        .and(warp::query::<SearchQueryParams>())
+        .and_then(search);
+
     fetch_all
         .or(fetch_by_id)
         .or(reprocessing)
         .or(fetch_my_items)
         .or(fetch_my_item)
         .or(push_my_items)
+        .or(search)
         .boxed()
 }
 
@@ -107,4 +116,21 @@ async fn push_my_items(
         .await
         .map(|x| warp::reply::json(&x))
         .map_err(Rejection::from)
+}
+
+async fn search(
+    service: ItemService,
+    query: SearchQueryParams
+) -> Result<impl Reply, Rejection> {
+    service
+        .search(query.exact.unwrap_or_default(), &query.name)
+        .await
+        .map(|x| warp::reply::json(&x))
+        .map_err(Rejection::from)
+}
+
+#[derive(Deserialize)]
+struct SearchQueryParams {
+    name: String,
+    exact: Option<bool>,
 }

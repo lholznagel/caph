@@ -13,7 +13,7 @@ use warp::Filter;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    morgan::Morgan::init(vec!["sqlx".into()]);
+    morgan::Morgan::init(vec!["sqlx".into(), "warp".into(), "tracing".into()]);
 
     let pool = PgPoolOptions::new()
         .max_connections(25)
@@ -30,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let region_service = RegionService::new(pool.clone());
     let resolve_service = ResolveService::new(pool.clone());
 
-    let root = warp::any().and(warp::path!("v1" / ..)).boxed();
+    let root = warp::any().and(warp::path!("api" / "v1" / ..)).boxed();
     let combined = api::blueprint::filter(blueprint_service, root.clone())
         .or(api::item::filter(item_service, root.clone()))
         .or(api::market::filter(market_service, root.clone()))
@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(api::resolve::filter(resolve_service, root.clone()))
         .boxed();
     warp::serve(combined)
-        .run("localhost:10101".parse::<SocketAddr>().unwrap())
+        .run("127.0.0.1:10101".parse::<SocketAddr>().unwrap())
         .await;
 
     Ok(())

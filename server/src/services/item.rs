@@ -106,6 +106,30 @@ impl ItemService {
 
         Ok(())
     }
+
+    pub async fn search(
+        &self,
+        exact: bool,
+        name: &str,
+    ) -> Result<Vec<Item>, EveServerError> {
+        let mut conn = self.0.acquire().await?;
+
+        if exact {
+            sqlx::query_as::<_, Item>("SELECT id, name, volume FROM items WHERE name = $1")
+                .bind(name)
+                .fetch_all(&mut conn)
+                .await
+                .map_err(|x| x.into())
+        } else {
+            sqlx::query_as::<_, Item>(&format!(
+                "SELECT id, name FROM items WHERE name ILIKE '%{}%'",
+                name
+            ))
+            .fetch_all(&mut conn)
+            .await
+            .map_err(|x| x.into())
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, sqlx::FromRow)]
