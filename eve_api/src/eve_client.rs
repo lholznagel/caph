@@ -7,10 +7,25 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub struct EveClient;
 
 impl EveClient {
-    pub(crate) const BASE_ADDR: &'static str = "https://esi.evetech.net/latest";
+    const BASE_ADDR: &'static str = "https://esi.evetech.net/latest";
 
     pub async fn fetch_market_orders(&self, id: u32) -> Result<Option<Vec<MarketOrder>>> {
         self.fetch_by_id("markets", id, Some("orders")).await
+    }
+
+    pub async fn fetch_market_history(
+        &self,
+        region_id: u32,
+        type_id: u32,
+    ) -> Result<Vec<MarketHistory>> {
+        self.fetch(&format!(
+            "markets/{}/history?type_id={}",
+            region_id, type_id
+        ))
+        .await?
+        .json::<Vec<MarketHistory>>()
+        .await
+        .map_err(Into::into)
     }
 
     pub async fn fetch_route(
@@ -36,7 +51,7 @@ impl EveClient {
     /// When requesting the eve online API often the server returns 502 or 503
     /// this results in a broken payload. If that happens, we just retry the request.
     /// The function will try 3 times, after that it will return an error.
-    pub(crate) async fn fetch(&self, path: &str) -> Result<Response> {
+    async fn fetch(&self, path: &str) -> Result<Response> {
         let mut retry_counter = 0;
 
         loop {
@@ -63,7 +78,7 @@ impl EveClient {
         }
     }
 
-    pub(crate) async fn fetch_by_id<T: DeserializeOwned>(
+    async fn fetch_by_id<T: DeserializeOwned>(
         &self,
         path: &str,
         id: u32,
@@ -102,7 +117,7 @@ impl EveClient {
         Ok(Some(fetched_data))
     }
 
-    pub(crate) fn page_count(&self, response: &Response) -> u8 {
+    fn page_count(&self, response: &Response) -> u8 {
         let headers = response.headers();
         if let Some(x) = headers.get("x-pages") {
             x.to_str()
@@ -132,6 +147,16 @@ pub struct MarketOrder {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct MarketHistory {
+    pub average: f32,
+    pub highest: f32,
+    pub lowest: f32,
+    pub date: String,
+    pub order_count: u64,
+    pub volume: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum RouteFlag {
     Shortest,
     Secure,
@@ -143,8 +168,9 @@ impl RouteFlag {
         match self {
             Self::Shortest => "shortest",
             Self::Secure => "secure",
-            Self::Insecure => "insecure"
-        }.into()
+            Self::Insecure => "insecure",
+        }
+        .into()
     }
 }
 

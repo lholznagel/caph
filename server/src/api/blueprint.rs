@@ -1,6 +1,6 @@
 use crate::services::BlueprintService;
 
-use warp::{Filter, Rejection, Reply, filters::BoxedFilter, get, path};
+use warp::{filters::BoxedFilter, get, path, Filter, Rejection, Reply};
 
 pub fn filter(service: BlueprintService, root: BoxedFilter<()>) -> BoxedFilter<(impl Reply,)> {
     let root = root

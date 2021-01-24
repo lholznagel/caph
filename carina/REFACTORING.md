@@ -1,0 +1,19 @@
+- Simplify insert
+  - Cmp the new entry with the old
+  - Insert the Array of entries
+- Models
+  - Refacotr Insert stuff
+  - Try to remove the wrapping model
+  - Naming schema
+- Caches
+  - rename `by_id` to `fetch_by_id`
+  - Use streams for saving the file
+  - Get rid of `db_to_bytes`
+  - New `Storage` trait for saving the db
+  - New `Fetch`, `Insert` and `Lookup` traits
+  - `Cache` trait needs to implement at least `Storage`, `Fetch` and `Insert`
+  - Evaluate:
+    - Wrapper types for Cache Entries
+    - Wrapp all map entries into one type
+    - Question: is it easier to work with that?
+- Imports

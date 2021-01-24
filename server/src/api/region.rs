@@ -1,7 +1,7 @@
 use crate::services::RegionService;
 
 use serde::Deserialize;
-use warp::{Filter, Rejection, Reply, filters::BoxedFilter, get, path};
+use warp::{filters::BoxedFilter, get, path, Filter, Rejection, Reply};
 
 #[derive(Deserialize)]
 struct RouteQueryParams {
@@ -27,9 +27,7 @@ pub fn filter(service: RegionService, root: BoxedFilter<()>) -> BoxedFilter<(imp
         .and(get())
         .and_then(route);
 
-    regions
-        .or(route)
-        .boxed()
+    regions.or(route).boxed()
 }
 
 fn with_service(service: RegionService) -> BoxedFilter<(RegionService,)> {

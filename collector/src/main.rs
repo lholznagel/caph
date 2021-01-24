@@ -5,14 +5,15 @@ mod postgres;
 mod sde;
 
 use metrix::{MetricCollector, MetricCommand, Metrics};
-use sqlx::postgres::PgPoolOptions;
-use sqlx::Executor;
 use std::time::Duration;
-use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     morgan::Morgan::init(vec!["sqlx".into()]);
+
+    use sqlx::postgres::PgPoolOptions;
+    use sqlx::Executor;
+    use tokio::sync::mpsc;
 
     let (metric_tx, metric_rx) = mpsc::channel::<(&str, MetricCommand)>(100);
     let metric_collector = MetricCollector::default();

@@ -17,7 +17,7 @@ pub use self::unique_name::*;
 
 use std::collections::HashMap;
 
-/// https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html
+/// <https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip.html>
 #[derive(Debug)]
 pub struct EveSdeParser;
 

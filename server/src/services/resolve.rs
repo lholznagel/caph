@@ -27,7 +27,10 @@ impl ResolveService {
         }
     }
 
-    pub async fn bulk_resolve_to_name(&self, ids: Vec<u32>) -> Result<Vec<Resolve>, EveServerError> {
+    pub async fn bulk_resolve_to_name(
+        &self,
+        ids: Vec<u32>,
+    ) -> Result<Vec<Resolve>, EveServerError> {
         let mut results = Vec::with_capacity(ids.len());
 
         for id in ids {

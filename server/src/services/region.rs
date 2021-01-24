@@ -25,11 +25,7 @@ impl RegionService {
             .map_err(|x| x.into())
     }
 
-    pub async fn route(
-        &self,
-        origin: u32,
-        destination: u32,
-    ) -> Result<Vec<Route>, EveServerError> {
+    pub async fn route(&self, origin: u32, destination: u32) -> Result<Vec<Route>, EveServerError> {
         let mut conn = self.0.acquire().await?;
         let routes = sqlx::query_as::<_, Route>(
             r#"
@@ -45,23 +41,33 @@ impl RegionService {
 
         if routes.is_empty() {
             let mut routes = Vec::new();
-            routes.push(self.fetch_and_insert_route(origin, destination, RouteFlag::Shortest).await?);
-            routes.push(self.fetch_and_insert_route(origin, destination, RouteFlag::Secure).await?);
-            routes.push(self.fetch_and_insert_route(origin, destination, RouteFlag::Insecure).await?);
+            routes.push(
+                self.fetch_and_insert_route(origin, destination, RouteFlag::Shortest)
+                    .await?,
+            );
+            routes.push(
+                self.fetch_and_insert_route(origin, destination, RouteFlag::Secure)
+                    .await?,
+            );
+            routes.push(
+                self.fetch_and_insert_route(origin, destination, RouteFlag::Insecure)
+                    .await?,
+            );
             Ok(routes)
         } else {
             Ok(routes)
         }
     }
 
-    async fn fetch_and_insert_route(&self, origin: u32, destination: u32, flag: RouteFlag) -> Result<Route, EveServerError> {
+    async fn fetch_and_insert_route(
+        &self,
+        origin: u32,
+        destination: u32,
+        flag: RouteFlag,
+    ) -> Result<Route, EveServerError> {
         let client = EveClient::default();
         let route = client
-            .fetch_route(
-                origin,
-                destination,
-                Some(flag.clone()),
-            )
+            .fetch_route(origin, destination, Some(flag.clone()))
             .await
             .unwrap()
             .into_iter()

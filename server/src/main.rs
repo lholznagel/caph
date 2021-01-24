@@ -10,14 +10,13 @@ use sqlx::Executor;
 use std::net::SocketAddr;
 use warp::Filter;
 
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     morgan::Morgan::init(vec!["sqlx".into(), "warp".into(), "tracing".into()]);
 
     let pool = PgPoolOptions::new()
         .max_connections(25)
-        .connect("postgres://caph:caph@cygnus.local:5432/caph_eve")
+        .connect("postgres://caph:caph@virgo:5432/caph_eve")
         .await?;
 
     // Make sure the database has the newest scripts applied

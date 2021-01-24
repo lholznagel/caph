@@ -30,18 +30,22 @@ impl BlueprintService {
             .await
             .unwrap()
             .into_iter()
-            .for_each(|x| { blueprints.insert(x.blueprint_id as u32, Vec::new()); });
-
-        sqlx::query_as::<_, BlueprintResource>("SELECT blueprint_id, material_id, quantity, is_product FROM blueprint_resources")
-            .fetch_all(&mut conn)
-            .await
-            .unwrap()
-            .into_iter()
             .for_each(|x| {
-                blueprints
-                    .entry(x.blueprint_id as u32)
-                    .and_modify(|y| y.push(x));
+                blueprints.insert(x.blueprint_id as u32, Vec::new());
             });
+
+        sqlx::query_as::<_, BlueprintResource>(
+            "SELECT blueprint_id, material_id, quantity, is_product FROM blueprint_resources",
+        )
+        .fetch_all(&mut conn)
+        .await
+        .unwrap()
+        .into_iter()
+        .for_each(|x| {
+            blueprints
+                .entry(x.blueprint_id as u32)
+                .and_modify(|y| y.push(x));
+        });
 
         blueprints
     }
@@ -55,18 +59,22 @@ impl BlueprintService {
             .await
             .unwrap()
             .into_iter()
-            .for_each(|x| { schematics.insert(x.schematic_id as u32, Vec::new()); });
-
-        sqlx::query_as::<_, SchematicResource>("SELECT schematic_id, material_id, quantity, is_input FROM schematic_resources")
-            .fetch_all(&mut conn)
-            .await
-            .unwrap()
-            .into_iter()
             .for_each(|x| {
-                schematics
-                    .entry(x.schematic_id as u32)
-                    .and_modify(|y| y.push(x));
+                schematics.insert(x.schematic_id as u32, Vec::new());
             });
+
+        sqlx::query_as::<_, SchematicResource>(
+            "SELECT schematic_id, material_id, quantity, is_input FROM schematic_resources",
+        )
+        .fetch_all(&mut conn)
+        .await
+        .unwrap()
+        .into_iter()
+        .for_each(|x| {
+            schematics
+                .entry(x.schematic_id as u32)
+                .and_modify(|y| y.push(x));
+        });
 
         schematics
     }
@@ -111,7 +119,11 @@ impl BlueprintService {
         requested_material: MaterialNeeded,
     ) -> Option<Vec<MaterialNeeded>> {
         for (id, resources) in schematics {
-            if resources.iter().find(|x| !x.is_input && x.material_id as u32 == requested_material.id).is_some() {
+            if resources
+                .iter()
+                .find(|x| !x.is_input && x.material_id as u32 == requested_material.id)
+                .is_some()
+            {
                 let mut needed_materials = Vec::new();
                 for r in resources.iter().filter(|x| x.is_input) {
                     needed_materials.push(MaterialNeeded {
@@ -126,7 +138,11 @@ impl BlueprintService {
         }
 
         for (id, resources) in bps {
-            if resources.iter().find(|x| x.is_product && x.material_id as u32 == requested_material.id).is_some() {
+            if resources
+                .iter()
+                .find(|x| x.is_product && x.material_id as u32 == requested_material.id)
+                .is_some()
+            {
                 let mut needed_materials = Vec::new();
                 for r in resources.iter().filter(|x| !x.is_product) {
                     needed_materials.push(MaterialNeeded {
@@ -154,7 +170,7 @@ pub struct BlueprintResource {
     pub blueprint_id: i32,
     pub material_id: i32,
     pub quantity: i32,
-    pub is_product: bool
+    pub is_product: bool,
 }
 
 #[derive(Clone, Debug, sqlx::FromRow)]

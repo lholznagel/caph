@@ -1,6 +1,6 @@
 use crate::services::{MarketFilter, MarketService};
 
-use warp::{Filter, Rejection, Reply, filters::BoxedFilter, get, post, path};
+use warp::{filters::BoxedFilter, get, path, post, Filter, Rejection, Reply};
 
 pub fn filter(service: MarketService, root: BoxedFilter<()>) -> BoxedFilter<(impl Reply,)> {
     let root = root
@@ -14,19 +14,19 @@ pub fn filter(service: MarketService, root: BoxedFilter<()>) -> BoxedFilter<(imp
         .and(warp::body::json())
         .and_then(filter_market);
 
-    let fetch_by_item_id= root
+    let fetch_by_item_id = root
         .clone()
         .and(path!(u32))
         .and(get())
         .and_then(fetch_by_item_id);
 
-    let buy_stats= root
+    let buy_stats = root
         .clone()
         .and(path!(u32 / "stats" / "buy"))
         .and(get())
         .and_then(buy_stats);
 
-    let sell_stats= root
+    let sell_stats = root
         .clone()
         .and(path!(u32 / "stats" / "sell"))
         .and(get())
@@ -43,7 +43,10 @@ fn with_service(service: MarketService) -> BoxedFilter<(MarketService,)> {
     warp::any().map(move || service.clone()).boxed()
 }
 
-async fn filter_market(service: MarketService, filter: MarketFilter) -> Result<impl Reply, Rejection> {
+async fn filter_market(
+    service: MarketService,
+    filter: MarketFilter,
+) -> Result<impl Reply, Rejection> {
     service
         .all(filter)
         .await

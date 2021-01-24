@@ -29,12 +29,14 @@ pub fn from_reader<R: ByteReader>(
 }
 
 pub async fn fetch_zip() -> Result<Vec<u8>, ()> {
-    let x = reqwest::get("https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/sde.zip")
-        .await
-        .unwrap()
-        .bytes()
-        .await
-        .unwrap()
-        .to_vec();
+    let x = reqwest::get(
+        "https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/sde.zip",
+    )
+    .await
+    .unwrap()
+    .bytes()
+    .await
+    .unwrap()
+    .to_vec();
     Ok(x)
 }

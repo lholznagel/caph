@@ -1,0 +1,12 @@
+[package]
+name = "carina"
+version = "0.1.0"
+authors = ["lholznagel <contact@lholznagel.info>"]
+edition = "2018"
+
+[dependencies]
+async-trait = "0.1.42"
+cachem_utils = { git = "https://github.com/lholznagel/cachem.git", rev = "811d92c6daa3dda093174e9e2361e0942b269a69" }
+log = "0.4.13"
+morgan = { git = "https://github.com/lholznagel/morgan.git", rev = "624526038c210b142d2835fa77965064771ac192" }
+tokio = { version = "1.0.2", features = ["full"] }

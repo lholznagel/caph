@@ -118,10 +118,7 @@ async fn push_my_items(
         .map_err(Rejection::from)
 }
 
-async fn search(
-    service: ItemService,
-    query: SearchQueryParams
-) -> Result<impl Reply, Rejection> {
+async fn search(service: ItemService, query: SearchQueryParams) -> Result<impl Reply, Rejection> {
     service
         .search(query.exact.unwrap_or_default(), &query.name)
         .await

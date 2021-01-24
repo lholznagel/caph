@@ -25,7 +25,7 @@ pub struct MarketFilter {
     #[serde(rename = "maxItems")]
     pub max_items: Option<u32>,
     #[serde(rename = "sortPrice")]
-    pub sort_price: Option<Sort>
+    pub sort_price: Option<Sort>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -128,91 +128,105 @@ impl MarketService {
             .map_err(|x| x.into())
     }
 
-    pub async fn stats(&self, item_id: u32, is_buy_order: bool) -> Result<MarketStats, EveServerError> {
+    pub async fn stats(
+        &self,
+        item_id: u32,
+        is_buy_order: bool,
+    ) -> Result<MarketStats, EveServerError> {
         #[derive(sqlx::FromRow)]
         struct CountResult {
-            count: i64
+            count: i64,
         }
 
         #[derive(sqlx::FromRow)]
         struct PriceResult {
-            price: f32
+            price: f32,
         }
 
         let mut conn = self.db.acquire().await.unwrap();
-        let highest_price = sqlx::query_as::<_, PriceResult>(r#"SELECT MAX(market_orders.price) as price
+        let highest_price = sqlx::query_as::<_, PriceResult>(
+            r#"SELECT MAX(market_orders.price) as price
             FROM market_orders
             JOIN market_history
             ON market_orders.order_id = market_history.order_id
             WHERE market_history.volume_remain > 0
             AND market_orders.type_id = $1
             AND market_orders.is_buy_order = $2
-            "#)
-            .bind(item_id as i32)
-            .bind(is_buy_order)
-            .fetch_one(&mut conn)
-            .await
-            .unwrap()
-            .price;
-        let lowest_price = sqlx::query_as::<_, PriceResult>(r#"SELECT MIN(market_orders.price) as price
+            "#,
+        )
+        .bind(item_id as i32)
+        .bind(is_buy_order)
+        .fetch_one(&mut conn)
+        .await
+        .unwrap()
+        .price;
+        let lowest_price = sqlx::query_as::<_, PriceResult>(
+            r#"SELECT MIN(market_orders.price) as price
             FROM market_orders
             JOIN market_history
             ON market_orders.order_id = market_history.order_id
             WHERE market_history.volume_remain > 0
             AND market_orders.type_id = $1
             AND market_orders.is_buy_order = $2
-            "#)
-            .bind(item_id as i32)
-            .bind(is_buy_order)
-            .fetch_one(&mut conn)
-            .await
-            .unwrap()
-            .price;
-        let average_price = sqlx::query_as::<_, PriceResult>(r#"SELECT CAST(AVG(market_orders.price) as real) as price
+            "#,
+        )
+        .bind(item_id as i32)
+        .bind(is_buy_order)
+        .fetch_one(&mut conn)
+        .await
+        .unwrap()
+        .price;
+        let average_price = sqlx::query_as::<_, PriceResult>(
+            r#"SELECT CAST(AVG(market_orders.price) as real) as price
             FROM market_orders
             JOIN market_history
             ON market_orders.order_id = market_history.order_id
             WHERE market_history.volume_remain > 0
             AND market_orders.type_id = $1
             AND market_orders.is_buy_order = $2
-            "#)
-            .bind(item_id as i32)
-            .bind(is_buy_order)
-            .fetch_one(&mut conn)
-            .await
-            .unwrap()
-            .price;
+            "#,
+        )
+        .bind(item_id as i32)
+        .bind(is_buy_order)
+        .fetch_one(&mut conn)
+        .await
+        .unwrap()
+        .price;
 
-        let order_count = sqlx::query_as::<_, CountResult>(r#"SELECT COUNT(*) as count
+        let order_count = sqlx::query_as::<_, CountResult>(
+            r#"SELECT COUNT(*) as count
             FROM market_orders
             JOIN market_history
             ON market_orders.order_id = market_history.order_id
             WHERE market_history.volume_remain > 0
             AND market_orders.type_id = $1
             AND market_orders.is_buy_order = $2
-            "#)
-            .bind(item_id as i32)
-            .bind(is_buy_order)
-            .fetch_one(&mut conn)
-            .await
-            .unwrap()
-            .count as u32;
-        let total_volume = sqlx::query_as::<_, CountResult>(r#"SELECT CAST(volume_remain as BIGINT) as count
+            "#,
+        )
+        .bind(item_id as i32)
+        .bind(is_buy_order)
+        .fetch_one(&mut conn)
+        .await
+        .unwrap()
+        .count as u32;
+        let total_volume = sqlx::query_as::<_, CountResult>(
+            r#"SELECT CAST(volume_remain as BIGINT) as count
             FROM market_orders
             JOIN market_history
             ON market_orders.order_id = market_history.order_id
             WHERE market_history.volume_remain > 0
             AND market_orders.type_id = $1
             AND market_orders.is_buy_order = $2
-            "#)
-            .bind(item_id as i32)
-            .bind(is_buy_order)
-            .fetch_all(&mut conn)
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|x| x.count as u64)
-            .sum();
+            "#,
+        )
+        .bind(item_id as i32)
+        .bind(is_buy_order)
+        .fetch_all(&mut conn)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|x| x.count as u64)
+        .sum();
 
         Ok(MarketStats {
             average_price,

@@ -1,5 +1,5 @@
-use crate::metrics::PostgresMetrics;
 use crate::error::CollectorError;
+use crate::metrics::PostgresMetrics;
 
 use metrix::Metrics;
 use sqlx::{Pool, Postgres};

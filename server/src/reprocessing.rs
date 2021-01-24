@@ -1,4 +1,4 @@
-/// http://games.chruker.dk/eve_online/refining_yield.php?base=50
+/// <http://games.chruker.dk/eve_online/refining_yield.php?base=50>
 ///
 /// Just dont ask
 pub fn calc_reprocessing(

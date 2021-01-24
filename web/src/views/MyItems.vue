@@ -119,21 +119,13 @@ export default class MyItems extends Vue {
       });
     }
 
-    // TODO: use resolve api
-    const search: IName[] = (
-      await axios.post(
-        '/api/v1/items/search?exact=true',
-        parsed.map(x => x.name)
-      )
-    ).data;
-
     const req = {};
     for (const parse of parsed) {
       if (parse.name === '') {
         continue;
       }
 
-      const id = (search.find(y => y.name === parse.name) || { id: 1 }).id;
+      const id = (await axios.get(`/api/v1/items/search?exact=true&name=${parse.name}`)).data[0].id;
 
       // if there is already an entry, add the quantity
       if (req[id]) {

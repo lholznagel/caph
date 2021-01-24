@@ -1,5 +1,5 @@
-use crate::metrics::MarketMetrics;
 use crate::error::CollectorError;
+use crate::metrics::MarketMetrics;
 
 use caph_eve_online_api::{EveClient, MarketOrder};
 use futures::stream::{FuturesUnordered, StreamExt};

@@ -49,7 +49,7 @@ impl ItemService {
                 id: x.id,
                 material_id: x.material_id,
                 quantity: x.quantity,
-                reprocessed: x.quantity as f32 * (modifier / 100f32)
+                reprocessed: x.quantity as f32 * (modifier / 100f32),
             }
         })
         .collect::<Vec<ItemReprocessingResult>>();
@@ -58,23 +58,19 @@ impl ItemService {
 
     pub async fn fetch_my_items(&self) -> Result<Vec<MyItem>, EveServerError> {
         let mut conn = self.0.acquire().await?;
-        sqlx::query_as::<_, MyItem>(
-            "SELECT id, quantity FROM user_items",
-        )
-        .fetch_all(&mut conn)
-        .await
-        .map_err(|x| x.into())
+        sqlx::query_as::<_, MyItem>("SELECT id, quantity FROM user_items")
+            .fetch_all(&mut conn)
+            .await
+            .map_err(|x| x.into())
     }
 
     pub async fn fetch_my_item(&self, id: u32) -> Result<MyItem, EveServerError> {
         let mut conn = self.0.acquire().await?;
-        sqlx::query_as::<_, MyItem>(
-            "SELECT id, quantity FROM user_items WHERE id = $1",
-        )
-        .bind(id as i32)
-        .fetch_one(&mut conn)
-        .await
-        .map_err(|x| x.into())
+        sqlx::query_as::<_, MyItem>("SELECT id, quantity FROM user_items WHERE id = $1")
+            .bind(id as i32)
+            .fetch_one(&mut conn)
+            .await
+            .map_err(|x| x.into())
     }
 
     pub async fn push_my_items(&self, items: HashMap<u32, u64>) -> Result<(), EveServerError> {
@@ -90,9 +86,12 @@ impl ItemService {
             .map(|(_, x)| x as i64)
             .collect::<Vec<i64>>();
 
-        sqlx::query(&format!("DELETE FROM user_items WHERE id = ANY(ARRAY {:?})", ids))
-            .execute(&mut conn)
-            .await?;
+        sqlx::query(&format!(
+            "DELETE FROM user_items WHERE id = ANY(ARRAY {:?})",
+            ids
+        ))
+        .execute(&mut conn)
+        .await?;
 
         sqlx::query(
             r#"INSERT INTO user_items (id, quantity)
@@ -107,11 +106,7 @@ impl ItemService {
         Ok(())
     }
 
-    pub async fn search(
-        &self,
-        exact: bool,
-        name: &str,
-    ) -> Result<Vec<Item>, EveServerError> {
+    pub async fn search(&self, exact: bool, name: &str) -> Result<Vec<Item>, EveServerError> {
         let mut conn = self.0.acquire().await?;
 
         if exact {

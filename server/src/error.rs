@@ -1,12 +1,12 @@
 use std::error::Error;
 use std::fmt;
 
-use warp::{Rejection, reject::Reject};
+use warp::{reject::Reject, Rejection};
 
 #[derive(Debug)]
 pub enum EveServerError {
     IoError(std::io::Error),
-    SqlError(sqlx::Error)
+    SqlError(sqlx::Error),
 }
 
 impl Error for EveServerError {}

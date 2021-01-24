@@ -9,5 +9,5 @@ pub struct TypeMaterial {
 pub struct Material {
     #[serde(rename = "materialTypeID")]
     pub material_type_id: u32,
-    pub quantity: usize,
+    pub quantity: u32,
 }

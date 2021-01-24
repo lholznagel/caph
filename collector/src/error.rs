@@ -8,7 +8,7 @@ pub enum CollectorError {
     ClockRunsBackwards,
     DownloadSdeZip,
     SdeParserError(caph_eve_sde_parser::EveSdeParserError),
-    SqlxError(sqlx::Error)
+    SqlxError(sqlx::Error),
 }
 
 impl From<sqlx::Error> for CollectorError {

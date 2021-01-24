@@ -18,10 +18,7 @@ pub struct Sde {
 
 impl Sde {
     pub async fn new(db: Pool<Postgres>, metrics: Metrics) -> Self {
-        Self {
-            db,
-            metrics,
-        }
+        Self { db, metrics }
     }
 
     pub async fn background(&mut self) -> Result<(), CollectorError> {
@@ -30,7 +27,9 @@ impl Sde {
         let zip = caph_eve_sde_parser::fetch_zip()
             .await
             .map_err(|_| CollectorError::DownloadSdeZip)?;
-        self.metrics.duration(SdeMetrics::DOWNLOAD_TIME, start).await;
+        self.metrics
+            .duration(SdeMetrics::DOWNLOAD_TIME, start)
+            .await;
         log::debug!("Fetched sde zip");
 
         log::debug!("Parsing sde zip");
@@ -133,7 +132,9 @@ impl Sde {
             skip += BATCH_SIZE;
         }
 
-        self.metrics.duration(SdeMetrics::ITEM_INSERT_TIME, start).await;
+        self.metrics
+            .duration(SdeMetrics::ITEM_INSERT_TIME, start)
+            .await;
         log::info!("Importing items done. Took {}s", start.elapsed().as_secs());
         Ok(())
     }
@@ -225,7 +226,9 @@ impl Sde {
             skip += BATCH_SIZE;
         }
 
-        self.metrics.duration(SdeMetrics::NAME_INSERT_TIME, start).await;
+        self.metrics
+            .duration(SdeMetrics::NAME_INSERT_TIME, start)
+            .await;
         log::info!("Importing names done. Took {}s", start.elapsed().as_secs());
         Ok(())
     }
