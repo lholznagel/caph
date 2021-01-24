@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 caph_eve_online_api = { path = "../eve_api" }
 log = "0.4.11"
-morgan = { path = "../morgan" }
+morgan = { git = "https://github.com/lholznagel/morgan.git", rev = "624526038c210b142d2835fa77965064771ac192" }
 serde = { version = "1.0.118", features = ["derive"] }
 sqlx = { version = "0.4.1", default-features = false, features = ["macros", "runtime-tokio-rustls", "postgres"] }
 tokio = { version = "0.2.24", features = ["full"] }

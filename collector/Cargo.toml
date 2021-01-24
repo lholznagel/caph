@@ -9,7 +9,7 @@ caph_eve_online_api = { path = "../eve_api" }
 caph_eve_sde_parser = { path = "../eve_sde_parser" }
 futures = "0.3.8"
 log = "0.4.11"
-morgan = { path = "../morgan" }
-metrix = { path = "../metrix" }
+morgan = { git = "https://github.com/lholznagel/morgan.git", rev = "624526038c210b142d2835fa77965064771ac192" }
+metrix = { git = "https://github.com/lholznagel/metrix.git", rev = "ff47998a2d25dd744612909e641e2cc5d8fdebdf" }
 sqlx = { version = "0.4.1", default-features = false, features = ["macros", "runtime-tokio-rustls", "postgres"] }
 tokio = { version = "0.2.24", features = ["macros", "rt-threaded", "time", "stream"] }
