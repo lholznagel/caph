@@ -188,7 +188,7 @@ checksum = "b700ce4376041dcd0a327fd0097c41095743c4c8af8887265942faf1100bd040"
 [[package]]
 name = "cachem_derive"
 version = "0.0.0"
-source = "git+https://github.com/lholznagel/cachem.git?rev=811d92c6daa3dda093174e9e2361e0942b269a69#811d92c6daa3dda093174e9e2361e0942b269a69"
+source = "git+https://github.com/lholznagel/cachem.git?rev=63d0b001f312622984fd515462d44569add3ba74#63d0b001f312622984fd515462d44569add3ba74"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -198,7 +198,7 @@ dependencies = [
 [[package]]
 name = "cachem_utils"
 version = "0.0.0"
-source = "git+https://github.com/lholznagel/cachem.git?rev=811d92c6daa3dda093174e9e2361e0942b269a69#811d92c6daa3dda093174e9e2361e0942b269a69"
+source = "git+https://github.com/lholznagel/cachem.git?rev=63d0b001f312622984fd515462d44569add3ba74#63d0b001f312622984fd515462d44569add3ba74"
 dependencies = [
  "async-trait",
  "cachem_derive",

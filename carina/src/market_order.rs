@@ -1,7 +1,7 @@
 use crate::{Action, Caches, FileUtils, parser_request};
 
 use async_trait::async_trait;
-use cachem_utils::{CachemError, ProtocolParse, Save, ProtocolRequest};
+use cachem_utils::{CachemError, Parse, Save, ProtocolRequest};
 use std::collections::HashMap;
 use std::io::Cursor;
 use tokio::sync::Mutex;
@@ -111,7 +111,7 @@ impl Save for MarketOrderCache {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, ProtocolParse)]
+#[derive(Copy, Clone, Debug, PartialEq, Parse)]
 pub struct MarketOrderEntry {
     pub order_id:      u64,
     pub volume_remain: u32,
@@ -132,10 +132,10 @@ impl MarketOrderEntry {
     }
 }
 
-#[derive(ProtocolParse)]
+#[derive(Parse)]
 pub struct FetchMarketOrderEntryById(pub u64);
 parser_request!(Action::Fetch, Caches::MarketOrder, FetchMarketOrderEntryById);
 
-#[derive(ProtocolParse)]
+#[derive(Parse)]
 pub struct InsertMarketOrderEntries(pub Vec<MarketOrderEntry>);
 parser_request!(Action::Insert, Caches::MarketOrder, InsertMarketOrderEntries);

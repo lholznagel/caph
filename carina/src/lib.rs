@@ -18,7 +18,7 @@ pub use self::market_order_info::*;
 pub use self::region::*;
 pub use self::station::*;
 
-use cachem_utils::ProtocolParse;
+use cachem_utils::Parse;
 
 #[macro_export]
 macro_rules! parser_request {
@@ -36,32 +36,8 @@ macro_rules! parser_request {
     };
 }
 
-#[derive(Debug, Default, ProtocolParse)]
+#[derive(Debug, Default, Parse)]
 pub struct EmptyResponse;
-
-/*#[async_trait::async_trait]
-impl ProtocolParse for EmptyResponse {
-    /// An implementor should read the given buffer and parse that data into the
-    /// implementing struct
-    async fn read<B>(
-        buf: &mut B
-    ) -> Result<Self, CachemError>
-    where
-        B: AsyncBufRead + AsyncRead + Send + Unpin {
-
-        Ok(Self::default())
-    }
-
-    async fn write<B>(
-        &self,
-        buf: &mut B
-    ) -> Result<(), CachemError>
-    where
-        B: AsyncWrite + Send + Unpin {
-
-        Ok(())
-    }
-}*/
 
 #[derive(Debug)]
 pub enum Action {

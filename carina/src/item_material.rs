@@ -1,7 +1,7 @@
 use crate::{Action, Caches, FileUtils, parser_request};
 
 use async_trait::async_trait;
-use cachem_utils::{CachemError, ProtocolParse, Save, ProtocolRequest};
+use cachem_utils::{CachemError, Parse, Save, ProtocolRequest};
 use std::collections::HashMap;
 use std::io::Cursor;
 use tokio::sync::Mutex;
@@ -82,7 +82,7 @@ impl Save for ItemMaterialCache {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, ProtocolParse)]
+#[derive(Clone, Copy, Debug, PartialEq, Parse)]
 pub struct ItemMaterialEntry {
     pub item_id:     u32,
     pub material_id: u32,
@@ -103,10 +103,10 @@ impl ItemMaterialEntry {
     }
 }
 
-#[derive(ProtocolParse)]
+#[derive(Parse)]
 pub struct FetchItemMaterialEntryById(pub u32);
 parser_request!(Action::Fetch, Caches::ItemMaterial, FetchItemMaterialEntryById);
 
-#[derive(ProtocolParse)]
+#[derive(Parse)]
 pub struct InsertItemMaterialEntries(pub Vec<ItemMaterialEntry>);
 parser_request!(Action::Insert, Caches::ItemMaterial, InsertItemMaterialEntries);

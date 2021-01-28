@@ -1,52 +1,7 @@
-use cachem_utils::{CachemError, Protocol, StorageHandler};
+use cachem_utils::{CachemError, Protocol, StorageHandler, cachem};
 use carina::*;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufStream};
-use tokio::net::TcpListener;
-
-macro_rules! s {
-    (FetchId, $parse_into:ty, $cache:expr, $socket:expr) => {
-        {
-            let id = Protocol::read::<_, $parse_into>(&mut $socket).await.unwrap();
-            if let Some(x) = $cache.fetch_by_id(id.0).await {
-                Protocol::response(&mut $socket, x).await
-            } else {
-                $socket.write_u8(0u8).await.unwrap();
-                Ok(())
-            }
-        }
-    };
-    (FetchAll, $parse_into:ty, $cache:expr, $socket:expr) => {
-        {
-            if let Some(x) = $cache.fetch_all().await {
-                Protocol::response(&mut $socket, x).await
-            } else {
-                $socket.write_u8(0u8).await.unwrap();
-                Ok(())
-            }
-        }
-    };
-    (Lookup, $parse_from:ty, $cache:expr, $socket:expr) => {
-        {
-            let data = Protocol::read::<_, $parse_from>(&mut $socket).await.unwrap();
-            if let Ok(x) = $cache.lookup(data.0).await {
-                Protocol::response(&mut $socket, x).await
-            } else {
-                Err(CachemError::Empty)
-            }
-        }
-    };
-    (Insert, $parse_from:ty, $cache:expr, $socket:expr) => {
-        {
-            let data = Protocol::read::<_, $parse_from>(&mut $socket).await.unwrap();
-            if let Ok(_) = $cache.insert(data.0).await {
-                Protocol::response(&mut $socket, EmptyResponse::default()).await
-            } else {
-                Err(CachemError::Empty)
-            }
-        }
-    };
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -60,7 +15,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let market_order_info_cache = Arc::new(MarketOrderInfoCache::new().await?);
     let region_cache = Arc::new(RegionCache::new().await?);
     let station_cache = Arc::new(StationCache::new().await.unwrap());
-    let listener = TcpListener::bind("127.0.0.1:9999").await?;
 
     let mut storage_handler = StorageHandler::default();
     storage_handler.register(blueprint_cache.clone());
@@ -75,9 +29,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         storage_handler.save_on_interrupt().await;
     });
 
-    loop {
-        let (mut socket, _) = listener.accept().await?;
-
+    cachem! { 
+        "0.0.0.0:9998",
         let blueprint_copy = blueprint_cache.clone();
         let id_name_copy = id_name_cache.clone();
         let item_copy = item_cache.clone();
@@ -86,70 +39,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let market_order_info_copy = market_order_info_cache.clone();
         let region_copy = region_cache.clone();
         let station_copy = station_cache.clone();
-        tokio::spawn(async move {
-            // Only read the first two bytes, thats all we need to determine
-            // what action and what cache should be used
-            let mut buf = [0; 2];
 
-            loop {
-                let mut buf_socket = BufStream::new(socket);
-                match buf_socket.read(&mut buf).await {
-                    // socket closed
-                    Ok(n) if n == 0 => return,
-                    Ok(n) => n,
-                    Err(e) => {
-                        eprintln!("failed to read from socket; err = {:?}", e);
-                        return;
-                    }
-                };
+        (Action::Fetch, Caches::Blueprint)          => (FetchId, FetchBlueprintEntryById, blueprint_copy),
+        (Action::Insert, Caches::Blueprint)         => (Insert, InsertBlueprintEntries, blueprint_copy),
 
-                let action = Action::from(buf[0]);
-                let cache = Caches::from(buf[1]);
-                let x = match (action, cache) {
-                    (Action::Fetch, Caches::Blueprint) => s!(FetchId, FetchBlueprintEntryById, blueprint_copy, buf_socket),
-                    (Action::Insert, Caches::Blueprint) => s!(Insert, InsertBlueprintEntries, blueprint_copy, buf_socket),
+        (Action::Fetch, Caches::IdName)             => (FetchId, FetchNameEntryById, id_name_copy),
+        (Action::Insert, Caches::IdName)            => (Insert, InsertIdNameEntries, id_name_copy),
 
-                    (Action::Fetch, Caches::IdName) => s!(FetchId, FetchNameEntryById, id_name_copy, buf_socket),
-                    (Action::Insert, Caches::IdName) => s!(Insert, InsertIdNameEntries, id_name_copy, buf_socket),
+        (Action::Fetch, Caches::Item)               => (FetchId, FetchItemEntryById, item_copy),
+        (Action::Insert, Caches::Item)              => (Insert, InsertItemEntries, item_copy),
 
-                    (Action::Fetch, Caches::Item) => s!(FetchId, FetchItemEntryById, item_copy, buf_socket),
-                    (Action::Insert, Caches::Item) => s!(Insert, InsertItemEntries, item_copy, buf_socket),
+        (Action::Fetch, Caches::ItemMaterial)       => (FetchId, FetchItemMaterialEntryById, item_material_copy),
+        (Action::Insert, Caches::ItemMaterial)      => (Insert, InsertItemMaterialEntries, item_material_copy),
 
-                    (Action::Fetch, Caches::ItemMaterial) => s!(FetchId, FetchItemMaterialEntryById, item_material_copy, buf_socket),
-                    (Action::Insert, Caches::ItemMaterial) => s!(Insert, InsertItemMaterialEntries, item_material_copy, buf_socket),
+        (Action::Fetch, Caches::MarketOrder)        => (FetchId, FetchMarketOrderEntryById, market_order_copy),
+        (Action::Insert, Caches::MarketOrder)       => (Insert, InsertMarketOrderEntries, market_order_copy),
 
-                    (Action::Fetch, Caches::MarketOrder) => s!(FetchId, FetchMarketOrderEntryById, market_order_copy, buf_socket),
-                    (Action::Insert, Caches::MarketOrder) => {
-                        {
-                            let data = Protocol::read::<_, InsertMarketOrderEntries>(&mut buf_socket).await.unwrap();
-                            if let Ok(_) = market_order_copy.insert(data.0).await {
-                                Protocol::response(&mut buf_socket, EmptyResponse::default()).await
-                            } else {
-                                Err(CachemError::Empty)
-                            }
-                        }
-                    }
+        (Action::Fetch, Caches::MarketOrderInfo)    => (FetchId, FetchMarketOrderInfoEntryById, market_order_info_copy),
+        (Action::Lookup, Caches::MarketOrderInfo)   => (Lookup, LookupMarketOrderInfoEntries, market_order_info_copy),
+        (Action::Insert, Caches::MarketOrderInfo)   => (Insert, InsertMarketOrderInfoEntries, market_order_info_copy),
 
-                    (Action::Fetch, Caches::MarketOrderInfo) => s!(FetchId, FetchMarketOrderInfoEntryById, market_order_info_copy, buf_socket),
-                    (Action::Lookup, Caches::MarketOrderInfo) => s!(Lookup, LookupMarketOrderInfoEntries, market_order_info_copy, buf_socket),
-                    (Action::Insert, Caches::MarketOrderInfo) => s!(Insert, InsertMarketOrderInfoEntries, market_order_info_copy, buf_socket),
+        (Action::Fetch, Caches::Region)             => (FetchAll, FetchRegionEntries, region_copy),
+        (Action::Insert, Caches::Region)            => (Insert, InsertRegionEntries, region_copy),
 
-                    (Action::Fetch, Caches::Region) => s!(FetchAll, FetchRegionEntries, region_copy, buf_socket),
-                    (Action::Insert, Caches::Region) => s!(Insert, InsertRegionEntries, region_copy, buf_socket),
-
-                    (Action::Fetch, Caches::Station) => s!(FetchId, FetchStationEntryById, station_copy, buf_socket),
-                    (Action::Insert, Caches::Station) => s!(Insert, InsertStationEntries, station_copy, buf_socket),
-                    _ => panic!("Invalid message {:?}", buf)
-                };
-
-                if let Err(e) = x {
-                    log::error!("Message error {}", e);
-                } else {
-                    log::info!("Message ok");
-                }
-                // return the socket so that we don´t consume it
-                socket = buf_socket.into_inner();
-            }
-        });
-    }
+        (Action::Fetch, Caches::Station)            => (FetchId, FetchStationEntryById, station_copy),
+        (Action::Insert, Caches::Station)           => (Insert, InsertStationEntries, station_copy),
+    };
 }

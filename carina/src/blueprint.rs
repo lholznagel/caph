@@ -1,7 +1,7 @@
 use crate::{Action, Caches, FileUtils, parser_request};
 
 use async_trait::async_trait;
-use cachem_utils::{CachemError, ProtocolParse, Save, ProtocolRequest};
+use cachem_utils::{CachemError, Parse, Save, ProtocolRequest};
 use std::collections::HashMap;
 use std::io::Cursor;
 use tokio::sync::Mutex;
@@ -81,7 +81,7 @@ impl Save for BlueprintCache {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, ProtocolParse)]
+#[derive(Clone, Debug, PartialEq, Parse)]
 pub struct BlueprintEntry {
     pub item_id:   u32,
     pub time:      u32,
@@ -102,7 +102,7 @@ impl BlueprintEntry {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, ProtocolParse)]
+#[derive(Clone, Debug, PartialEq, Parse)]
 pub struct Material {
     pub material_id: u32,
     pub quantity:    u32,
@@ -123,10 +123,10 @@ impl Material {
     }
 }
 
-#[derive(ProtocolParse)]
+#[derive(Parse)]
 pub struct FetchBlueprintEntryById(pub u32);
 parser_request!(Action::Fetch, Caches::Blueprint, FetchBlueprintEntryById);
 
-#[derive(ProtocolParse)]
+#[derive(Parse)]
 pub struct InsertBlueprintEntries(pub Vec<BlueprintEntry>);
 parser_request!(Action::Insert, Caches::Blueprint, InsertBlueprintEntries);

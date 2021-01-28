@@ -1,7 +1,7 @@
 use crate::{Action, Caches, FileUtils, parser_request};
 
 use async_trait::async_trait;
-use cachem_utils::{CachemError, ProtocolParse, Save, ProtocolRequest};
+use cachem_utils::{CachemError, Parse, Save, ProtocolRequest};
 use std::collections::HashSet;
 use std::io::Cursor;
 use tokio::sync::Mutex;
@@ -61,7 +61,7 @@ impl Save for RegionCache {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, ProtocolParse)]
+#[derive(PartialEq, Eq, Hash, Parse)]
 pub struct RegionEntry {
     pub region_id: u32,
 }
@@ -77,13 +77,13 @@ impl RegionEntry {
     }
 }
 
-#[derive(ProtocolParse)]
+#[derive(Parse)]
 pub struct RegionEntries(pub HashSet<u32>);
 
-#[derive(Default, ProtocolParse)]
+#[derive(Default, Parse)]
 pub struct FetchRegionEntries;
 parser_request!(Action::Fetch, Caches::Region, FetchRegionEntries);
 
-#[derive(ProtocolParse)]
+#[derive(Parse)]
 pub struct InsertRegionEntries(pub HashSet<RegionEntry>);
 parser_request!(Action::Insert, Caches::Region, InsertRegionEntries);
