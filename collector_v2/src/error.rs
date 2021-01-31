@@ -1,5 +1,7 @@
 //! Thin error wrapper that is used in the application
 
+use cachem::CachemError;
+
 /// Type wrapper for a result
 pub type CollectorResult<T> = std::result::Result<T, CollectorError>;
 
@@ -11,9 +13,9 @@ pub enum CollectorError {
     // There was an error parsing the sde.zip file
     SdeParserError(caph_eve_sde_parser::EveSdeParserError),
     // There was an error with the database connection pool
-    DbConnectionPoolError(cachem_utils::CachemConnectionPoolError),
+    DbConnectionPoolError(cachem::CachemError),
     // There was an error with the database protocol
-    DbProtocolError(cachem_utils::CachemError),
+    DbProtocolError(cachem::CachemError),
 }
 impl std::error::Error for CollectorError {}
 
@@ -23,14 +25,11 @@ impl std::fmt::Display for CollectorError {
     }
 }
 
-impl From<cachem_utils::CachemConnectionPoolError> for CollectorError {
-    fn from(x: cachem_utils::CachemConnectionPoolError) -> Self {
-        Self::DbConnectionPoolError(x)
-    }
-}
-
-impl From<cachem_utils::CachemError> for CollectorError {
-    fn from(x: cachem_utils::CachemError) -> Self {
-        Self::DbProtocolError(x)
+impl From<cachem::CachemError> for CollectorError {
+    fn from(x: cachem::CachemError) -> Self {
+        match x {
+            CachemError::ConnectionPoolError(_) => Self::DbConnectionPoolError(x),
+            _ => Self::DbProtocolError(x),
+        }
     }
 }

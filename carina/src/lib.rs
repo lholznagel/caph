@@ -1,5 +1,4 @@
 mod blueprint;
-mod file;
 mod id_name;
 mod item_material;
 mod item;
@@ -9,7 +8,6 @@ mod region;
 mod station;
 
 pub use self::blueprint::*;
-pub use self::file::*;
 pub use self::id_name::*;
 pub use self::item_material::*;
 pub use self::item::*;
@@ -18,29 +16,13 @@ pub use self::market_order_info::*;
 pub use self::region::*;
 pub use self::station::*;
 
-use cachem_utils::Parse;
-
-#[macro_export]
-macro_rules! parser_request {
-    ($action:expr, $cache:expr, $struct:ident) => {
-        #[async_trait::async_trait]
-        impl ProtocolRequest for $struct {
-            fn action(&self) -> u8 {
-                $action.into()
-            }
-
-            fn cache_type(&self) -> u8 {
-                $cache.into()
-            }
-        }
-    };
-}
+use cachem::Parse;
 
 #[derive(Debug, Default, Parse)]
 pub struct EmptyResponse;
 
 #[derive(Debug)]
-pub enum Action {
+pub enum Actions {
     Fetch,
     Insert,
     Update,
@@ -48,7 +30,7 @@ pub enum Action {
     Lookup,
 }
 
-impl Into<u8> for Action {
+impl Into<u8> for Actions {
     fn into(self) -> u8 {
         match self {
             Self::Fetch  => 0u8,
@@ -60,15 +42,15 @@ impl Into<u8> for Action {
     }
 }
 
-impl From<u8> for Action {
+impl From<u8> for Actions {
     fn from(x: u8) -> Self {
         match x {
-            0   => Action::Fetch,
-            1   => Action::Insert,
-            2   => Action::Update,
-            3   => Action::Delete,
-            4   => Action::Lookup,
-            _ => panic!("Unrecognized action {}", x),
+            0   => Actions::Fetch,
+            1   => Actions::Insert,
+            2   => Actions::Update,
+            3   => Actions::Delete,
+            4   => Actions::Lookup,
+            _ => panic!("Unrecognized actions {}", x),
         }
     }
 }

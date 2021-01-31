@@ -5,14 +5,14 @@ mod sde;
 use self::market::*;
 use self::sde::*;
 
-use cachem_utils::ConnectionPool;
+use cachem::ConnectionPool;
 use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     morgan::Morgan::init(vec![]);
 
-    let pool = ConnectionPool::new(10).await?;
+    let pool = ConnectionPool::new("127.0.0.1:9999".into(), 10).await?;
 
     let pool_copy = pool.clone();
     let market = tokio::task::spawn(async {

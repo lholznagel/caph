@@ -1,12 +1,11 @@
-use crate::{Action, Caches, FileUtils, parser_request};
+use crate::{Actions, Caches, EmptyResponse};
 
 use async_trait::async_trait;
-use cachem_utils::{CachemError, Parse, Save, ProtocolRequest};
+use cachem::{CachemError, Fetch, FileUtils, Insert, Parse, Save, request};
 use std::collections::HashMap;
-use std::io::Cursor;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
-pub struct BlueprintCache(Mutex<HashMap<u32, BlueprintEntry>>);
+pub struct BlueprintCache(RwLock<HashMap<u32, BlueprintEntry>>);
 
 impl BlueprintCache {
     pub const CAPACITY: usize = 100_000;
@@ -15,20 +14,41 @@ impl BlueprintCache {
 
     pub async fn new() -> Result<Self, CachemError> {
         let cache = Self::load().await?;
-        Ok(Self(Mutex::new(cache)))
+        Ok(Self(RwLock::new(cache)))
     }
 
-    pub async fn fetch_by_id(&self, item_id: u32) -> Option<BlueprintEntry> {
-        if let Some(x) = self.0.lock().await.get(&item_id) {
-            Some(x.clone())
+    async fn load() -> Result<HashMap<u32, BlueprintEntry>, CachemError> {
+        let entries = FileUtils::open::<BlueprintEntry>(Self::FILE_NAME).await?;
+        let mut data = HashMap::with_capacity(entries.len() as usize);
+        for entry in entries {
+            data.insert(entry.item_id, entry);
+        }
+        Ok(data)
+    }
+}
+
+#[async_trait]
+impl Fetch<FetchBlueprintEntryById> for BlueprintCache {
+    type Error = EmptyResponse;
+    type Response = BlueprintEntry;
+
+    async fn fetch(&self, input: FetchBlueprintEntryById) -> Result<Self::Response, Self::Error> {
+        if let Some(x) = self.0.read().await.get(&input.0) {
+            Ok(x.clone())
         } else {
-            None
+            Err(EmptyResponse::default())
         }
     }
+}
 
-    pub async fn insert(&self, data: Vec<BlueprintEntry>) -> Result<(), CachemError> {
-        let mut old_data = { self.0.lock().await.clone() };
-        let mut data = data;
+#[async_trait]
+impl Insert<InsertBlueprintEntries> for BlueprintCache {
+    type Error = EmptyResponse;
+    type Response = EmptyResponse;
+
+    async fn insert(&self, input: InsertBlueprintEntries) -> Result<Self::Response, Self::Error> {
+        let mut old_data = { self.0.read().await.clone() };
+        let mut data = input.0;
         let mut changes: usize = 0;
 
         while let Some(x) = data.pop() {
@@ -48,35 +68,20 @@ impl BlueprintCache {
 
         // there where some changes, so we apply those to the main structure
         if changes > 0 {
-            *self.0.lock().await = old_data;
+            *self.0.write().await = old_data;
         }
-        Ok(())
-    }
-
-    async fn load() -> Result<HashMap<u32, BlueprintEntry>, CachemError> {
-        if let Some(mut buf) = FileUtils::open(Self::FILE_NAME).await? {
-            let length = u32::read(&mut buf).await?;
-            let mut data = HashMap::with_capacity(length as usize);
-            for _ in 0..length {
-                let blueprint_entry = BlueprintEntry::read(&mut buf).await?;
-                data.insert(blueprint_entry.item_id, blueprint_entry);
-            }
-            Ok(data)
-        } else {
-            Ok(HashMap::with_capacity(Self::CAPACITY))
-        }
+        Ok(EmptyResponse::default())
     }
 }
 
 #[async_trait]
 impl Save for BlueprintCache {
     async fn store(&self) -> Result<(), CachemError> {
-        let mut buf = Cursor::new(Vec::new());
-        u32::from(self.0.lock().await.len() as u32).write(&mut buf).await?;
-        for entries in self.0.lock().await.values() {
-            entries.write(&mut buf).await?;
+        let mut entries = Vec::with_capacity(self.0.read().await.len());
+        for (_, x) in self.0.read().await.iter() {
+            entries.push(x.clone());
         }
-        FileUtils::save(Self::FILE_NAME, buf).await?;
+        FileUtils::save(Self::FILE_NAME, entries).await?;
         Ok(())
     }
 }
@@ -123,10 +128,10 @@ impl Material {
     }
 }
 
+#[request(Actions::Fetch, Caches::Blueprint)]
 #[derive(Parse)]
 pub struct FetchBlueprintEntryById(pub u32);
-parser_request!(Action::Fetch, Caches::Blueprint, FetchBlueprintEntryById);
 
+#[request(Actions::Insert, Caches::Blueprint)]
 #[derive(Parse)]
 pub struct InsertBlueprintEntries(pub Vec<BlueprintEntry>);
-parser_request!(Action::Insert, Caches::Blueprint, InsertBlueprintEntries);

@@ -1,4 +1,4 @@
-use cachem_utils::{ConnectionPool, Protocol};
+use cachem::{ConnectionPool, Protocol};
 use caph_eve_sde_parser::{
     Blueprint, ParseRequest, ParseResult, Schematic, Station, TypeIds, TypeMaterial, UniqueName,
 };
@@ -123,7 +123,6 @@ impl Sde {
                     log::info!("After send region {}", start.elapsed().as_millis());
                 }
             }
-            self.pool.release(conn).await;
         }
 
         log::info!("Took {}", start.elapsed().as_millis());

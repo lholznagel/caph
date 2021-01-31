@@ -1,12 +1,11 @@
-use crate::{Action, Caches, FileUtils, parser_request};
+use crate::{Actions, Caches, EmptyResponse};
 
 use async_trait::async_trait;
-use cachem_utils::{CachemError, Parse, Save, ProtocolRequest};
+use cachem::{CachemError, Fetch, FileUtils, Insert, Parse, Save, request};
 use std::collections::HashSet;
-use std::io::Cursor;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
-pub struct RegionCache(Mutex<HashSet<u32>>);
+pub struct RegionCache(RwLock<HashSet<u32>>);
 
 impl RegionCache {
     pub const CAPACITY: usize = 50;
@@ -15,48 +14,54 @@ impl RegionCache {
 
     pub async fn new() -> Result<Self, CachemError> {
         let cache = Self::load().await?;
-        Ok(Self(Mutex::new(cache)))
-    }
-
-    pub async fn fetch_all(&self) -> Option<RegionEntries> {
-        let entries = self.0.lock().await;
-        Some(RegionEntries(entries.clone()))
-    }
-
-    pub async fn insert(&self, data: HashSet<RegionEntry>) -> Result<(), CachemError> {
-        let mut new_data = HashSet::with_capacity(data.len());
-        for x in data {
-            new_data.insert(x.region_id.into());
-        }
-
-        *self.0.lock().await = new_data;
-        Ok(())
+        Ok(Self(RwLock::new(cache)))
     }
 
     async fn load() -> Result<HashSet<u32>, CachemError> {
-        if let Some(mut db_file) = FileUtils::open(Self::FILE_NAME).await? {
-            let length = u32::read(&mut db_file).await?;
-            let mut data = HashSet::with_capacity(length as usize);
-            for _ in 0..length {
-                let region_id = u32::read(&mut db_file).await?;
-                data.insert(region_id);
-            }
-            Ok(data)
-        } else {
-            Ok(HashSet::with_capacity(Self::CAPACITY))
+        let entries = FileUtils::open::<u32>(Self::FILE_NAME).await?;
+        let mut data = HashSet::with_capacity(entries.len() as usize);
+        for entry in entries {
+            data.insert(entry);
         }
+        Ok(data)
+    }
+}
+
+#[async_trait]
+impl Fetch<FetchRegionEntries> for RegionCache {
+    type Error = EmptyResponse;
+    type Response = RegionEntries;
+
+    async fn fetch(&self, _input: FetchRegionEntries) -> Result<Self::Response, Self::Error> {
+        let entries = self.0.read().await;
+        Ok(RegionEntries(entries.clone()))
+    }
+}
+
+#[async_trait]
+impl Insert<InsertRegionEntries> for RegionCache {
+    type Error = EmptyResponse;
+    type Response = EmptyResponse;
+
+    async fn insert(&self, input: InsertRegionEntries) -> Result<Self::Response, Self::Error> {
+        let mut new_data = HashSet::with_capacity(input.0.len());
+        for x in input.0 {
+            new_data.insert(x.region_id.into());
+        }
+
+        *self.0.write().await = new_data;
+        Ok(EmptyResponse::default())
     }
 }
 
 #[async_trait]
 impl Save for RegionCache {
     async fn store(&self) -> Result<(), CachemError> {
-        let mut db_data = Cursor::new(Vec::new());
-        u32::from(self.0.lock().await.len() as u32).write(&mut db_data).await?;
-        for (region_id) in self.0.lock().await.iter() {
-            region_id.write(&mut db_data).await?;
+        let mut entries = Vec::with_capacity(self.0.read().await.len());
+        for x in self.0.read().await.iter() {
+            entries.push(*x);
         }
-        FileUtils::save(Self::FILE_NAME, db_data).await?;
+        FileUtils::save(Self::FILE_NAME, entries).await?;
         Ok(())
     }
 }
@@ -80,10 +85,10 @@ impl RegionEntry {
 #[derive(Parse)]
 pub struct RegionEntries(pub HashSet<u32>);
 
+#[request(Actions::Fetch, Caches::Region)]
 #[derive(Default, Parse)]
 pub struct FetchRegionEntries;
-parser_request!(Action::Fetch, Caches::Region, FetchRegionEntries);
 
+#[request(Actions::Insert, Caches::Region)]
 #[derive(Parse)]
 pub struct InsertRegionEntries(pub HashSet<RegionEntry>);
-parser_request!(Action::Insert, Caches::Region, InsertRegionEntries);

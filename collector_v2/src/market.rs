@@ -1,6 +1,6 @@
 use crate::error::CollectorError;
 
-use cachem_utils::{ConnectionPool, Protocol};
+use cachem::{ConnectionPool, Protocol};
 use caph_eve_online_api::{EveClient, MarketOrder};
 use carina::*;
 use chrono::NaiveDateTime;
@@ -31,7 +31,6 @@ impl Market {
         .await
         .unwrap();
         log::info!("After fetch");
-        self.pool.release(conn).await;
         log::info!("There are {} regions", regions.0.len());
 
         log::info!("Requesting market_infos");
@@ -114,7 +113,6 @@ impl Market {
             )
             .await
             .unwrap();
-            self.pool.release(conn).await;
             log::info!("Send all market infos to db {}ms", start.elapsed().as_millis());
         } else {
             log::warn!("Market orders was empty");
@@ -145,7 +143,6 @@ impl Market {
             )
             .await
             .unwrap();
-            self.pool.release(conn).await;
         } else {
             log::warn!("Market orders was empty");
         }

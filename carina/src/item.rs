@@ -1,12 +1,11 @@
-use crate::{Action, Caches, FileUtils, parser_request};
+use crate::{Actions, Caches, EmptyResponse};
 
 use async_trait::async_trait;
-use cachem_utils::{CachemError, Parse, Save, ProtocolRequest};
+use cachem::{CachemError, Fetch, FileUtils, Insert, Parse, Save, request};
 use std::collections::HashMap;
-use std::io::Cursor;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
-pub struct ItemCache(Mutex<HashMap<u32, ItemEntry>>);
+pub struct ItemCache(RwLock<HashMap<u32, ItemEntry>>);
 
 impl ItemCache {
     pub const CAPACITY: usize = 40_000;
@@ -15,21 +14,42 @@ impl ItemCache {
 
     pub async fn new() -> Result<Self, CachemError> {
         let cache = Self::load().await?;
-        Ok(Self(Mutex::new(cache)))
+        Ok(Self(RwLock::new(cache)))
     }
 
-    pub async fn fetch_by_id(&self, item_id: u32) -> Option<ItemEntry> {
-        if let Some(x) = self.0.lock().await.get(&item_id) {
-            Some(x.clone())
+    async fn load() -> Result<HashMap<u32, ItemEntry>, CachemError> {
+        let entries = FileUtils::open::<ItemEntry>(Self::FILE_NAME).await?;
+        let mut data = HashMap::with_capacity(entries.len() as usize);
+        for entry in entries {
+            data.insert(entry.item_id, entry);
+        }
+        Ok(data)
+    }
+}
+
+#[async_trait]
+impl Fetch<FetchItemEntryById> for ItemCache {
+    type Error = EmptyResponse;
+    type Response = ItemEntry;
+
+    async fn fetch(&self, input: FetchItemEntryById) -> Result<Self::Response, Self::Error> {
+        if let Some(x) = self.0.read().await.get(&input.0) {
+            Ok(x.clone())
         } else {
-            None
+            Err(EmptyResponse::default())
         }
     }
+}
 
-    pub async fn insert(&self, data: Vec<ItemEntry>) -> Result<(), CachemError> {
-        let mut old_data = { self.0.lock().await.clone() };
-        let mut data = data;
-        let mut changes = 0usize;
+#[async_trait]
+impl Insert<InsertItemEntries> for ItemCache {
+    type Error = EmptyResponse;
+    type Response = EmptyResponse;
+
+    async fn insert(&self, input: InsertItemEntries) -> Result<Self::Response, Self::Error> {
+        let mut old_data = { self.0.read().await.clone() };
+        let mut data = input.0;
+        let mut changes: usize = 0;
 
         while let Some(x) = data.pop() {
             old_data
@@ -48,35 +68,20 @@ impl ItemCache {
 
         // there where some changes, so we apply those to the main structure
         if changes > 0 {
-            *self.0.lock().await = old_data;
+            *self.0.write().await = old_data;
         }
-        Ok(())
-    }
-
-    async fn load() -> Result<HashMap<u32, ItemEntry>, CachemError> {
-        if let Some(mut buf) = FileUtils::open(Self::FILE_NAME).await? {
-            let length = u32::read(&mut buf).await?;
-            let mut data = HashMap::with_capacity(length as usize);
-            for _ in 0..length {
-                let entry = ItemEntry::read(&mut buf).await?;
-                data.insert(entry.item_id, entry);
-            }
-            Ok(data)
-        } else {
-            Ok(HashMap::with_capacity(Self::CAPACITY))
-        }
+        Ok(EmptyResponse::default())
     }
 }
 
 #[async_trait]
 impl Save for ItemCache {
     async fn store(&self) -> Result<(), CachemError> {
-        let mut buf = Cursor::new(Vec::new());
-        u32::from(self.0.lock().await.len() as u32).write(&mut buf).await?;
-        for entries in self.0.lock().await.values() {
-            entries.write(&mut buf).await?;
+        let mut entries = Vec::with_capacity(self.0.read().await.len());
+        for (_, x) in self.0.read().await.iter() {
+            entries.push(x.clone());
         }
-        FileUtils::save(Self::FILE_NAME, buf).await?;
+        FileUtils::save(Self::FILE_NAME, entries).await?;
         Ok(())
     }
 }
@@ -99,10 +104,10 @@ impl ItemEntry {
     }
 }
 
+#[request(Actions::Fetch, Caches::Item)]
 #[derive(Parse)]
 pub struct FetchItemEntryById(pub u32);
-parser_request!(Action::Fetch, Caches::Item, FetchItemEntryById);
 
+#[request(Actions::Insert, Caches::Item)]
 #[derive(Parse)]
 pub struct InsertItemEntries(pub Vec<ItemEntry>);
-parser_request!(Action::Insert, Caches::Item, InsertItemEntries);

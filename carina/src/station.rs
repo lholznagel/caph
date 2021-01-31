@@ -1,12 +1,11 @@
-use crate::{Action, Caches, FileUtils, parser_request};
+use crate::{Actions, Caches, EmptyResponse};
 
 use async_trait::async_trait;
-use cachem_utils::{CachemError, Parse, Save, ProtocolRequest};
+use cachem::{CachemError, Fetch, FileUtils, Insert, Parse, Save, request};
 use std::collections::HashMap;
-use std::io::Cursor;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
-pub struct StationCache(Mutex<HashMap<u32, StationEntry>>);
+pub struct StationCache(RwLock<HashMap<u32, StationEntry>>);
 
 impl StationCache {
     pub const CAPACITY: usize = 6_000;
@@ -15,21 +14,42 @@ impl StationCache {
 
     pub async fn new() -> Result<Self, CachemError> {
         let cache = Self::load().await?;
-        Ok(Self(Mutex::new(cache)))
+        Ok(Self(RwLock::new(cache)))
     }
 
-    pub async fn fetch_by_id(&self, station_id: u32) -> Option<StationEntry> {
-        if let Some(x) = self.0.lock().await.get(&station_id) {
-            Some(*x)
+    async fn load() -> Result<HashMap<u32, StationEntry>, CachemError> {
+        let entries = FileUtils::open::<StationEntry>(Self::FILE_NAME).await?;
+        let mut data = HashMap::with_capacity(entries.len() as usize);
+        for entry in entries {
+            data.insert(entry.system_id, entry);
+        }
+        Ok(data)
+    }
+}
+
+#[async_trait]
+impl Fetch<FetchStationEntryById> for StationCache {
+    type Error = EmptyResponse;
+    type Response = StationEntry;
+
+    async fn fetch(&self, input: FetchStationEntryById) -> Result<Self::Response, Self::Error> {
+        if let Some(x) = self.0.read().await.get(&input.0) {
+            Ok(x.clone())
         } else {
-            None
+            Err(EmptyResponse::default())
         }
     }
+}
 
-    pub async fn insert(&self, data: Vec<StationEntry>) -> Result<(), CachemError> {
-        let mut old_data = { self.0.lock().await.clone() };
-        let mut data = data;
-        let mut changes = 0usize;
+#[async_trait]
+impl Insert<InsertStationEntries> for StationCache {
+    type Error = EmptyResponse;
+    type Response = EmptyResponse;
+
+    async fn insert(&self, input: InsertStationEntries) -> Result<Self::Response, Self::Error> {
+        let mut old_data = { self.0.read().await.clone() };
+        let mut data = input.0;
+        let mut changes: usize = 0;
 
         while let Some(x) = data.pop() {
             old_data
@@ -37,7 +57,7 @@ impl StationCache {
                 .and_modify(|entry| {
                     if *entry != x {
                         changes += 1;
-                        *entry = x;
+                        *entry = x.clone();
                     }
                 })
                 .or_insert({
@@ -46,36 +66,22 @@ impl StationCache {
                 });
         }
 
+        // there where some changes, so we apply those to the main structure
         if changes > 0 {
-            *self.0.lock().await = old_data;
+            *self.0.write().await = old_data;
         }
-        Ok(())
-    }
-
-    async fn load() -> Result<HashMap<u32, StationEntry>, CachemError> {
-        if let Some(mut buf) = FileUtils::open(Self::FILE_NAME).await? {
-            let length = u32::read(&mut buf).await?;
-            let mut data = HashMap::with_capacity(length as usize);
-            for _ in 0..length {
-                let entry = StationEntry::read(&mut buf).await?;
-                data.insert(entry.station_id, entry);
-            }
-            Ok(data)
-        } else {
-            Ok(HashMap::with_capacity(Self::CAPACITY))
-        }
+        Ok(EmptyResponse::default())
     }
 }
 
 #[async_trait]
 impl Save for StationCache {
     async fn store(&self) -> Result<(), CachemError> {
-        let mut buf = Cursor::new(Vec::new());
-        u32::from(self.0.lock().await.len() as u32).write(&mut buf).await?;
-        for entries in self.0.lock().await.values() {
-            entries.write(&mut buf).await?;
+        let mut entries = Vec::with_capacity(self.0.read().await.len());
+        for (_, x) in self.0.read().await.iter() {
+            entries.push(x.clone());
         }
-        FileUtils::save(Self::FILE_NAME, buf).await?;
+        FileUtils::save(Self::FILE_NAME, entries).await?;
         Ok(())
     }
 }
@@ -105,10 +111,10 @@ impl StationEntry {
     }
 }
 
+#[request(Actions::Fetch, Caches::Station)]
 #[derive(Parse)]
 pub struct FetchStationEntryById(pub u32);
-parser_request!(Action::Fetch, Caches::Station, FetchStationEntryById);
 
+#[request(Actions::Insert, Caches::Station)]
 #[derive(Parse)]
 pub struct InsertStationEntries(pub Vec<StationEntry>);
-parser_request!(Action::Insert, Caches::Station, InsertStationEntries);

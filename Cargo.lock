@@ -186,23 +186,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b700ce4376041dcd0a327fd0097c41095743c4c8af8887265942faf1100bd040"
 
 [[package]]
+name = "cachem"
+version = "0.1.0"
+source = "git+https://github.com/lholznagel/cachem.git?rev=1f21a9c860287601849f05c1d86d47797f7901e5#1f21a9c860287601849f05c1d86d47797f7901e5"
+dependencies = [
+ "async-trait",
+ "cachem_derive",
+ "tokio 1.1.1",
+]
+
+[[package]]
 name = "cachem_derive"
-version = "0.0.0"
-source = "git+https://github.com/lholznagel/cachem.git?rev=63d0b001f312622984fd515462d44569add3ba74#63d0b001f312622984fd515462d44569add3ba74"
+version = "0.1.0"
+source = "git+https://github.com/lholznagel/cachem.git?rev=1f21a9c860287601849f05c1d86d47797f7901e5#1f21a9c860287601849f05c1d86d47797f7901e5"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "cachem_utils"
-version = "0.0.0"
-source = "git+https://github.com/lholznagel/cachem.git?rev=63d0b001f312622984fd515462d44569add3ba74#63d0b001f312622984fd515462d44569add3ba74"
-dependencies = [
- "async-trait",
- "cachem_derive",
- "tokio 1.1.0",
 ]
 
 [[package]]
@@ -279,10 +279,10 @@ name = "carina"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "cachem_utils",
+ "cachem",
  "log",
  "morgan",
- "tokio 1.1.0",
+ "tokio 1.1.1",
 ]
 
 [[package]]
@@ -320,7 +320,7 @@ dependencies = [
 name = "collector"
 version = "0.1.0"
 dependencies = [
- "cachem_utils",
+ "cachem",
  "caph_eve_online_api",
  "caph_eve_sde_parser",
  "carina",
@@ -328,7 +328,7 @@ dependencies = [
  "futures",
  "log",
  "morgan",
- "tokio 1.1.0",
+ "tokio 1.1.1",
 ]
 
 [[package]]
@@ -637,7 +637,7 @@ dependencies = [
  "http",
  "indexmap",
  "slab",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "tokio-util 0.6.2",
  "tracing",
  "tracing-futures",
@@ -805,7 +805,7 @@ dependencies = [
  "itoa",
  "pin-project 1.0.4",
  "socket2",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "tower-service",
  "tracing",
  "want",
@@ -821,7 +821,7 @@ dependencies = [
  "hyper 0.14.2",
  "log",
  "rustls 0.19.0",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "tokio-rustls 0.22.0",
  "webpki",
 ]
@@ -947,11 +947,11 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.13"
+version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcf3805d4480bb5b86070dcfeb9e2cb2ebc148adb753c5cca5f884d1d65a42b2"
+checksum = "51b9bbe6c47d51fc3e1a9b945965946b4c44142ab8792c50835a980d362c2710"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
 ]
 
 [[package]]
@@ -1495,7 +1495,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded 0.7.0",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "tokio-rustls 0.22.0",
  "url",
  "wasm-bindgen",
@@ -1975,9 +1975,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "1.1.0"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8efab2086f17abcddb8f756117665c958feee6b2e39974c2f1600592ab3a4195"
+checksum = "6714d663090b6b0acb0fa85841c6d66233d150cdb2602c8f9b8abb03370beb3f"
 dependencies = [
  "autocfg",
  "bytes 1.0.1",
@@ -2034,7 +2034,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc6844de72e57df1980054b38be3a9f4702aba4858be64dd700181a8a6d0e1b6"
 dependencies = [
  "rustls 0.19.0",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "webpki",
 ]
 
@@ -2046,7 +2046,7 @@ checksum = "76066865172052eb8796c686f0b441a93df8b08d40a950b062ffb9a426f00edd"
 dependencies = [
  "futures-core",
  "pin-project-lite 0.2.4",
- "tokio 1.1.0",
+ "tokio 1.1.1",
 ]
 
 [[package]]
@@ -2088,7 +2088,7 @@ dependencies = [
  "futures-sink",
  "log",
  "pin-project-lite 0.2.4",
- "tokio 1.1.0",
+ "tokio 1.1.1",
  "tokio-stream",
 ]
 

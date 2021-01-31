@@ -6,11 +6,11 @@ edition = "2018"
 
 [dependencies]
 chrono = "0.4.19"
-cachem_utils = { git = "https://github.com/lholznagel/cachem.git", rev = "63d0b001f312622984fd515462d44569add3ba74" }
+cachem = { git = "https://github.com/lholznagel/cachem.git", rev = "1f21a9c860287601849f05c1d86d47797f7901e5" }
 caph_eve_online_api = { path = "../eve_api" }
 caph_eve_sde_parser = { path = "../eve_sde_parser" }
 carina = { path = "../carina" }
 futures = "0.3.12"
-log = "0.4.13"
+log = "0.4.14"
 morgan = { git = "https://github.com/lholznagel/morgan.git", rev = "624526038c210b142d2835fa77965064771ac192" }
-tokio = { version = "1.1.0", features = ["full"] }
+tokio = { version = "1.1.1", features = ["full"] }

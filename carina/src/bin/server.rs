@@ -1,7 +1,6 @@
-use cachem_utils::{CachemError, Protocol, StorageHandler, cachem};
+use cachem::{CachemError, Protocol, StorageHandler, Fetch, Insert, Lookup, cachem};
 use carina::*;
 use std::sync::Arc;
-use tokio::io::{AsyncReadExt, AsyncWriteExt, BufStream};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -29,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         storage_handler.save_on_interrupt().await;
     });
 
-    cachem! { 
+    cachem! {
         "0.0.0.0:9998",
         let blueprint_copy = blueprint_cache.clone();
         let id_name_copy = id_name_cache.clone();
@@ -40,29 +39,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let region_copy = region_cache.clone();
         let station_copy = station_cache.clone();
 
-        (Action::Fetch, Caches::Blueprint)          => (FetchId, FetchBlueprintEntryById, blueprint_copy),
-        (Action::Insert, Caches::Blueprint)         => (Insert, InsertBlueprintEntries, blueprint_copy),
+        (Actions::Fetch, Caches::Blueprint)          => (blueprint_copy, fetch, FetchBlueprintEntryById),
+        (Actions::Insert, Caches::Blueprint)         => (blueprint_copy, insert, InsertBlueprintEntries),
 
-        (Action::Fetch, Caches::IdName)             => (FetchId, FetchNameEntryById, id_name_copy),
-        (Action::Insert, Caches::IdName)            => (Insert, InsertIdNameEntries, id_name_copy),
+        (Actions::Fetch, Caches::IdName)             => (id_name_copy, fetch, FetchNameEntryById),
+        (Actions::Insert, Caches::IdName)            => (id_name_copy, insert, InsertIdNameEntries),
 
-        (Action::Fetch, Caches::Item)               => (FetchId, FetchItemEntryById, item_copy),
-        (Action::Insert, Caches::Item)              => (Insert, InsertItemEntries, item_copy),
+        (Actions::Fetch, Caches::Item)               => (item_copy, fetch, FetchItemEntryById),
+        (Actions::Insert, Caches::Item)              => (item_copy, insert, InsertItemEntries),
 
-        (Action::Fetch, Caches::ItemMaterial)       => (FetchId, FetchItemMaterialEntryById, item_material_copy),
-        (Action::Insert, Caches::ItemMaterial)      => (Insert, InsertItemMaterialEntries, item_material_copy),
+        (Actions::Fetch, Caches::ItemMaterial)       => (item_material_copy, fetch, FetchItemMaterialEntryById),
+        (Actions::Insert, Caches::ItemMaterial)      => (item_material_copy, insert, InsertItemMaterialEntries),
 
-        (Action::Fetch, Caches::MarketOrder)        => (FetchId, FetchMarketOrderEntryById, market_order_copy),
-        (Action::Insert, Caches::MarketOrder)       => (Insert, InsertMarketOrderEntries, market_order_copy),
+        (Actions::Fetch, Caches::MarketOrder)        => (market_order_copy, fetch, FetchMarketOrderEntryById),
+        (Actions::Insert, Caches::MarketOrder)       => (market_order_copy, insert, InsertMarketOrderEntries),
 
-        (Action::Fetch, Caches::MarketOrderInfo)    => (FetchId, FetchMarketOrderInfoEntryById, market_order_info_copy),
-        (Action::Lookup, Caches::MarketOrderInfo)   => (Lookup, LookupMarketOrderInfoEntries, market_order_info_copy),
-        (Action::Insert, Caches::MarketOrderInfo)   => (Insert, InsertMarketOrderInfoEntries, market_order_info_copy),
+        (Actions::Fetch, Caches::MarketOrderInfo)    => (market_order_info_copy, fetch, FetchMarketOrderInfoEntryById),
+        (Actions::Lookup, Caches::MarketOrderInfo)   => (market_order_info_copy, lookup, LookupMarketOrderInfoEntries),
+        (Actions::Insert, Caches::MarketOrderInfo)   => (market_order_info_copy, insert, InsertMarketOrderInfoEntries),
 
-        (Action::Fetch, Caches::Region)             => (FetchAll, FetchRegionEntries, region_copy),
-        (Action::Insert, Caches::Region)            => (Insert, InsertRegionEntries, region_copy),
+        (Actions::Fetch, Caches::Region)             => (region_copy, fetch, FetchRegionEntries),
+        (Actions::Insert, Caches::Region)            => (region_copy, insert, InsertRegionEntries),
 
-        (Action::Fetch, Caches::Station)            => (FetchId, FetchStationEntryById, station_copy),
-        (Action::Insert, Caches::Station)           => (Insert, InsertStationEntries, station_copy),
+        (Actions::Fetch, Caches::Station)            => (station_copy, fetch, FetchStationEntryById),
+        (Actions::Insert, Caches::Station)           => (station_copy, insert, InsertStationEntries),
     };
 }

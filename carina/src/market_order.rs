@@ -1,14 +1,13 @@
-use crate::{Action, Caches, FileUtils, parser_request};
+use crate::{Actions, Caches, EmptyResponse};
 
 use async_trait::async_trait;
-use cachem_utils::{CachemError, Parse, Save, ProtocolRequest};
+use cachem::{CachemError, Fetch, FileUtils, Insert, Parse, Save, request};
 use std::collections::HashMap;
-use std::io::Cursor;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 pub struct MarketOrderCache {
-    current: Mutex<HashMap<u64, MarketOrderEntry>>,
-    history: Mutex<HashMap<u64, Vec<MarketOrderEntry>>>,
+    current: RwLock<HashMap<u64, MarketOrderEntry>>,
+    history: RwLock<HashMap<u64, Vec<MarketOrderEntry>>>,
 }
 
 impl MarketOrderCache {
@@ -19,30 +18,57 @@ impl MarketOrderCache {
     pub async fn new() -> Result<Self, CachemError> {
         let history = Self::load().await?;
         Ok(Self {
-            current: Mutex::new(HashMap::with_capacity(Self::CAPACITY)),
-            history: Mutex::new(history),
+            current: RwLock::new(HashMap::with_capacity(Self::CAPACITY)),
+            history: RwLock::new(history),
         })
     }
 
-    pub async fn fetch_by_id(&self, order_id: u64) -> Option<MarketOrderEntry> {
-        if let Some(x) = self.current.lock().await.get(&order_id) {
-            Some(x.clone())
+    async fn load() -> Result<HashMap<u64, Vec<MarketOrderEntry>>, CachemError> {
+        let entries = FileUtils::open::<MarketOrderSaveEntry>(Self::FILE_NAME).await?;
+        let mut data = HashMap::with_capacity(entries.len() as usize);
+        for entry in entries {
+            data.insert(entry.order_id, entry.into());
+        }
+        Ok(data)
+    }
+}
+
+#[async_trait]
+impl Fetch<FetchMarketOrderEntryById> for MarketOrderCache {
+    type Error = EmptyResponse;
+    type Response = MarketOrderEntry;
+
+    async fn fetch(&self, input: FetchMarketOrderEntryById) -> Result<Self::Response, Self::Error> {
+        if let Some(x) = self.current.read().await.get(&input.0) {
+            Ok(x.clone())
         } else {
-            None
+            Err(EmptyResponse::default())
         }
     }
+}
 
-    pub async fn fetch_histry_by_id(&self, order_id: u64) -> Option<Vec<MarketOrderEntry>> {
-        if let Some(x) = self.history.lock().await.get(&order_id) {
-            Some(x.clone())
+#[async_trait]
+impl Fetch<FetchMarketOrderHistoryEntryById> for MarketOrderCache {
+    type Error = EmptyResponse;
+    type Response = MarketOrderEntry;
+
+    async fn fetch(&self, input: FetchMarketOrderHistoryEntryById) -> Result<Self::Response, Self::Error> {
+        if let Some(x) = self.current.read().await.get(&input.0) {
+            Ok(x.clone())
         } else {
-            None
+            Err(EmptyResponse::default())
         }
     }
+}
 
-    pub async fn insert(&self, data: Vec<MarketOrderEntry>) -> Result<(), CachemError> {
-        let mut old_data = { self.history.lock().await.clone() };
-        let mut data = data;
+#[async_trait]
+impl Insert<InsertMarketOrderEntries> for MarketOrderCache {
+    type Error = EmptyResponse;
+    type Response = EmptyResponse;
+
+    async fn insert(&self, input: InsertMarketOrderEntries) -> Result<Self::Response, Self::Error> {
+        let mut old_data = { self.history.read().await.clone() };
+        let mut data = input.0;
         let mut changes = 0usize;
 
         while let Some(x) = data.pop() {
@@ -62,51 +88,29 @@ impl MarketOrderCache {
         }
 
         if changes > 0 {
-            *self.history.lock().await = old_data;
+            *self.history.write().await = old_data;
         }
 
         let mut map = HashMap::with_capacity(Self::CAPACITY);
         for x in data {
             map.insert(x.order_id, x);
         }
-        *self.current.lock().await = map;
-        Ok(())
-    }
-
-    async fn load() -> Result<HashMap<u64, Vec<MarketOrderEntry>>, CachemError> {
-        if let Some(mut buf) = FileUtils::open(Self::FILE_NAME).await? {
-            let length = u32::read(&mut buf).await?;
-            let mut data = HashMap::with_capacity(length as usize);
-
-            for _ in 0..length {
-                let entry_count = u32::read(&mut buf).await?;
-                let mut entries = Vec::with_capacity(entry_count as usize);
-
-                for _ in 0..entry_count {
-                    let entry = MarketOrderEntry::read(&mut buf).await?;
-                    entries.push(entry);
-                }
-                data.insert(entries[0].order_id, entries);
-            }
-            Ok(data)
-        } else {
-            Ok(HashMap::with_capacity(Self::CAPACITY))
-        }
+        *self.current.write().await = map;
+        Ok(EmptyResponse::default())
     }
 }
 
 #[async_trait]
 impl Save for MarketOrderCache {
     async fn store(&self) -> Result<(), CachemError> {
-        let mut buf = Cursor::new(Vec::new());
-        u32::from(self.history.lock().await.len() as u32).write(&mut buf).await?;
-        for entries in self.history.lock().await.values() {
-            u32::from(entries.len() as u32).write(&mut buf).await?;
-            for entry in entries {
-                entry.write(&mut buf).await?;
-            }
+        let mut entries = Vec::with_capacity(self.history.read().await.len());
+        for (id, x) in self.history.read().await.iter() {
+            entries.push(MarketOrderSaveEntry {
+                order_id: id.clone(),
+                orders: x.clone(),
+            });
         }
-        FileUtils::save(Self::FILE_NAME, buf).await?;
+        FileUtils::save(Self::FILE_NAME, entries).await?;
         Ok(())
     }
 }
@@ -133,9 +137,25 @@ impl MarketOrderEntry {
 }
 
 #[derive(Parse)]
-pub struct FetchMarketOrderEntryById(pub u64);
-parser_request!(Action::Fetch, Caches::MarketOrder, FetchMarketOrderEntryById);
+pub struct MarketOrderSaveEntry {
+    pub order_id: u64,
+    pub orders: Vec<MarketOrderEntry>,
+}
 
+impl Into<Vec<MarketOrderEntry>> for MarketOrderSaveEntry {
+    fn into(self) -> Vec<MarketOrderEntry> {
+        self.orders
+    }
+}
+
+#[request(Actions::Fetch, Caches::MarketOrder)]
+#[derive(Parse)]
+pub struct FetchMarketOrderEntryById(pub u64);
+
+#[request(Actions::Fetch, Caches::MarketOrder)]
+#[derive(Parse)]
+pub struct FetchMarketOrderHistoryEntryById(pub u64);
+
+#[request(Actions::Insert, Caches::MarketOrder)]
 #[derive(Parse)]
 pub struct InsertMarketOrderEntries(pub Vec<MarketOrderEntry>);
-parser_request!(Action::Insert, Caches::MarketOrder, InsertMarketOrderEntries);
