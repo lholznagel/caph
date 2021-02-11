@@ -1,30 +1,15 @@
 use crate::{Actions, Caches, EmptyResponse};
 
 use async_trait::async_trait;
-use cachem::{CachemError, Fetch, FileUtils, Insert, Parse, Save, request};
+use cachem::{Fetch, Insert, Parse, request};
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 
+#[derive(Default)]
 pub struct BlueprintCache(RwLock<HashMap<u32, BlueprintEntry>>);
 
 impl BlueprintCache {
     pub const CAPACITY: usize = 100_000;
-
-    const FILE_NAME: &'static str = "blueprints.carina";
-
-    pub async fn new() -> Result<Self, CachemError> {
-        let cache = Self::load().await?;
-        Ok(Self(RwLock::new(cache)))
-    }
-
-    async fn load() -> Result<HashMap<u32, BlueprintEntry>, CachemError> {
-        let entries = FileUtils::open::<BlueprintEntry>(Self::FILE_NAME).await?;
-        let mut data = HashMap::with_capacity(entries.len() as usize);
-        for entry in entries {
-            data.insert(entry.item_id, entry);
-        }
-        Ok(data)
-    }
 }
 
 #[async_trait]
@@ -74,18 +59,6 @@ impl Insert<InsertBlueprintEntries> for BlueprintCache {
     }
 }
 
-#[async_trait]
-impl Save for BlueprintCache {
-    async fn store(&self) -> Result<(), CachemError> {
-        let mut entries = Vec::with_capacity(self.0.read().await.len());
-        for (_, x) in self.0.read().await.iter() {
-            entries.push(x.clone());
-        }
-        FileUtils::save(Self::FILE_NAME, entries).await?;
-        Ok(())
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Parse)]
 pub struct BlueprintEntry {
     pub item_id:   u32,
@@ -129,9 +102,9 @@ impl Material {
 }
 
 #[request(Actions::Fetch, Caches::Blueprint)]
-#[derive(Parse)]
+#[derive(Debug, Parse)]
 pub struct FetchBlueprintEntryById(pub u32);
 
 #[request(Actions::Insert, Caches::Blueprint)]
-#[derive(Parse)]
+#[derive(Debug, Parse)]
 pub struct InsertBlueprintEntries(pub Vec<BlueprintEntry>);

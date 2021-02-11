@@ -1,30 +1,15 @@
 use crate::{Actions, Caches, EmptyResponse};
 
 use async_trait::async_trait;
-use cachem::{CachemError, Fetch, FileUtils, Insert, Parse, Save, request};
+use cachem::{Fetch, Insert, Parse, request};
 use std::collections::HashSet;
 use tokio::sync::RwLock;
 
+#[derive(Default)]
 pub struct RegionCache(RwLock<HashSet<u32>>);
 
 impl RegionCache {
     pub const CAPACITY: usize = 50;
-
-    const FILE_NAME: &'static str = "regions.carina";
-
-    pub async fn new() -> Result<Self, CachemError> {
-        let cache = Self::load().await?;
-        Ok(Self(RwLock::new(cache)))
-    }
-
-    async fn load() -> Result<HashSet<u32>, CachemError> {
-        let entries = FileUtils::open::<u32>(Self::FILE_NAME).await?;
-        let mut data = HashSet::with_capacity(entries.len() as usize);
-        for entry in entries {
-            data.insert(entry);
-        }
-        Ok(data)
-    }
 }
 
 #[async_trait]
@@ -54,19 +39,7 @@ impl Insert<InsertRegionEntries> for RegionCache {
     }
 }
 
-#[async_trait]
-impl Save for RegionCache {
-    async fn store(&self) -> Result<(), CachemError> {
-        let mut entries = Vec::with_capacity(self.0.read().await.len());
-        for x in self.0.read().await.iter() {
-            entries.push(*x);
-        }
-        FileUtils::save(Self::FILE_NAME, entries).await?;
-        Ok(())
-    }
-}
-
-#[derive(PartialEq, Eq, Hash, Parse)]
+#[derive(Debug, PartialEq, Eq, Hash, Parse)]
 pub struct RegionEntry {
     pub region_id: u32,
 }
@@ -82,13 +55,13 @@ impl RegionEntry {
     }
 }
 
-#[derive(Parse)]
+#[derive(Debug, Parse)]
 pub struct RegionEntries(pub HashSet<u32>);
 
 #[request(Actions::Fetch, Caches::Region)]
-#[derive(Default, Parse)]
+#[derive(Debug, Default, Parse)]
 pub struct FetchRegionEntries;
 
 #[request(Actions::Insert, Caches::Region)]
-#[derive(Parse)]
+#[derive(Debug, Parse)]
 pub struct InsertRegionEntries(pub HashSet<RegionEntry>);

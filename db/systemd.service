@@ -1,11 +1,11 @@
 [Unit]
-Description=Caph data collector
+Description=Caph database
 
 [Service]
 Type=simple
 Environment=MORGAN_COLOR=false
 Environment=RUST_BACKTRACE=1
-ExecStart=/opt/caph/caph_collector
+ExecStart=/opt/caph/caph_db
 
 [Install]
 WantedBy=multi-user.target

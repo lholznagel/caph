@@ -1,9 +1,10 @@
 use crate::error::CollectorError;
+use crate::time::previous_30_minute;
 
 use cachem::{ConnectionPool, Protocol};
 use caph_eve_online_api::{EveClient, MarketOrder};
-use carina::*;
-use chrono::NaiveDateTime;
+use caph_db::*;
+use chrono::Utc;
 use futures::stream::{FuturesUnordered, StreamExt};
 use std::time::Instant;
 
@@ -18,10 +19,10 @@ impl Market {
         }
     }
 
-    pub async fn background(&mut self) -> Result<(), CollectorError> {
+    pub async fn task(&mut self) -> Result<(), CollectorError> {
+        let timestamp = previous_30_minute(Utc::now().timestamp() as u64);
         let client = EveClient::default();
 
-        log::info!("Requesting all regions.");
         let mut requests = FuturesUnordered::new();
         let mut conn = self.pool.acquire().await?;
         let regions = Protocol::request::<_, RegionEntries>(
@@ -30,10 +31,7 @@ impl Market {
         )
         .await
         .unwrap();
-        log::info!("After fetch");
-        log::info!("There are {} regions", regions.0.len());
 
-        log::info!("Requesting market_infos");
         for region in regions.0 {
             requests.push(client.fetch_market_orders(region.into()));
         }
@@ -48,9 +46,8 @@ impl Market {
                 _ => (),
             }
         }
-        log::info!("Done requesting market infos");
 
-        self.market_info(results).await?;
+        self.market_info(results, timestamp).await?;
 
         Ok(())
     }
@@ -58,6 +55,7 @@ impl Market {
     async fn market_info(
         &mut self,
         entries: Vec<MarketOrder>,
+        timestamp: u64
     ) -> Result<(), CollectorError> {
         log::info!("Starting market import");
         let start = Instant::now();
@@ -78,7 +76,6 @@ impl Market {
         log::info!("Lookup took {}ms", start.elapsed().as_millis());
 
         log::info!("Starting import of {}", ids.len());
-        // FIXME: this process takes ages, about 190_000ms for about 1_000_000 entries
         // TODO: Add metrics
         let mut market_order_infos = Vec::with_capacity(MarketOrderCache::CAPACITY);
         for entry in entries.iter() {
@@ -86,14 +83,9 @@ impl Market {
                 continue;
             }
 
-            let date = NaiveDateTime::parse_from_str(
-                &entry.issued,
-                "%Y-%m-%dT%H:%M:%SZ"
-            ).unwrap();
-
             let market_order_info = MarketOrderInfoEntry::new(
                 entry.order_id,
-                date.timestamp_millis() as u64,
+                timestamp,
                 entry.volume_total,
                 entry.system_id,
                 entry.type_id,
@@ -121,15 +113,11 @@ impl Market {
         let start = Instant::now();
         let mut market_orders = Vec::with_capacity(MarketOrderCache::CAPACITY);
         for entry in entries {
-            let date = NaiveDateTime::parse_from_str(
-                &entry.issued,
-                "%Y-%m-%dT%H:%M:%SZ"
-            ).unwrap();
-
             let market_order = MarketOrderEntry::new(
                 entry.order_id,
+                timestamp,
                 entry.volume_remain,
-                date.timestamp_millis() as u64
+                entry.type_id,
             );
             market_orders.push(market_order);
         }

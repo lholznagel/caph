@@ -1,30 +1,15 @@
 use crate::{Actions, Caches, EmptyResponse};
 
 use async_trait::async_trait;
-use cachem::{CachemError, Fetch, FileUtils, Insert, Parse, Save, request};
+use cachem::{Fetch, Insert, Parse, request};
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 
+#[derive(Default)]
 pub struct IdNameCache(RwLock<HashMap<u32, IdNameEntry>>);
 
 impl IdNameCache {
     pub const CAPACITY: usize = 425_000;
-
-    const FILE_NAME: &'static str = "id_names.carina";
-
-    pub async fn new() -> Result<Self, CachemError> {
-        let cache = Self::load().await?;
-        Ok(Self(RwLock::new(cache)))
-    }
-
-    async fn load() -> Result<HashMap<u32, IdNameEntry>, CachemError> {
-        let entries = FileUtils::open::<IdNameEntry>(Self::FILE_NAME).await?;
-        let mut data = HashMap::with_capacity(entries.len() as usize);
-        for entry in entries {
-            data.insert(entry.item_id, entry);
-        }
-        Ok(data)
-    }
 }
 
 #[async_trait]
@@ -74,18 +59,6 @@ impl Insert<InsertIdNameEntries> for IdNameCache {
     }
 }
 
-#[async_trait]
-impl Save for IdNameCache {
-    async fn store(&self) -> Result<(), CachemError> {
-        let mut entries = Vec::with_capacity(self.0.read().await.len());
-        for (_, x) in self.0.read().await.iter() {
-            entries.push(x.clone());
-        }
-        FileUtils::save(Self::FILE_NAME, entries).await?;
-        Ok(())
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Parse)]
 pub struct IdNameEntry {
     pub item_id: u32,
@@ -105,9 +78,9 @@ impl IdNameEntry {
 }
 
 #[request(Actions::Fetch, Caches::IdName)]
-#[derive(Parse)]
+#[derive(Debug, Parse)]
 pub struct FetchNameEntryById(pub u32);
 
 #[request(Actions::Insert, Caches::IdName)]
-#[derive(Parse)]
+#[derive(Debug, Parse)]
 pub struct InsertIdNameEntries(pub Vec<IdNameEntry>);

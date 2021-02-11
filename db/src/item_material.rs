@@ -1,30 +1,15 @@
 use crate::{Actions, Caches, EmptyResponse};
 
 use async_trait::async_trait;
-use cachem::{CachemError, Fetch, FileUtils, Insert, Parse, Save, request};
+use cachem::{Fetch, Insert, Parse, request};
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 
+#[derive(Default)]
 pub struct ItemMaterialCache(RwLock<HashMap<u32, ItemMaterialEntry>>);
 
 impl ItemMaterialCache {
     pub const CAPACITY: usize = 45_000;
-
-    const FILE_NAME: &'static str = "item_materials.carina";
-
-    pub async fn new() -> Result<Self, CachemError> {
-        let cache = Self::load().await?;
-        Ok(Self(RwLock::new(cache)))
-    }
-
-    async fn load() -> Result<HashMap<u32, ItemMaterialEntry>, CachemError> {
-        let entries = FileUtils::open::<ItemMaterialEntry>(Self::FILE_NAME).await?;
-        let mut data = HashMap::with_capacity(entries.len() as usize);
-        for entry in entries {
-            data.insert(entry.item_id, entry);
-        }
-        Ok(data)
-    }
 }
 
 #[async_trait]
@@ -74,18 +59,6 @@ impl Insert<InsertItemMaterialEntries> for ItemMaterialCache {
     }
 }
 
-#[async_trait]
-impl Save for ItemMaterialCache {
-    async fn store(&self) -> Result<(), CachemError> {
-        let mut entries = Vec::with_capacity(self.0.read().await.len());
-        for (_, x) in self.0.read().await.iter() {
-            entries.push(x.clone());
-        }
-        FileUtils::save(Self::FILE_NAME, entries).await?;
-        Ok(())
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Parse)]
 pub struct ItemMaterialEntry {
     pub item_id:     u32,
@@ -108,9 +81,9 @@ impl ItemMaterialEntry {
 }
 
 #[request(Actions::Fetch, Caches::ItemMaterial)]
-#[derive(Parse)]
+#[derive(Debug, Parse)]
 pub struct FetchItemMaterialEntryById(pub u32);
 
 #[request(Actions::Insert, Caches::ItemMaterial)]
-#[derive(Parse)]
+#[derive(Debug, Parse)]
 pub struct InsertItemMaterialEntries(pub Vec<ItemMaterialEntry>);

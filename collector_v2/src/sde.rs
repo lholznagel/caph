@@ -2,7 +2,7 @@ use cachem::{ConnectionPool, Protocol};
 use caph_eve_sde_parser::{
     Blueprint, ParseRequest, ParseResult, Schematic, Station, TypeIds, TypeMaterial, UniqueName,
 };
-use carina::*;
+use caph_db::*;
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
 use std::time::Instant;
@@ -27,7 +27,7 @@ impl Sde {
         Self { pool }
     }
 
-    pub async fn background(&mut self) -> CollectorResult<()> {
+    pub async fn run(&mut self) -> CollectorResult<()> {
         log::debug!("Fetching sde zip");
         let zip = caph_eve_sde_parser::fetch_zip()
             .await
@@ -52,6 +52,7 @@ impl Sde {
         let start = std::time::Instant::now();
         // collects all actions that need to be perfomed
         let mut actions: Vec<Action> = Vec::new();
+        //let mut conn = self.pool.acquire().await?;
         for parse_result in parse_results {
             let x = match parse_result {
                 ParseResult::TypeIds(x) => self.items(x).await?,
@@ -69,6 +70,7 @@ impl Sde {
             let mut conn = self.pool.acquire().await?;
             match action {
                 Action::IdName(x) => {
+                    log::info!("Starting name import");
                     let start = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
@@ -78,6 +80,7 @@ impl Sde {
                     log::info!("After send id names {}", start.elapsed().as_millis());
                 },
                 Action::Item(x) => {
+                    log::info!("Starting item import");
                     let start = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
@@ -87,6 +90,7 @@ impl Sde {
                     log::info!("After send items {}", start.elapsed().as_millis());
                 },
                 Action::ItemMaterial(x) => {
+                    log::info!("Starting item material import");
                     let start = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
@@ -96,6 +100,7 @@ impl Sde {
                     log::info!("After send item materials {}", start.elapsed().as_millis());
                 },
                 Action::Station(x) => {
+                    log::info!("Starting station import");
                     let start = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
@@ -105,6 +110,7 @@ impl Sde {
                     log::info!("After send stations {}", start.elapsed().as_millis());
                 },
                 Action::Blueprint(x) => {
+                    log::info!("Starting blueprint import");
                     let start = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
@@ -114,13 +120,14 @@ impl Sde {
                     log::info!("After send blueprints {}", start.elapsed().as_millis());
                 }
                 Action::Region(x) => {
+                    log::info!("Starting region import");
                     let start = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
                         InsertRegionEntries(x)
                     )
                     .await?;
-                    log::info!("After send region {}", start.elapsed().as_millis());
+                    log::info!("After send regions {}", start.elapsed().as_millis());
                 }
             }
         }
@@ -134,7 +141,6 @@ impl Sde {
         &mut self,
         items: HashMap<u32, TypeIds>,
     ) -> Result<Vec<Action>, CollectorError> {
-        log::info!("Starting item import");
         // We know the roughly how many items there are, so we allocate accordingly
         let mut id_name_actions = Vec::with_capacity(ItemCache::CAPACITY);
         let mut item_actions = Vec::with_capacity(ItemCache::CAPACITY);
@@ -163,7 +169,6 @@ impl Sde {
         &mut self,
         materials: HashMap<u32, TypeMaterial>,
     ) -> Result<Vec<Action>, CollectorError> {
-        log::info!("Starting item material import");
         // We know the roughly how many items there are, so we allocate accordingly
         let mut item_material_actions = Vec::with_capacity(ItemMaterialCache::CAPACITY);
 
@@ -186,7 +191,6 @@ impl Sde {
         &mut self,
         names: Vec<UniqueName>,
     ) -> Result<Vec<Action>, CollectorError> {
-        log::info!("Starting name import");
         // We know the roughly how many items there are, so we allocate accordingly
         let mut id_name_actions = Vec::with_capacity(IdNameCache::CAPACITY);
 
@@ -206,8 +210,6 @@ impl Sde {
         &mut self,
         stations: Vec<Station>,
     ) -> Result<Vec<Action>, CollectorError> {
-        log::info!("Starting station import");
-
         // We know the roughly how many items there are, so we allocate accordingly
         let mut region_actions = HashSet::with_capacity(RegionCache::CAPACITY);
         let mut station_actions = Vec::with_capacity(StationCache::CAPACITY);
@@ -237,10 +239,8 @@ impl Sde {
         &mut self,
         blueprints: HashMap<u32, Blueprint>,
     ) -> Result<Vec<Action>, CollectorError> {
-        log::info!("Starting blueprint import");
-
         // We know the roughly how many items there are, so we allocate accordingly
-        let mut blueprint_actions = Vec::with_capacity(StationCache::CAPACITY);
+        let mut blueprint_actions = Vec::with_capacity(BlueprintCache::CAPACITY);
 
         for (id, blueprint) in blueprints {
             let mut time = 0;
@@ -279,10 +279,8 @@ impl Sde {
         &mut self,
         schematics: HashMap<u32, Schematic>,
     ) -> Result<Vec<Action>, CollectorError> {
-        log::info!("Starting schematic import");
-
         // We know the roughly how many items there are, so we allocate accordingly
-        let mut schematic_actions = Vec::with_capacity(StationCache::CAPACITY);
+        let mut schematic_actions = Vec::with_capacity(BlueprintCache::CAPACITY);
 
         for (id, schematic) in schematics {
             let time = schematic.cycle_time;

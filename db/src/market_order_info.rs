@@ -5,6 +5,7 @@ use cachem::{CachemError, Fetch, FileUtils, Insert, Lookup, Parse, Save, request
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 
+#[derive(Default)]
 pub struct MarketOrderInfoCache(RwLock<HashMap<u64, MarketOrderInfoEntry>>);
 
 impl MarketOrderInfoCache {
@@ -13,8 +14,9 @@ impl MarketOrderInfoCache {
     const FILE_NAME: &'static str = "market_order.carina";
 
     pub async fn new() -> Result<Self, CachemError> {
-        let cache = Self::load().await?;
-        Ok(Self(RwLock::new(cache)))
+        //let cache = Self::load().await?;
+        //Ok(Self(RwLock::new(cache)))
+        Ok(Self::default())
     }
 
     async fn load() -> Result<HashMap<u64, MarketOrderInfoEntry>, CachemError> {
@@ -144,16 +146,16 @@ impl MarketOrderInfoEntry {
 }
 
 #[request(Actions::Fetch, Caches::MarketOrderInfo)]
-#[derive(Parse)]
+#[derive(Debug, Parse)]
 pub struct FetchMarketOrderInfoEntryById(pub u64);
 
 #[request(Actions::Insert, Caches::MarketOrderInfo)]
-#[derive(Parse)]
+#[derive(Debug, Parse)]
 pub struct InsertMarketOrderInfoEntries(pub Vec<MarketOrderInfoEntry>);
 
 #[request(Actions::Lookup, Caches::MarketOrderInfo)]
-#[derive(Parse)]
+#[derive(Debug, Parse)]
 pub struct LookupMarketOrderInfoEntries(pub Vec<u64>);
 
-#[derive(Parse)]
+#[derive(Debug, Parse)]
 pub struct LookupMarketOrderInfoEntriesResult(pub Vec<u64>);

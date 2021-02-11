@@ -6,10 +6,10 @@ codegen-units = 1
 
 [workspace]
 members = [
-  'carina',
   'collector',
   'collector_v2',
+  'db',
   'eve_api',
   'eve_sde_parser',
-  'server'
+  'server',
 ]

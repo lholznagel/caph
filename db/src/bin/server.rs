@@ -1,35 +1,29 @@
 use cachem::{CachemError, Protocol, StorageHandler, Fetch, Insert, Lookup, cachem};
-use carina::*;
+use caph_db::*;
 use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     morgan::Morgan::init(vec![]);
 
-    let blueprint_cache = Arc::new(BlueprintCache::new().await?);
-    let id_name_cache = Arc::new(IdNameCache::new().await?);
-    let item_cache = Arc::new(ItemCache::new().await?);
-    let item_material_cache = Arc::new(ItemMaterialCache::new().await?);
+    let blueprint_cache = Arc::new(BlueprintCache::default());
+    let id_name_cache = Arc::new(IdNameCache::default());
+    let item_cache = Arc::new(ItemCache::default());
+    let item_material_cache = Arc::new(ItemMaterialCache::default());
     let market_order_cache = Arc::new(MarketOrderCache::new().await?);
     let market_order_info_cache = Arc::new(MarketOrderInfoCache::new().await?);
-    let region_cache = Arc::new(RegionCache::new().await?);
-    let station_cache = Arc::new(StationCache::new().await.unwrap());
+    let region_cache = Arc::new(RegionCache::default());
+    let station_cache = Arc::new(StationCache::default());
 
     let mut storage_handler = StorageHandler::default();
-    storage_handler.register(blueprint_cache.clone());
-    storage_handler.register(id_name_cache.clone());
-    storage_handler.register(item_cache.clone());
-    storage_handler.register(item_material_cache.clone());
     storage_handler.register(market_order_cache.clone());
     storage_handler.register(market_order_info_cache.clone());
-    storage_handler.register(region_cache.clone());
-    storage_handler.register(station_cache.clone());
     tokio::task::spawn(async move {
         storage_handler.save_on_interrupt().await;
     });
 
     cachem! {
-        "0.0.0.0:9998",
+        "0.0.0.0:9999",
         let blueprint_copy = blueprint_cache.clone();
         let id_name_copy = id_name_cache.clone();
         let item_copy = item_cache.clone();
