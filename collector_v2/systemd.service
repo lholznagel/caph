@@ -1,11 +1,14 @@
 [Unit]
 Description=Caph data collector
+After=caph_db.service
 
 [Service]
 Type=simple
 Environment=MORGAN_COLOR=false
 Environment=RUST_BACKTRACE=1
-ExecStart=/opt/caph/caph_collector
+ExecStartPre=/bin/sleep 5
+ExecStart=/opt/caph/caph_collector_v2
+Restart=always
 
 [Install]
 WantedBy=multi-user.target

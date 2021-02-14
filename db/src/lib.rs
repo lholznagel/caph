@@ -53,6 +53,7 @@ pub enum Actions {
     Update,
     Delete,
     Lookup,
+    Raw,
 }
 
 impl Into<u8> for Actions {
@@ -63,6 +64,7 @@ impl Into<u8> for Actions {
             Self::Update => 2u8,
             Self::Delete => 3u8,
             Self::Lookup => 4u8,
+            Self::Raw    => 5u8,
         }
     }
 }
@@ -70,11 +72,12 @@ impl Into<u8> for Actions {
 impl From<u8> for Actions {
     fn from(x: u8) -> Self {
         match x {
-            0   => Actions::Fetch,
-            1   => Actions::Insert,
-            2   => Actions::Update,
-            3   => Actions::Delete,
-            4   => Actions::Lookup,
+            0 => Actions::Fetch,
+            1 => Actions::Insert,
+            2 => Actions::Update,
+            3 => Actions::Delete,
+            4 => Actions::Lookup,
+            5 => Actions::Raw,
             _ => panic!("Unrecognized actions {}", x),
         }
     }
@@ -121,4 +124,12 @@ impl From<u8> for Caches {
             _ => panic!("Unrecognized cache type {}", x),
         }
     }
+}
+
+#[async_trait::async_trait]
+pub trait Raw<T: Parse> {
+    type Error;
+    type Response;
+
+    async fn raw(&self, input: T) -> Result<Self::Response, Self::Error>;
 }

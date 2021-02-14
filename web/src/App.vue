@@ -7,6 +7,11 @@
             <v-list-item-title>My items</v-list-item-title>
           </v-list-item-content>
         </v-list-item>
+        <v-list-item to="/market/raw">
+          <v-list-item-content>
+            <v-list-item-title>Raw market</v-list-item-title>
+          </v-list-item-content>
+        </v-list-item>
       </v-list>
     </v-navigation-drawer>
 

@@ -11,12 +11,10 @@ pub struct MarketOrderInfoCache(RwLock<HashMap<u64, MarketOrderInfoEntry>>);
 impl MarketOrderInfoCache {
     pub const CAPACITY: usize = 1_000_000;
 
-    const FILE_NAME: &'static str = "market_order.carina";
+    const FILE_NAME: &'static str = "./db/storage/market_order_infos.carina";
 
     pub async fn new() -> Result<Self, CachemError> {
-        //let cache = Self::load().await?;
-        //Ok(Self(RwLock::new(cache)))
-        Ok(Self::default())
+        Ok(Self(RwLock::new(Self::load().await?)))
     }
 
     async fn load() -> Result<HashMap<u64, MarketOrderInfoEntry>, CachemError> {
@@ -93,6 +91,7 @@ impl Insert<InsertMarketOrderInfoEntries> for MarketOrderInfoCache {
         if changes > 0 {
             *self.0.write().await = old_data;
         }
+        self.store().await.unwrap();
         Ok(EmptyResponse::default())
     }
 }

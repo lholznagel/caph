@@ -1,14 +1,15 @@
 [package]
-name = "caph_server"
+name = "caph_api_server"
 version = "0.1.0"
 authors = ["lholznagel <contact@lholznagel.info>"]
 edition = "2018"
 
 [dependencies]
+cachem = { path = "../../cachem/cachem", features = ["derive"] }
+caph_db = { path = "../db" }
 caph_eve_online_api = { path = "../eve_api" }
-log = "0.4.11"
+log = "0.4.14"
 morgan = { git = "https://github.com/lholznagel/morgan.git", rev = "624526038c210b142d2835fa77965064771ac192" }
-serde = { version = "1.0.118", features = ["derive"] }
-sqlx = { version = "0.4.1", default-features = false, features = ["macros", "runtime-tokio-rustls", "postgres"] }
-tokio = { version = "0.2.24", features = ["full"] }
-warp = "0.2.5"
+serde = { version = "1.0.123", features = ["derive"] }
+tokio = { version = "1.2.0", features = ["full"] }
+warp = "0.3.0"

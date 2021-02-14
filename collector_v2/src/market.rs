@@ -60,20 +60,22 @@ impl Market {
         log::info!("Starting market import");
         let start = Instant::now();
 
-        let mut lookup_ids = Vec::with_capacity(MarketOrderInfoCache::CAPACITY);
+        //let mut lookup_ids = Vec::with_capacity(MarketOrderInfoCache::CAPACITY);
+        let mut ids = Vec::with_capacity(MarketOrderInfoCache::CAPACITY);
         for entry in entries.iter() {
-            lookup_ids.push(entry.order_id);
+            // lookup_ids.push(entry.order_id);
+            ids.push(entry.order_id);
         }
-        log::info!("Looking up {} ids", lookup_ids.len());
+        //log::info!("Looking up {} ids", lookup_ids.len());
 
-        let mut conn = self.pool.acquire().await.unwrap();
-        let ids = Protocol::request::<_, LookupMarketOrderInfoEntries>(
+        //let mut conn = self.pool.acquire().await.unwrap();
+        /*let ids = Protocol::request::<_, LookupMarketOrderInfoEntries>(
             &mut conn,
             LookupMarketOrderInfoEntries(lookup_ids)
         )
         .await
         .unwrap().0;
-        log::info!("Lookup took {}ms", start.elapsed().as_millis());
+        log::info!("Lookup took {}ms", start.elapsed().as_millis());*/
 
         log::info!("Starting import of {}", ids.len());
         // TODO: Add metrics

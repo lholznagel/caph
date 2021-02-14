@@ -1,23 +1,17 @@
 use std::error::Error;
 use std::fmt;
 
-use warp::{reject::Reject, Rejection};
+use warp::reject::Reject;
 
 #[derive(Debug)]
 pub enum EveServerError {
     IoError(std::io::Error),
-    SqlError(sqlx::Error),
+    CachemError(cachem::CachemError),
 }
 
 impl Error for EveServerError {}
 
 impl Reject for EveServerError {}
-
-impl From<EveServerError> for Rejection {
-    fn from(e: EveServerError) -> Self {
-        warp::reject::custom(e)
-    }
-}
 
 impl From<std::io::Error> for EveServerError {
     fn from(e: std::io::Error) -> Self {
@@ -25,9 +19,9 @@ impl From<std::io::Error> for EveServerError {
     }
 }
 
-impl From<sqlx::Error> for EveServerError {
-    fn from(e: sqlx::Error) -> Self {
-        EveServerError::SqlError(e)
+impl From<cachem::CachemError> for EveServerError {
+    fn from(e: cachem::CachemError) -> Self {
+        EveServerError::CachemError(e)
     }
 }
 

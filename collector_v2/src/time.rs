@@ -23,6 +23,8 @@ pub fn duration_to_next_30_minute() -> Duration {
 /// Adds 30 minutes to the given timestamp
 fn next_30_minutes(timestamp: u64) -> u64 {
     let date_time = NaiveDateTime::from_timestamp(timestamp as i64, 0);
+    // add 30 minutes
     let date_time = date_time.checked_add_signed(chrono::Duration::minutes(30)).unwrap();
-    date_time.timestamp() as u64
+    // calculate it down to be even 30 minutes
+    previous_30_minute(date_time.timestamp() as u64)
 }

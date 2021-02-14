@@ -1,7 +1,8 @@
-use crate::{error::EveServerError, services::ItemService};
+use crate::error::EveServerError;
 
+use cachem::{ConnectionPool, Protocol};
+use caph_db::{MarketOrderSaveEntry};
 use serde::{Deserialize, Serialize};
-use sqlx::{Pool, Postgres};
 
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct MarketFilter {
@@ -40,15 +41,37 @@ pub enum Sort {
 
 #[derive(Clone)]
 pub struct MarketService {
-    db: Pool<Postgres>,
-    item_service: ItemService,
+    pool: ConnectionPool,
 }
 
 impl MarketService {
-    pub fn new(db: Pool<Postgres>, item_service: ItemService) -> Self {
-        Self { db, item_service }
+    pub fn new(pool: ConnectionPool) -> Self {
+        Self { pool }
     }
 
+    /*pub async fn raw(&self) -> Result<Vec<Orders>, EveServerError> {
+        let mut conn = self.pool.acquire().await?;
+
+        let a = Protocol::request::<_, Market>(
+            &mut conn,
+            RawMarketOrderEntries::default()
+        )
+        .await
+        .unwrap()
+        .0
+        .into_iter()
+        .filter(|x| x.item_id == 1230)
+        .collect::<Vec<_>>();
+
+        let mut transformed = Vec::with_capacity(a.len());
+        for x in a {
+            transformed.push(Orders::from(x));
+        }
+
+        Ok(transformed)
+    }*/
+}
+/*
     pub async fn all(&self, filter: MarketFilter) -> Result<Vec<Market>, EveServerError> {
         let mut query = Vec::new();
         query.push(r#"
@@ -259,3 +282,4 @@ pub struct MarketStats {
     pub order_count: u32,
     pub total_volume: u64,
 }
+*/
