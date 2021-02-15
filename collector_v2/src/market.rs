@@ -86,12 +86,12 @@ impl Market {
             }
 
             let market_order_info = MarketOrderInfoEntry::new(
-                entry.order_id,
                 timestamp,
-                entry.volume_total,
+                entry.order_id,
+                entry.location_id,
                 entry.system_id,
                 entry.type_id,
-                entry.location_id,
+                entry.volume_total,
                 entry.price,
                 entry.is_buy_order,
             );
@@ -103,7 +103,7 @@ impl Market {
             let mut conn = self.pool.acquire().await.unwrap();
             Protocol::request::<_, EmptyResponse>(
                 &mut conn,
-                InsertMarketOrderInfoEntries(market_order_infos)
+                InsertMarketOrderInfoReq(market_order_infos)
             )
             .await
             .unwrap();

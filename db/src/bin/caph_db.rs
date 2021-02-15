@@ -1,4 +1,4 @@
-use cachem::{CachemError, Protocol, Fetch, Insert, cachem};
+use cachem::{CachemError, Protocol, Fetch, Insert, Storage, cachem};
 use caph_db::*;
 use std::sync::Arc;
 
@@ -10,10 +10,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let id_name_cache = Arc::new(IdNameCache::default());
     let item_cache = Arc::new(ItemCache::default());
     let item_material_cache = Arc::new(ItemMaterialCache::default());
-    let market_order_cache = Arc::new(MarketOrderCache::new().await?);
-    let market_order_info_cache = Arc::new(MarketOrderInfoCache::new().await?);
     let region_cache = Arc::new(RegionCache::default());
     let station_cache = Arc::new(StationCache::default());
+    
+    let market_order_info_cache = Arc::new(MarketOrderInfoCache::load_from_file().await?);
+    let market_order_cache = Arc::new(MarketOrderCache::load_from_file().await?);
 
     cachem! {
         "0.0.0.0:9999",
@@ -41,8 +42,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         (Actions::Fetch, Caches::MarketOrder)        => (market_order_copy, fetch, FetchMarketOrderEntries),
         (Actions::Insert, Caches::MarketOrder)       => (market_order_copy, insert, InsertMarketOrderEntries),
 
-        (Actions::Fetch, Caches::MarketOrderInfo)    => (market_order_info_copy, fetch, FetchMarketOrderInfoEntryById),
-        (Actions::Insert, Caches::MarketOrderInfo)   => (market_order_info_copy, insert, InsertMarketOrderInfoEntries),
+        (Actions::Fetch, Caches::MarketOrderInfo)    => (market_order_info_copy, fetch, FetchMarketOrderInfoReq),
+        (Actions::Insert, Caches::MarketOrderInfo)   => (market_order_info_copy, insert, InsertMarketOrderInfoReq),
 
         (Actions::Fetch, Caches::Region)             => (region_copy, fetch, FetchRegionEntries),
         (Actions::Insert, Caches::Region)            => (region_copy, insert, InsertRegionEntries),

@@ -1,17 +1,18 @@
-mod api;
-mod error;
-mod reprocessing;
-mod services;
+// mod api;
+// mod error;
+// mod reprocessing;
+// mod services;
 
-use self::services::*;
+// use self::services::*;
 
-use std::net::SocketAddr;
-use cachem::ConnectionPool;
-use warp::Filter;
+// use std::net::SocketAddr;
+// use cachem::ConnectionPool;
+// use warp::Filter;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    morgan::Morgan::init(vec!["sqlx".into(), "warp".into(), "tracing".into()]);
+    /*
+    morgan::Morgan::init(vec!["warp".into(), "tracing".into()]);
 
     let pool = ConnectionPool::new("127.0.0.1:9999".into(), 10).await?;
 
@@ -31,6 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     warp::serve(combined)
         .run("0.0.0.0:10101".parse::<SocketAddr>().unwrap())
         .await;
+    */
 
     Ok(())
 }
