@@ -1,7 +1,7 @@
 use crate::error::CollectorError;
 use crate::time::previous_30_minute;
 
-use cachem::{ConnectionPool, Protocol};
+use cachem::{ConnectionPool, EmptyResponse, Protocol};
 use caph_eve_online_api::{EveClient, MarketOrder};
 use caph_db::*;
 use chrono::Utc;
@@ -27,7 +27,7 @@ impl Market {
         let mut conn = self.pool.acquire().await?;
         let regions = Protocol::request::<_, RegionEntries>(
             &mut conn,
-            FetchRegionEntries::default()
+            FetchRegionReq::default()
         )
         .await
         .unwrap();
@@ -129,7 +129,7 @@ impl Market {
             let mut conn = self.pool.acquire().await.unwrap();
             Protocol::request::<_, EmptyResponse>(
                 &mut conn,
-                InsertMarketOrderEntries(market_orders)
+                InsertMarketOrderReq(market_orders)
             )
             .await
             .unwrap();

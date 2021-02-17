@@ -30,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         //.or(api::resolve::filter(resolve_service, root.clone()))
         .boxed();
     warp::serve(combined)
-        .run("0.0.0.0:10101".parse::<SocketAddr>().unwrap())
+        .run(([0.0.0.0], 10101))
         .await;
     */
 

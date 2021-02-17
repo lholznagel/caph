@@ -1,17 +1,17 @@
 use super::{MarketOrderCache, MarketOrderEntry, MarketItemOrderId};
 
-use crate::{Actions, Caches, EmptyResponse};
+use crate::Actions;
 
 use async_trait::async_trait;
-use cachem::{Insert, Parse, Storage, request};
+use cachem::{EmptyResponse, Insert, Parse, Storage, request};
 use std::collections::HashMap;
 
 #[async_trait]
-impl Insert<InsertMarketOrderEntries> for MarketOrderCache {
+impl Insert<InsertMarketOrderReq> for MarketOrderCache {
     type Error    = EmptyResponse;
     type Response = EmptyResponse;
 
-    async fn insert(&self, input: InsertMarketOrderEntries) -> Result<Self::Response, Self::Error> {
+    async fn insert(&self, input: InsertMarketOrderReq) -> Result<Self::Response, Self::Error> {
         let mut current = HashMap::new();
 
         for entry in input.0 {
@@ -57,6 +57,6 @@ impl Insert<InsertMarketOrderEntries> for MarketOrderCache {
     }
 }
 
-#[request(Actions::Insert, Caches::MarketOrder)]
+#[request(Actions::InsertMarketOrders)]
 #[derive(Debug, Parse)]
-pub struct InsertMarketOrderEntries(pub Vec<MarketOrderEntry>);
+pub struct InsertMarketOrderReq(pub Vec<MarketOrderEntry>);

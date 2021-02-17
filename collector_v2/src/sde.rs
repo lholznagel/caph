@@ -1,4 +1,4 @@
-use cachem::{ConnectionPool, Protocol};
+use cachem::{ConnectionPool, EmptyResponse, Protocol};
 use caph_eve_sde_parser::{
     Blueprint, ParseRequest, ParseResult, Schematic, Station, TypeIds, TypeMaterial, UniqueName,
 };
@@ -74,7 +74,7 @@ impl Sde {
                     let start = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
-                        InsertIdNameEntries(x)
+                        InsertIdNameReq(x)
                     )
                     .await?;
                     log::info!("After send id names {}", start.elapsed().as_millis());
@@ -84,7 +84,7 @@ impl Sde {
                     let start = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
-                        InsertItemEntries(x)
+                        InsertItemReq(x)
                     )
                     .await?;
                     log::info!("After send items {}", start.elapsed().as_millis());
@@ -94,7 +94,7 @@ impl Sde {
                     let start = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
-                        InsertItemMaterialEntries(x)
+                        InsertItemMaterialReq(x)
                     )
                     .await?;
                     log::info!("After send item materials {}", start.elapsed().as_millis());
@@ -104,7 +104,7 @@ impl Sde {
                     let start = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
-                        InsertStationEntries(x)
+                        InsertStationReq(x)
                     )
                     .await?;
                     log::info!("After send stations {}", start.elapsed().as_millis());
@@ -114,7 +114,7 @@ impl Sde {
                     let start = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
-                        InsertBlueprintEntries(x)
+                        InsertBlueprintReq(x)
                     )
                     .await?;
                     log::info!("After send blueprints {}", start.elapsed().as_millis());
@@ -124,7 +124,7 @@ impl Sde {
                     let start = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
-                        InsertRegionEntries(x)
+                        InsertRegionReq(x)
                     )
                     .await?;
                     log::info!("After send regions {}", start.elapsed().as_millis());

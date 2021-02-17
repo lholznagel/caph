@@ -1,17 +1,17 @@
 use super::MarketOrderCache;
 
-use crate::{Actions, Caches, EmptyResponse};
+use crate::Actions;
 
 use async_trait::async_trait;
-use cachem::{Fetch, Parse, request};
+use cachem::{EmptyResponse, Fetch, Parse, request};
 use std::collections::HashMap;
 
 #[async_trait]
-impl Fetch<FetchMarketOrderEntries> for MarketOrderCache {
+impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
     type Error    = EmptyResponse;
-    type Response = FetchMarketOrderResponse;
+    type Response = FetchMarketOrderRes;
 
-    async fn fetch(&self, input: FetchMarketOrderEntries) -> Result<Self::Response, Self::Error> {
+    async fn fetch(&self, input: FetchMarketOrderReq) -> Result<Self::Response, Self::Error> {
         let item_id = input.0.item_id;
         let ts_start = input.0.ts_start;
         let ts_stop = input.0.ts_stop;
@@ -130,13 +130,13 @@ impl Fetch<FetchMarketOrderEntries> for MarketOrderCache {
             });
         }
         response.sort_by(|a, b| a.timestamp.partial_cmp(&b.timestamp).unwrap_or(std::cmp::Ordering::Equal));
-        Ok(FetchMarketOrderResponse(response))
+        Ok(FetchMarketOrderRes(response))
     }
 }
 
-#[request(Actions::Fetch, Caches::MarketOrder)]
+#[request(Actions::FetchMarketOrder)]
 #[derive(Debug, Parse)]
-pub struct FetchMarketOrderEntries(pub FetchMarketOrderFilter);
+pub struct FetchMarketOrderReq(pub FetchMarketOrderFilter);
 
 #[derive(Debug, Parse)]
 pub struct FetchMarketOrderFilter {
@@ -146,7 +146,7 @@ pub struct FetchMarketOrderFilter {
 }
 
 #[derive(Debug, Parse)]
-pub struct FetchMarketOrderResponse(pub Vec<FetchMarketOrderResponseTs>);
+pub struct FetchMarketOrderRes(pub Vec<FetchMarketOrderResponseTs>);
 
 #[derive(Debug, Parse)]
 pub struct FetchMarketOrderResponseTs {

@@ -1,7 +1,10 @@
-use crate::{Actions, Caches, EmptyResponse};
+mod fetch;
+mod insert;
 
-use async_trait::async_trait;
-use cachem::{Fetch, Insert, Parse, request};
+pub use self::fetch::*;
+pub use self::insert::*;
+
+use cachem::Parse;
 use std::collections::HashSet;
 use tokio::sync::RwLock;
 
@@ -10,33 +13,6 @@ pub struct RegionCache(RwLock<HashSet<u32>>);
 
 impl RegionCache {
     pub const CAPACITY: usize = 50;
-}
-
-#[async_trait]
-impl Fetch<FetchRegionEntries> for RegionCache {
-    type Error = EmptyResponse;
-    type Response = RegionEntries;
-
-    async fn fetch(&self, _input: FetchRegionEntries) -> Result<Self::Response, Self::Error> {
-        let entries = self.0.read().await;
-        Ok(RegionEntries(entries.clone()))
-    }
-}
-
-#[async_trait]
-impl Insert<InsertRegionEntries> for RegionCache {
-    type Error = EmptyResponse;
-    type Response = EmptyResponse;
-
-    async fn insert(&self, input: InsertRegionEntries) -> Result<Self::Response, Self::Error> {
-        let mut new_data = HashSet::with_capacity(input.0.len());
-        for x in input.0 {
-            new_data.insert(x.region_id.into());
-        }
-
-        *self.0.write().await = new_data;
-        Ok(EmptyResponse::default())
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Parse)]
@@ -57,11 +33,3 @@ impl RegionEntry {
 
 #[derive(Debug, Parse)]
 pub struct RegionEntries(pub HashSet<u32>);
-
-#[request(Actions::Fetch, Caches::Region)]
-#[derive(Debug, Default, Parse)]
-pub struct FetchRegionEntries;
-
-#[request(Actions::Insert, Caches::Region)]
-#[derive(Debug, Parse)]
-pub struct InsertRegionEntries(pub HashSet<RegionEntry>);

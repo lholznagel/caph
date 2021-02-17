@@ -1,21 +1,21 @@
-use crate::{Actions, MarketOrderInfoCache, MarketOrderInfoEntry};
+use crate::{Actions, StationCache, StationEntry};
 
-use async_trait::async_trait;
-use cachem::{EmptyResponse, Insert, Parse, Storage, request};
+use async_trait::*;
+use cachem::{EmptyResponse, Insert, Parse, request};
 
 #[async_trait]
-impl Insert<InsertMarketOrderInfoReq> for MarketOrderInfoCache {
+impl Insert<InsertStationReq> for StationCache {
     type Error    = EmptyResponse;
     type Response = EmptyResponse;
 
-    async fn insert(&self, input: InsertMarketOrderInfoReq) -> Result<Self::Response, Self::Error> {
+    async fn insert(&self, input: InsertStationReq) -> Result<Self::Response, Self::Error> {
         let mut old_data = { self.0.read().await.clone() };
         let mut data = input.0;
         let mut changes: usize = 0;
 
         while let Some(x) = data.pop() {
             old_data
-                .entry(x.order_id)
+                .entry(x.station_id)
                 .and_modify(|entry| {
                     if *entry != x {
                         changes += 1;
@@ -32,11 +32,11 @@ impl Insert<InsertMarketOrderInfoReq> for MarketOrderInfoCache {
         if changes > 0 {
             *self.0.write().await = old_data;
         }
-        self.save_to_file().await.unwrap();
         Ok(EmptyResponse::default())
     }
 }
 
-#[request(Actions::InsertMarketOrdersInfo)]
+#[request(Actions::InsertStations)]
 #[derive(Debug, Parse)]
-pub struct InsertMarketOrderInfoReq(pub Vec<MarketOrderInfoEntry>);
+pub struct InsertStationReq(pub Vec<StationEntry>);
+

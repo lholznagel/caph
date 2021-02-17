@@ -1,7 +1,7 @@
-use crate::{Actions, Caches, EmptyResponse, MarketOrderInfoCache, MarketOrderInfoEntry};
+use crate::{Actions, MarketOrderInfoCache, MarketOrderInfoEntry};
 
 use async_trait::async_trait;
-use cachem::{Fetch, Parse, request};
+use cachem::{EmptyResponse, Fetch, Parse, request};
 
 #[async_trait]
 impl Fetch<FetchMarketOrderInfoReq> for MarketOrderInfoCache {
@@ -17,7 +17,7 @@ impl Fetch<FetchMarketOrderInfoReq> for MarketOrderInfoCache {
     }
 }
 
-#[request(Actions::Fetch, Caches::MarketOrderInfo)]
+#[request(Actions::FetchMarketOrderInfo)]
 #[derive(Debug, Parse)]
 pub struct FetchMarketOrderInfoReq(pub u64);
 

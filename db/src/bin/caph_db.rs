@@ -1,4 +1,4 @@
-use cachem::{CachemError, Protocol, Fetch, Insert, Storage, cachem};
+use cachem::{Protocol, Fetch, Insert, Storage, cachem};
 use caph_db::*;
 use std::sync::Arc;
 
@@ -27,28 +27,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let region_copy = region_cache.clone();
         let station_copy = station_cache.clone();
 
-        (Actions::Fetch, Caches::Blueprint)          => (blueprint_copy, fetch, FetchBlueprintEntryById),
-        (Actions::Insert, Caches::Blueprint)         => (blueprint_copy, insert, InsertBlueprintEntries),
+        - Actions::InsertBlueprints       => (blueprint_copy, insert, InsertBlueprintReq),
 
-        (Actions::Fetch, Caches::IdName)             => (id_name_copy, fetch, FetchNameEntryById),
-        (Actions::Insert, Caches::IdName)            => (id_name_copy, insert, InsertIdNameEntries),
+        - Actions::InsertIdNames          => (id_name_copy, insert, InsertIdNameReq),
 
-        (Actions::Fetch, Caches::Item)               => (item_copy, fetch, FetchItemEntryById),
-        (Actions::Insert, Caches::Item)              => (item_copy, insert, InsertItemEntries),
+        - Actions::InsertItems            => (item_copy, insert, InsertItemReq),
 
-        (Actions::Fetch, Caches::ItemMaterial)       => (item_material_copy, fetch, FetchItemMaterialEntryById),
-        (Actions::Insert, Caches::ItemMaterial)      => (item_material_copy, insert, InsertItemMaterialEntries),
+        - Actions::InsertItemMaterials    => (item_material_copy, insert, InsertItemMaterialReq),
 
-        (Actions::Fetch, Caches::MarketOrder)        => (market_order_copy, fetch, FetchMarketOrderEntries),
-        (Actions::Insert, Caches::MarketOrder)       => (market_order_copy, insert, InsertMarketOrderEntries),
+        - Actions::FetchMarketOrder       => (market_order_copy, fetch, FetchMarketOrderReq),
+        - Actions::InsertMarketOrders     => (market_order_copy, insert, InsertMarketOrderReq),
 
-        (Actions::Fetch, Caches::MarketOrderInfo)    => (market_order_info_copy, fetch, FetchMarketOrderInfoReq),
-        (Actions::Insert, Caches::MarketOrderInfo)   => (market_order_info_copy, insert, InsertMarketOrderInfoReq),
+        - Actions::FetchMarketOrderInfo   => (market_order_info_copy, fetch, FetchMarketOrderInfoReq),
+        - Actions::InsertMarketOrdersInfo => (market_order_info_copy, insert, InsertMarketOrderInfoReq),
 
-        (Actions::Fetch, Caches::Region)             => (region_copy, fetch, FetchRegionEntries),
-        (Actions::Insert, Caches::Region)            => (region_copy, insert, InsertRegionEntries),
+        - Actions::FetchRegions           => (region_copy, fetch, FetchRegionReq),
+        - Actions::InsertRegions          => (region_copy, insert, InsertRegionReq),
 
-        (Actions::Fetch, Caches::Station)            => (station_copy, fetch, FetchStationEntryById),
-        (Actions::Insert, Caches::Station)           => (station_copy, insert, InsertStationEntries),
+        - Actions::InsertStations         => (station_copy, insert, InsertStationReq),
     };
 }
