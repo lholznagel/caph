@@ -7,7 +7,6 @@ codegen-units = 1
 [workspace]
 members = [
   'collector',
-  'collector_v2',
   'db',
   'eve_api',
   'eve_sde_parser',

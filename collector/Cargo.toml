@@ -5,11 +5,14 @@ authors = ["lholznagel <contact@lholznagel.info>"]
 edition = "2018"
 
 [dependencies]
+async-trait = "0.1.42"
+#cachem = { git = "https://github.com/lholznagel/cachem.git", rev = "7056e10887b8061ceb15b1efd9b2ff3cec0e15e9" }
+cachem = { path = "../../cachem/cachem" }
+caph_db = { path = "../db" }
 caph_eve_online_api = { path = "../eve_api" }
 caph_eve_sde_parser = { path = "../eve_sde_parser" }
-futures = "0.3.8"
-log = "0.4.11"
+chrono = "0.4.19"
+futures = "0.3.12"
+log = "0.4.14"
 morgan = { git = "https://github.com/lholznagel/morgan.git", rev = "624526038c210b142d2835fa77965064771ac192" }
-metrix = { git = "https://github.com/lholznagel/metrix.git", rev = "33d20d7206f18e8822ebcb272d9eed6f5d056e23" }
-sqlx = { version = "0.4.1", default-features = false, features = ["macros", "runtime-tokio-rustls", "postgres"] }
-tokio = { version = "0.2.24", features = ["macros", "rt-threaded", "time", "stream"] }
+tokio = { version = "1.2.0", features = ["full"] }

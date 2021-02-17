@@ -1,12 +1,14 @@
 [Unit]
 Description=Caph data collector
+After=caph_db.service
 
 [Service]
 Type=simple
 Environment=MORGAN_COLOR=false
 Environment=RUST_BACKTRACE=1
-Environment=DB=postgres://caph:caph@cygnus.local:5432/caph_eve
-ExecStart=/home/pleb/caph_collector
+ExecStartPre=/bin/sleep 5
+ExecStart=/opt/caph/caph_collector
+Restart=always
 
 [Install]
 WantedBy=multi-user.target

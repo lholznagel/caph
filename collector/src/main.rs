@@ -1,86 +1,46 @@
 mod error;
 mod market;
-mod metrics;
-mod postgres;
 mod sde;
+mod time;
 
-use metrix::{MetricCollector, MetricCommand, Metrics};
-use std::time::Duration;
+use self::market::*;
+use self::sde::*;
+use self::time::*;
+
+use cachem::ConnectionPool;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    morgan::Morgan::init(vec!["sqlx".into()]);
+    morgan::Morgan::init(vec![]);
 
-    use sqlx::postgres::PgPoolOptions;
-    use sqlx::Executor;
-    use tokio::sync::mpsc;
+    let pool = ConnectionPool::new("127.0.0.1:9999".into(), 10).await?;
 
-    let (metric_tx, metric_rx) = mpsc::channel::<(&str, MetricCommand)>(100);
-    let metric_collector = MetricCollector::default();
-
-    let db_uri =
-        std::env::var("DB").unwrap_or("postgres://caph:caph@virgo:5432/caph_test".into());
-    let pool = PgPoolOptions::new()
-        .max_connections(25)
-        .connect(&db_uri)
-        .await?;
-
-    // Make sure the database has the newest scripts applied
-    let mut conn = pool.acquire().await?;
-    conn.execute(include_str!("./tables.sql")).await?;
+    let mut sde = Sde::new(pool.clone()).await;
+    sde.run().await.unwrap();
 
     let pool_copy = pool.clone();
-    let metric_tx_copy = metric_tx.clone();
-    let sde = tokio::task::spawn(async {
-        let metrics = Metrics::new(metric_tx_copy);
-        let mut sde = sde::Sde::new(pool_copy, metrics).await;
+    tokio::task::spawn(async {
+        let mut market = Market::new(pool_copy);
 
         loop {
-            if let Err(e) = sde.background().await {
-                log::error!("Error running SDE task: {:?}", e);
-            }
-
-            tokio::time::delay_for(Duration::from_secs(24 * 60 * 60)).await; // 24 hours
-        }
-    });
-
-    let pool_copy = pool.clone();
-    let metric_tx_copy = metric_tx.clone();
-    let market = tokio::task::spawn(async {
-        let metrics = Metrics::new(metric_tx_copy);
-        let mut market = market::Market::new(pool_copy, metrics);
-
-        loop {
-            if let Err(e) = market.background().await {
+            if let Err(e) = market.task().await {
                 log::error!("Error running market task {:?}", e);
             }
 
-            tokio::time::delay_for(Duration::from_secs(30 * 60)).await; // 30 minutes
+            let next_run = duration_to_next_30_minute();
+            tokio::time::sleep(next_run).await; // Run on the next 30 minute interval
         }
-    });
+    })
+    .await
+    .unwrap();
 
-    let pool_copy = pool.clone();
-    let metric_tx_copy = metric_tx.clone();
-    let postgres = tokio::task::spawn(async {
-        let metrics = Metrics::new(metric_tx_copy);
-        let mut postgres = postgres::PostgresService::new(pool_copy, metrics);
-
-        loop {
-            postgres.background().await;
-            tokio::time::delay_for(Duration::from_secs(15 * 60)).await; // 15 minutes
-        }
-    });
-
+    /*
     #[allow(unused_must_use)]
     {
         tokio::join!(
-            sde,
             market,
-            postgres,
-            metric_collector.metric_server("127.0.0.1:8000"),
-            metric_collector.metric_listener(metric_rx),
         );
-    }
+    }*/
 
     Ok(())
 }

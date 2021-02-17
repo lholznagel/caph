@@ -1,39 +1,40 @@
-use crate::{error::CollectorError, metrics::SdeMetrics};
-
+use cachem::{ConnectionPool, EmptyResponse, Protocol};
 use caph_eve_sde_parser::{
     Blueprint, ParseRequest, ParseResult, Schematic, Station, TypeIds, TypeMaterial, UniqueName,
 };
-use metrix::Metrics;
-use sqlx::{pool::PoolConnection, Executor, Pool, Postgres};
-use std::collections::HashMap;
+use caph_db::*;
+use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
 use std::time::Instant;
 
-const BATCH_SIZE: usize = 10_000;
+use crate::error::{CollectorError, CollectorResult};
+
+pub enum Action {
+    Blueprint(Vec<BlueprintEntry>),
+    IdName(Vec<IdNameEntry>),
+    Item(Vec<ItemEntry>),
+    ItemMaterial(Vec<ItemMaterialEntry>),
+    Region(HashSet<RegionEntry>),
+    Station(Vec<StationEntry>),
+}
 
 pub struct Sde {
-    db: Pool<Postgres>,
-    metrics: Metrics,
+    pool: ConnectionPool,
 }
 
 impl Sde {
-    pub async fn new(db: Pool<Postgres>, metrics: Metrics) -> Self {
-        Self { db, metrics }
+    pub async fn new(pool: ConnectionPool) -> Self {
+        Self { pool }
     }
 
-    pub async fn background(&mut self) -> Result<(), CollectorError> {
+    pub async fn run(&mut self) -> CollectorResult<()> {
         log::debug!("Fetching sde zip");
-        let start = Instant::now();
         let zip = caph_eve_sde_parser::fetch_zip()
             .await
             .map_err(|_| CollectorError::DownloadSdeZip)?;
-        self.metrics
-            .duration(SdeMetrics::DOWNLOAD_TIME, start)
-            .await;
         log::debug!("Fetched sde zip");
 
         log::debug!("Parsing sde zip");
-        let start = Instant::now();
         let parse_results = caph_eve_sde_parser::from_reader(
             &mut Cursor::new(zip),
             vec![
@@ -46,352 +47,260 @@ impl Sde {
             ],
         )
         .map_err(CollectorError::SdeParserError)?;
-        self.metrics.duration(SdeMetrics::PARSE_TIME, start).await;
         log::debug!("Parsed sde zip");
 
-        let mut conn = self.db.acquire().await?;
-        conn.execute("BEGIN").await?;
-
-        self.remove_old("items").await?;
-        self.remove_old("item_materials").await?;
-        self.remove_old("names").await?;
-        self.remove_old("stations").await?;
-        self.remove_old("blueprints").await?;
-        self.remove_old("blueprint_resources").await?;
-        self.remove_old("schematics").await?;
-
-        let start = Instant::now();
+        let start = std::time::Instant::now();
+        // collects all actions that need to be perfomed
+        let mut actions: Vec<Action> = Vec::new();
+        //let mut conn = self.pool.acquire().await?;
         for parse_result in parse_results {
-            match parse_result {
-                ParseResult::TypeIds(x) => self.items(&mut conn, x).await?,
-                ParseResult::TypeMaterials(x) => self.item_materials(&mut conn, x).await?,
-                ParseResult::UniqueNames(x) => self.names(&mut conn, x).await?,
-                ParseResult::Stations(x) => self.stations(&mut conn, x).await?,
-                ParseResult::Blueprints(x) => self.blueprints(&mut conn, x).await?,
-                ParseResult::Schematic(x) => self.schematics(&mut conn, x).await?,
+            let x = match parse_result {
+                ParseResult::TypeIds(x) => self.items(x).await?,
+                ParseResult::TypeMaterials(x) => self.item_materials(x).await?,
+                ParseResult::UniqueNames(x) => self.unique_names(x).await?,
+                ParseResult::Stations(x) => self.stations(x).await?,
+                ParseResult::Blueprints(x) => self.blueprints(x).await?,
+                ParseResult::Schematic(x) => self.schematics(x).await?,
+            };
+            actions.extend(x);
+        }
+        log::info!("After parse {}", start.elapsed().as_millis());
+
+        for action in actions {
+            let mut conn = self.pool.acquire().await?;
+            match action {
+                Action::IdName(x) => {
+                    log::info!("Starting name import");
+                    let start = Instant::now();
+                    Protocol::request::<_, EmptyResponse>(
+                        &mut conn,
+                        InsertIdNameReq(x)
+                    )
+                    .await?;
+                    log::info!("After send id names {}", start.elapsed().as_millis());
+                },
+                Action::Item(x) => {
+                    log::info!("Starting item import");
+                    let start = Instant::now();
+                    Protocol::request::<_, EmptyResponse>(
+                        &mut conn,
+                        InsertItemReq(x)
+                    )
+                    .await?;
+                    log::info!("After send items {}", start.elapsed().as_millis());
+                },
+                Action::ItemMaterial(x) => {
+                    log::info!("Starting item material import");
+                    let start = Instant::now();
+                    Protocol::request::<_, EmptyResponse>(
+                        &mut conn,
+                        InsertItemMaterialReq(x)
+                    )
+                    .await?;
+                    log::info!("After send item materials {}", start.elapsed().as_millis());
+                },
+                Action::Station(x) => {
+                    log::info!("Starting station import");
+                    let start = Instant::now();
+                    Protocol::request::<_, EmptyResponse>(
+                        &mut conn,
+                        InsertStationReq(x)
+                    )
+                    .await?;
+                    log::info!("After send stations {}", start.elapsed().as_millis());
+                },
+                Action::Blueprint(x) => {
+                    log::info!("Starting blueprint import");
+                    let start = Instant::now();
+                    Protocol::request::<_, EmptyResponse>(
+                        &mut conn,
+                        InsertBlueprintReq(x)
+                    )
+                    .await?;
+                    log::info!("After send blueprints {}", start.elapsed().as_millis());
+                }
+                Action::Region(x) => {
+                    log::info!("Starting region import");
+                    let start = Instant::now();
+                    Protocol::request::<_, EmptyResponse>(
+                        &mut conn,
+                        InsertRegionReq(x)
+                    )
+                    .await?;
+                    log::info!("After send regions {}", start.elapsed().as_millis());
+                }
             }
         }
 
-        self.metrics
-            .duration(SdeMetrics::TOTAL_DB_INSERT_TIME, start)
-            .await;
-        conn.execute("COMMIT").await?;
-        self.metrics
-            .current_timestamp(SdeMetrics::LAST_COMPLETE_READOUT)
-            .await;
+        log::info!("Took {}", start.elapsed().as_millis());
+
         Ok(())
     }
 
     async fn items(
         &mut self,
-        conn: &mut PoolConnection<Postgres>,
         items: HashMap<u32, TypeIds>,
-    ) -> Result<(), CollectorError> {
-        log::info!("Starting item import");
-        let start = Instant::now();
+    ) -> Result<Vec<Action>, CollectorError> {
+        // We know the roughly how many items there are, so we allocate accordingly
+        let mut id_name_actions = Vec::with_capacity(ItemCache::CAPACITY);
+        let mut item_actions = Vec::with_capacity(ItemCache::CAPACITY);
 
-        let mut skip = 0;
-        let items_len = items.len();
+        for (id, type_id) in items {
+            let name = type_id
+                .name
+                .get("en")
+                .map(|x| x.clone())
+                .unwrap_or_default();
+            id_name_actions.push(IdNameEntry::new(id, name));
 
-        let mut ids = Vec::with_capacity(BATCH_SIZE);
-        let mut names = Vec::with_capacity(BATCH_SIZE);
-        let mut descriptions = Vec::with_capacity(BATCH_SIZE);
-        let mut volumes = Vec::with_capacity(BATCH_SIZE);
-
-        while skip <= items_len {
-            for (id, item) in items.iter().skip(skip).take(BATCH_SIZE) {
-                let name = item.name.get("en").map(|x| x.clone()).unwrap_or_default();
-                let description = if let Some(x) = item.description.clone() {
-                    x.get("en").map(|x| x.clone()).unwrap_or("".into())
-                } else {
-                    "".into()
-                };
-
-                ids.push(*id as i32);
-                names.push(name);
-                descriptions.push(description);
-                volumes.push(item.volume.unwrap_or(0f32));
-            }
-
-            sqlx::query(
-                r#"INSERT INTO items (id, name, description, volume)
-                SELECT * FROM UNNEST($1, $2, $3, $4)
-                RETURNING id, name, description"#,
-            )
-            .bind(&ids)
-            .bind(&names)
-            .bind(&descriptions)
-            .bind(&volumes)
-            .execute(&mut *conn)
-            .await?;
-
-            ids.clear();
-            names.clear();
-            descriptions.clear();
-            volumes.clear();
-            skip += BATCH_SIZE;
+            let volume = type_id.volume.unwrap_or(0f32);
+            item_actions.push(ItemEntry::new(id, volume));
         }
 
-        self.metrics
-            .duration(SdeMetrics::ITEM_INSERT_TIME, start)
-            .await;
-        log::info!("Importing items done. Took {}s", start.elapsed().as_secs());
-        Ok(())
+        let id_name_actions = Action::IdName(id_name_actions);
+        let item_actions = Action::Item(item_actions);
+        Ok(vec![
+            item_actions,
+            id_name_actions,
+        ])
     }
 
     async fn item_materials(
         &mut self,
-        conn: &mut PoolConnection<Postgres>,
         materials: HashMap<u32, TypeMaterial>,
-    ) -> Result<(), CollectorError> {
-        log::info!("Starting item material import");
-        let start = Instant::now();
+    ) -> Result<Vec<Action>, CollectorError> {
+        // We know the roughly how many items there are, so we allocate accordingly
+        let mut item_material_actions = Vec::with_capacity(ItemMaterialCache::CAPACITY);
 
-        let mut skip = 0;
-        let materials_len = materials.len();
+        for (id, materials) in materials {
+            for material in materials.materials.iter() {
+                let material_id = material.material_type_id;
+                let quantity = material.quantity;
 
-        // every reipe has one or more ingridient, so create a larger vec
-        let mut ids = Vec::with_capacity(BATCH_SIZE * 3);
-        let mut material_ids = Vec::with_capacity(BATCH_SIZE * 3);
-        let mut quantities = Vec::with_capacity(BATCH_SIZE * 3);
-
-        while skip <= materials_len {
-            for (id, materials) in materials.iter().skip(skip).take(BATCH_SIZE) {
-                for material in materials.materials.iter() {
-                    ids.push(*id as i32);
-                    material_ids.push(material.material_type_id as i32);
-                    quantities.push(material.quantity as i64);
-                }
+                item_material_actions.push(ItemMaterialEntry::new(id, material_id, quantity));
             }
-
-            sqlx::query(
-                r#"INSERT INTO item_materials (id, material_id, quantity)
-                SELECT * FROM UNNEST($1, $2, $3)
-                RETURNING id, material_id, quantity"#,
-            )
-            .bind(&ids)
-            .bind(&material_ids)
-            .bind(&quantities)
-            .execute(&mut *conn)
-            .await?;
-
-            ids.clear();
-            material_ids.clear();
-            quantities.clear();
-            skip += BATCH_SIZE;
         }
 
-        self.metrics
-            .duration(SdeMetrics::ITEM_MATERIAL_INSERT_TIME, start)
-            .await;
-        log::info!(
-            "Importing item materials done. Took {}s",
-            start.elapsed().as_secs()
-        );
-        Ok(())
+        let item_material_actions = Action::ItemMaterial(item_material_actions);
+        Ok(vec![
+            item_material_actions,
+        ])
     }
 
-    async fn names(
+    async fn unique_names(
         &mut self,
-        conn: &mut PoolConnection<Postgres>,
         names: Vec<UniqueName>,
-    ) -> Result<(), CollectorError> {
-        log::info!("Starting name import");
-        let start = Instant::now();
+    ) -> Result<Vec<Action>, CollectorError> {
+        // We know the roughly how many items there are, so we allocate accordingly
+        let mut id_name_actions = Vec::with_capacity(IdNameCache::CAPACITY);
 
-        let mut skip = 0;
-        let names_len = names.len();
-
-        let mut ids = Vec::with_capacity(BATCH_SIZE);
-        let mut names_db = Vec::with_capacity(BATCH_SIZE);
-
-        while skip <= names_len {
-            for name in names.iter().skip(skip).take(BATCH_SIZE) {
-                ids.push(name.item_id as i32);
-                names_db.push(name.item_name.clone());
-            }
-
-            sqlx::query(
-                r#"INSERT INTO names (id, name)
-                SELECT * FROM UNNEST($1, $2)
-                RETURNING id, name"#,
-            )
-            .bind(&ids)
-            .bind(&names_db)
-            .execute(&mut *conn)
-            .await?;
-
-            ids.clear();
-            names_db.clear();
-            skip += BATCH_SIZE;
+        for name in names {
+            let id = name.item_id;
+            let name = name.item_name;
+            id_name_actions.push(IdNameEntry::new(id, name));
         }
 
-        self.metrics
-            .duration(SdeMetrics::NAME_INSERT_TIME, start)
-            .await;
-        log::info!("Importing names done. Took {}s", start.elapsed().as_secs());
-        Ok(())
+        let id_name_actions = Action::IdName(id_name_actions);
+        Ok(vec![
+            id_name_actions
+        ])
     }
 
     async fn stations(
         &mut self,
-        conn: &mut PoolConnection<Postgres>,
         stations: Vec<Station>,
-    ) -> Result<(), CollectorError> {
-        log::info!("Starting station import");
-        let start = Instant::now();
+    ) -> Result<Vec<Action>, CollectorError> {
+        // We know the roughly how many items there are, so we allocate accordingly
+        let mut region_actions = HashSet::with_capacity(RegionCache::CAPACITY);
+        let mut station_actions = Vec::with_capacity(StationCache::CAPACITY);
 
-        let mut skip = 0;
-        let stations_len = stations.len();
-
-        let mut station_ids = Vec::with_capacity(BATCH_SIZE);
-        let mut constellation_ids = Vec::with_capacity(BATCH_SIZE);
-        let mut region_ids = Vec::with_capacity(BATCH_SIZE);
-        let mut solar_system_ids = Vec::with_capacity(BATCH_SIZE);
-        let mut security = Vec::with_capacity(BATCH_SIZE);
-
-        while skip <= stations_len {
-            for station in stations.iter().skip(skip).take(BATCH_SIZE) {
-                station_ids.push(station.station_id);
-                constellation_ids.push(station.constellation_id);
-                region_ids.push(station.region_id);
-                solar_system_ids.push(station.solar_system_id);
-                security.push(station.security);
-            }
-
-            sqlx::query(
-                r#"INSERT INTO stations (station_id, constellation_id, region_id, system_id, security)
-                SELECT * FROM UNNEST($1, $2, $3, $4, $5)
-                RETURNING station_id, constellation_id, region_id, system_id, security"#,
-            )
-            .bind(&station_ids)
-            .bind(&constellation_ids)
-            .bind(&region_ids)
-            .bind(&solar_system_ids)
-            .bind(&security)
-            .execute(&mut *conn)
-            .await?;
-
-            station_ids.clear();
-            constellation_ids.clear();
-            region_ids.clear();
-            solar_system_ids.clear();
-            security.clear();
-            skip += BATCH_SIZE;
+        for station in stations {
+            let id = station.station_id;
+            let region_id = station.region_id;
+            let system_id = station.solar_system_id;
+            let security = station.security;
+            station_actions.push(
+                StationEntry::new(id, region_id, system_id, security)
+            );
+            region_actions.insert(
+                RegionEntry::new(station.region_id)
+            );
         }
 
-        self.metrics
-            .duration(SdeMetrics::STATION_INSERT_TIME, start)
-            .await;
-        log::info!(
-            "Importing stations done. Took {}s",
-            start.elapsed().as_secs()
-        );
-        Ok(())
+        let region_actions = Action::Region(region_actions);
+        let station_actions = Action::Station(station_actions);
+        Ok(vec![
+            region_actions,
+            station_actions
+        ])
     }
 
     async fn blueprints(
         &mut self,
-        conn: &mut PoolConnection<Postgres>,
         blueprints: HashMap<u32, Blueprint>,
-    ) -> Result<(), CollectorError> {
-        let start = Instant::now();
-        let blueprints = blueprints
-            .into_iter()
-            .map(|(_, b)| b)
-            .collect::<Vec<Blueprint>>();
+    ) -> Result<Vec<Action>, CollectorError> {
+        // We know the roughly how many items there are, so we allocate accordingly
+        let mut blueprint_actions = Vec::with_capacity(BlueprintCache::CAPACITY);
 
-        for blueprint in blueprints {
-            if let Some(x) = blueprint.activities.manufacturing {
-                sqlx::query("INSERT INTO blueprints (blueprint_id, time) VALUES ($1, $2)")
-                    .bind(blueprint.blueprint_type_id)
-                    .bind(x.time as i32)
-                    .execute(&mut *conn)
-                    .await?;
+        for (id, blueprint) in blueprints {
+            let mut time = 0;
+            let mut materials = Vec::new();
+
+            for x in blueprint.activities.manufacturing {
+                time = x.time;
 
                 for material in x.materials.unwrap_or_default() {
-                    sqlx::query(r#"INSERT INTO blueprint_resources (blueprint_id, material_id, quantity, is_product) VALUES ($1, $2, $3, false)"#)
-                        .bind(blueprint.blueprint_type_id)
-                        .bind(material.type_id)
-                        .bind(material.quantity)
-                        .execute(&mut *conn)
-                        .await?;
+                    let material_id = material.type_id;
+                    let quantity = material.quantity;
+                    let material = Material::new(material_id, quantity, false);
+                    materials.push(material);
                 }
 
                 for product in x.products.unwrap_or_default() {
-                    sqlx::query(r#"INSERT INTO blueprint_resources (blueprint_id, material_id, quantity, is_product) VALUES ($1, $2, $3, true)"#)
-                        .bind(blueprint.blueprint_type_id)
-                        .bind(product.type_id)
-                        .bind(product.quantity)
-                        .execute(&mut *conn)
-                        .await?;
+                    let material_id = product.type_id;
+                    let quantity = product.quantity;
+                    let material = Material::new(material_id, quantity, true);
+                    materials.push(material);
                 }
             }
+
+            blueprint_actions.push(
+                BlueprintEntry::new(id, time, materials)
+            );
         }
 
-        self.metrics
-            .duration(SdeMetrics::BLUEPRINT_INSERT_TIME, start)
-            .await;
-        log::info!(
-            "Importing blueprints done. Took {}s",
-            start.elapsed().as_secs()
-        );
-
-        Ok(())
+        let blueprint_actions = Action::Blueprint(blueprint_actions);
+        Ok(vec![
+            blueprint_actions
+        ])
     }
 
     async fn schematics(
         &mut self,
-        conn: &mut PoolConnection<Postgres>,
         schematics: HashMap<u32, Schematic>,
-    ) -> Result<(), CollectorError> {
-        let start = Instant::now();
+    ) -> Result<Vec<Action>, CollectorError> {
+        // We know the roughly how many items there are, so we allocate accordingly
+        let mut schematic_actions = Vec::with_capacity(BlueprintCache::CAPACITY);
 
-        for (id, x) in schematics {
-            sqlx::query("INSERT INTO schematics (schematic_id, time) VALUES ($1, $2)")
-                .bind(id)
-                .bind(x.cycle_time)
-                .execute(&mut *conn)
-                .await?;
+        for (id, schematic) in schematics {
+            let time = schematic.cycle_time;
+            let mut materials = Vec::new();
 
-            for (type_id, y) in x.types {
-                sqlx::query(
-                    r#"
-                INSERT INTO schematic_resources (schematic_id, material_id, quantity, is_input)
-                VALUES ($1, $2, $3, $4)
-                "#,
-                )
-                .bind(id)
-                .bind(type_id)
-                .bind(y.quantity)
-                .bind(y.is_input)
-                .execute(&mut *conn)
-                .await?;
+            for (material_id, schematic) in schematic.types {
+                let quantity = schematic.quantity;
+                let is_product = !schematic.is_input;
+                let material = Material::new(material_id, quantity, is_product);
+                materials.push(material);
             }
+
+            schematic_actions.push(
+                BlueprintEntry::new(id, time, materials)
+            );
         }
 
-        self.metrics
-            .duration(SdeMetrics::SCHEMATIC_INSERT_TIME, start)
-            .await;
-        log::info!(
-            "Importing schematics done. Took {}s",
-            start.elapsed().as_secs()
-        );
-
-        Ok(())
-    }
-
-    async fn remove_old(&mut self, table: &str) -> Result<(), CollectorError> {
-        let start = Instant::now();
-        log::debug!("Removing all unlocked items in {}", table);
-
-        let mut conn = self.db.acquire().await?;
-        sqlx::query(&format!("DELETE FROM {}", table))
-            .execute(&mut conn)
-            .await?;
-
-        log::debug!("Removed all unlocked items");
-        self.metrics.duration(SdeMetrics::CLEANUP_TIME, start).await;
-        Ok(())
+        let schematic_actions = Action::Blueprint(schematic_actions);
+        Ok(vec![
+            schematic_actions
+        ])
     }
 }
