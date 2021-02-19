@@ -1,38 +1,178 @@
-// mod api;
-// mod error;
-// mod reprocessing;
-// mod services;
+mod error;
+mod reprocessing;
+mod services;
 
-// use self::services::*;
+use self::services::*;
 
-// use std::net::SocketAddr;
-// use cachem::ConnectionPool;
-// use warp::Filter;
+use cachem::ConnectionPool;
+use warp::{Filter, Rejection, Reply};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /*
-    morgan::Morgan::init(vec!["warp".into(), "tracing".into()]);
+    morgan::Morgan::init(vec!["tracing".into()]);
 
-    let pool = ConnectionPool::new("127.0.0.1:9999".into(), 10).await?;
+    let pool = ConnectionPool::new("0.0.0.0:9999".into(), 10).await?;
 
-    //let blueprint_service = BlueprintService::new(pool.clone());
-    //let item_service = ItemService::new(pool.clone());
-    let market_service = MarketService::new(pool.clone());
-    //let region_service = RegionService::new(pool.clone());
-    //let resolve_service = ResolveService::new(pool.clone());
+    let item_service = ItemService::new(pool.clone());
+    let market_service = MarketService::new(pool);
 
-    let root = warp::any().and(warp::path!("api" / "v1" / ..)).boxed();
-    let combined = api::market::filter(market_service, root.clone())
-        //.or(api::blueprint::filter(blueprint_service, root.clone()))
-        //.or(api::item::filter(item_service, root.clone()))
-        //.or(api::region::filter(region_service, root.clone()))
-        //.or(api::resolve::filter(resolve_service, root.clone()))
-        .boxed();
-    warp::serve(combined)
-        .run(([0.0.0.0], 10101))
-        .await;
-    */
+    ApiServer::new(
+        item_service,
+        market_service,
+    )
+    .serve()
+    .await;
 
     Ok(())
+}
+
+#[derive(Clone)]
+pub struct ApiServer{
+    items: ItemService,
+    market: MarketService,
+}
+
+impl ApiServer {
+    pub fn new(
+        items: ItemService,
+        market: MarketService,
+    ) -> Self {
+
+        Self {
+            items,
+            market,
+        }
+    }
+
+    pub async fn serve(&self) {
+        let _self = self.clone();
+
+        let root = warp::any()
+            .map(move || _self.clone())
+            .and(warp::path!("api" / ..));
+
+        let item = root
+            .clone()
+            .and(warp::path!("items" / ..));
+        let item_by_id = item
+            .clone()
+            .and(warp::path!(u32))
+            .and(warp::get())
+            .and_then(Self::item_by_id);
+        let item_resolve = item
+            .clone()
+            .and(warp::path!(u32 / "resolve"))
+            .and(warp::get())
+            .and_then(Self::item_resolve);
+        let item_reprocessing = item
+            .clone()
+            .and(warp::path!(u32 / "reprocessing"))
+            .and(warp::get())
+            .and_then(Self::item_reprocessing);
+        let item = item_by_id
+            .or(item_resolve)
+            .or(item_reprocessing);
+
+        let market = root
+            .clone()
+            .and(warp::path!("market" / ..));
+        let market_stats_buy = market
+            .clone()
+            .and(warp::path!(u32 / "stats" / "buy"))
+            .and(warp::get())
+            .and_then(Self::market_stats_buy);
+        let market_stats_sell = market
+            .clone()
+            .and(warp::path!(u32 / "stats" / "sell"))
+            .and(warp::get())
+            .and_then(Self::market_stats_sell);
+        let market_top_order = market
+            .clone()
+            .and(warp::path!(u32 / "orders"))
+            .and(warp::post())
+            .and(warp::body::json())
+            .and_then(Self::market_top_order);
+        let market = market_stats_buy
+            .or(market_stats_sell)
+            .or(market_top_order);
+
+        let api = item
+            .or(market);
+        warp::serve(api)
+            .run(([0, 0, 0, 0], 10101))
+            .await;
+    }
+
+    async fn item_by_id(
+        self: Self,
+        item_id: u32,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .items
+            .by_id(item_id)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn item_resolve(
+        self: Self,
+        item_id: u32,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .items
+            .resolve_id(item_id)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn item_reprocessing(
+        self: Self,
+        item_id: u32,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .items
+            .reprocessing(item_id)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn market_stats_buy(
+        self: Self,
+        item_id: u32,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .market
+            .stats(item_id, true)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn market_stats_sell(
+        self: Self,
+        item_id: u32,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .market
+            .stats(item_id, false)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn market_top_order(
+        self: Self,
+        item_id: u32,
+        body: TopOrderReq,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .market
+            .top_orders(item_id, body)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
 }

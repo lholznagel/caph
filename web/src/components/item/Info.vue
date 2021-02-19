@@ -18,15 +18,11 @@
           <tbody>
             <tr>
               <th>Name</th>
-              <td>{{ info.name }}</td>
-            </tr>
-            <tr>
-              <th>Quantity owned</th>
-              <td><c-format-number :value="quantity" /></td>
+              <td><c-name-by-id :id="Number(id)"/></td>
             </tr>
             <tr>
               <th>Volume</th>
-              <td><c-format-number :value="info.volume" /> m³ (<c-format-number :value="info.volume * quantity" /> m³) </td>
+              <td><c-format-number :value="info.volume" /> m³</td>
             </tr>
           </tbody>
         </template>
@@ -44,24 +40,19 @@ import { Component, Prop, Vue } from 'vue-property-decorator';
 export default class ItemInfo extends Vue {
   @Prop(Number)
   public id!: number;
-  @Prop(Number)
-  public quantity!: number;
 
   public busy: boolean = false;
-  public quantityModifier: number = 0;
-  public info: IReprocessing[] = [];
+  public info: IItem = { item_id: 0, volume: 0 };
 
   public async created() {
     this.busy = true;
-    this.info = (await axios.get(`/api/v1/items/${this.id}`)).data;
+    this.info = (await axios.get(`/api/items/${this.id}`)).data;
     this.busy = false;
   }
 }
 
-interface IReprocessing {
-  id: number;
-  material_id: number;
-  quantity: number;
-  reprocessed: number;
+interface IItem {
+  item_id: number;
+  volume: number;
 }
 </script>

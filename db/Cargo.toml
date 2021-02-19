@@ -6,10 +6,14 @@ edition = "2018"
 
 [dependencies]
 async-trait = "0.1.42"
-#cachem = { git = "https://github.com/lholznagel/cachem.git", rev = "7056e10887b8061ceb15b1efd9b2ff3cec0e15e9", features = ["derive"] }
 cachem = { path = "../../cachem/cachem", features = ["derive"] }
-# TODO: Remove after the database is mainly used
-chrono = "0.4.19"
 log = "0.4.14"
+metrix_exporter = { path = "../../metrix/exporter" }
 morgan = { git = "https://github.com/lholznagel/morgan.git", rev = "624526038c210b142d2835fa77965064771ac192" }
 tokio = { version = "1.2.0", features = ["full"] }
+
+serde = { version = "1.0.123", features = ["derive"], optional = true }
+
+[features]
+default    = []
+with_serde = ["serde"]

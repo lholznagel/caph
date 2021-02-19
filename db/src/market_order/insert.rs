@@ -4,7 +4,9 @@ use crate::Actions;
 
 use async_trait::async_trait;
 use cachem::{EmptyResponse, Insert, Parse, Storage, request};
+use metrix_exporter::metrix;
 use std::collections::HashMap;
+use std::time::Instant;
 
 #[async_trait]
 impl Insert<InsertMarketOrderReq> for MarketOrderCache {
@@ -12,6 +14,7 @@ impl Insert<InsertMarketOrderReq> for MarketOrderCache {
     type Response = EmptyResponse;
 
     async fn insert(&self, input: InsertMarketOrderReq) -> Result<Self::Response, Self::Error> {
+        let insert_start = Instant::now();
         let mut current = HashMap::new();
 
         for entry in input.0 {
@@ -47,12 +50,16 @@ impl Insert<InsertMarketOrderReq> for MarketOrderCache {
                     }
                 ]);
 
-            // Always insert into the current
-            current.insert(entry.order_id, entry);
+            current
+                .entry(entry.item_id)
+                .and_modify(|x: &mut Vec<MarketOrderEntry>| x.push(entry))
+                .or_insert(vec![entry]);
         }
 
         *self.current.write().await = current;
         self.save_to_file().await.unwrap();
+
+        metrix!(self, Self::METRIC_INSERT_DURATION, insert_start.elapsed().as_nanos());
         Ok(EmptyResponse::default())
     }
 }

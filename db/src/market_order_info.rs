@@ -1,8 +1,10 @@
 mod fetch;
+mod fetch_bulk;
 mod insert;
 mod storage;
 
 pub use self::fetch::*;
+pub use self::fetch_bulk::*;
 pub use self::insert::*;
 pub use self::storage::*;
 
@@ -17,6 +19,7 @@ impl MarketOrderInfoCache {
     pub const CAPACITY: usize = 1_000_000;
 }
 
+#[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Copy, Clone, Debug, PartialEq, Parse)]
 pub struct MarketOrderInfoEntry {
     /// Timestamp in seconds

@@ -126,7 +126,9 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "cachem_derive",
+ "log",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -136,20 +138,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "caph_api_server"
-version = "0.1.0"
-dependencies = [
- "cachem",
- "caph_db",
- "caph_eve_online_api",
- "log",
- "morgan",
- "serde",
- "tokio",
- "warp",
 ]
 
 [[package]]
@@ -174,9 +162,10 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "cachem",
- "chrono",
  "log",
+ "metrix_exporter",
  "morgan",
+ "serde",
  "tokio",
 ]
 
@@ -198,6 +187,20 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_yaml",
+]
+
+[[package]]
+name = "caph_server"
+version = "0.1.0"
+dependencies = [
+ "cachem",
+ "caph_db",
+ "caph_eve_online_api",
+ "log",
+ "morgan",
+ "serde",
+ "tokio",
+ "warp",
 ]
 
 [[package]]
@@ -661,6 +664,29 @@ name = "memchr"
 version = "2.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ee1c47aaa256ecabcaea351eae4a9b01ef39ed810004e298d2511ed284b1525"
+
+[[package]]
+name = "metrix_db"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "cachem",
+ "chrono",
+ "morgan",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "metrix_exporter"
+version = "0.1.0"
+dependencies = [
+ "cachem",
+ "log",
+ "metrix_db",
+ "tokio",
+ "uuid",
+]
 
 [[package]]
 name = "mime"
@@ -1505,6 +1531,15 @@ name = "utf-8"
 version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05e42f7c18b8f902290b009cde6d651262f956c98bc51bca4cd1d511c9cd85c7"
+
+[[package]]
+name = "uuid"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+dependencies = [
+ "getrandom 0.2.2",
+]
 
 [[package]]
 name = "version_check"

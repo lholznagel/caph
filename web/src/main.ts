@@ -20,6 +20,7 @@ Vue.component('c-item-reprocessing', () => import('@/components/item/Reprocessin
 
 Vue.component('c-market-orders', () => import('@/components/market/Orders.vue'));
 Vue.component('c-market-stats', () => import('@/components/market/Stats.vue'));
+Vue.component('c-market-charts', () => import('@/components/market/Chart.vue'));
 
 new Vue({
   router,

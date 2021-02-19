@@ -2,14 +2,9 @@
   <v-app id="app">
     <v-navigation-drawer clipped fixed app>
       <v-list>
-        <v-list-item to="/items/my">
+        <v-list-item to="/market">
           <v-list-item-content>
-            <v-list-item-title>My items</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-        <v-list-item to="/market/raw">
-          <v-list-item-content>
-            <v-list-item-title>Raw market</v-list-item-title>
+            <v-list-item-title>Market</v-list-item-title>
           </v-list-item-content>
         </v-list-item>
       </v-list>

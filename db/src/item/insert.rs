@@ -1,7 +1,7 @@
 use crate::{Actions, ItemCache, ItemEntry};
 
 use async_trait::*;
-use cachem::{EmptyResponse, Insert, Parse, request};
+use cachem::{EmptyResponse, Insert, Parse, Storage, request};
 
 #[async_trait]
 impl Insert<InsertItemReq> for ItemCache {
@@ -32,6 +32,7 @@ impl Insert<InsertItemReq> for ItemCache {
         if changes > 0 {
             *self.0.write().await = old_data;
         }
+        self.save_to_file().await.unwrap();
         Ok(EmptyResponse::default())
     }
 }

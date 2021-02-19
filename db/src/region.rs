@@ -1,8 +1,10 @@
 mod fetch;
 mod insert;
+mod storage;
 
 pub use self::fetch::*;
 pub use self::insert::*;
+pub use self::storage::*;
 
 use cachem::Parse;
 use std::collections::HashSet;
@@ -15,7 +17,7 @@ impl RegionCache {
     pub const CAPACITY: usize = 50;
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Parse)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Parse)]
 pub struct RegionEntry {
     pub region_id: u32,
 }

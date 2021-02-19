@@ -1,6 +1,10 @@
+mod fetch;
 mod insert;
+mod storage;
 
+pub use self::fetch::*;
 pub use self::insert::*;
+pub use self::storage::*;
 
 use cachem::Parse;
 use std::collections::HashMap;
@@ -13,6 +17,7 @@ impl ItemCache {
     pub const CAPACITY: usize = 40_000;
 }
 
+#[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Copy, Clone, Debug, PartialEq, Parse)]
 pub struct ItemEntry {
     pub item_id: u32,

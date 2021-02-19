@@ -12,10 +12,7 @@
           <tr v-for="item in reprocessed" :key="item.material_id">
             <th><c-name-by-id :id="item.material_id" /></th>
             <td>
-              <c-format-number :value="item.reprocessed" />
-            </td>
-            <td>
-              <c-format-number :value="item.reprocessed * quantityModifier" />
+              <c-format-number :value="Math.floor(item.reprocessed)" />
             </td>
           </tr>
         </tbody>
@@ -37,17 +34,13 @@ import { Component, Prop, Vue } from 'vue-property-decorator';
 export default class ItemInfo extends Vue {
   @Prop(Number)
   public id!: number;
-  @Prop(Number)
-  public quantity!: number;
 
   public busy: boolean = false;
-  public quantityModifier: number = 0;
   public reprocessed: IReprocessing[] = [];
 
   public async created() {
     this.busy = true;
-    this.reprocessed = (await axios.get(`/api/v1/items/${this.id}/reprocessing`)).data;
-    this.quantityModifier = Math.floor(this.quantity / 100);
+    this.reprocessed = (await axios.get(`/api/items/${this.id}/reprocessing`)).data;
     this.busy = false;
   }
 }

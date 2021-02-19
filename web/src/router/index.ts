@@ -7,23 +7,17 @@ Vue.use(VueRouter);
 const routes: RouteConfig[] = [
   {
     path: '/',
-    name: 'Home',
-    component: Home
+    redirect: 'Market'
   },
   {
-    path: '/items/my',
-    name: 'MyItems',
-    component: () => import(/* webpackChunkName: "my:items" */ '../views/MyItems.vue')
+    path: '/market',
+    name: 'Market',
+    component: () => import(/* webpackChunkName: "market" */ '../views/Market.vue')
   },
   {
-    path: '/market/:id/info',
+    path: '/market/:id',
     name: 'MarketInfo',
-    component: () => import(/* webpackChunkName: "item_info" */ '../views/MarketInfo.vue')
-  },
-  {
-    path: '/market/raw',
-    name: 'MarketRaw',
-    component: () => import(/* webpackChunkName: "market_raw" */ '../views/MarketRaw.vue')
+    component: () => import(/* webpackChunkName: "market_info" */ '../views/MarketInfo.vue')
   }
 ];
 

@@ -6,7 +6,7 @@
       v-if="busy"
     ></v-skeleton-loader>
 
-    <v-simple-table v-if="!busy">
+    <v-simple-table v-if="!busy && marketData.length > 0">
       <template v-slot:default>
         <thead>
           <tr>
@@ -15,7 +15,6 @@
             <th class="text-left">Security</th>
             <th class="text-left">System</th>
             <th class="text-left">Region</th>
-            <th class="text-left">Jumps</th>
           </tr>
         </thead>
         <tbody>
@@ -25,11 +24,14 @@
             <td>{{ item.security }}</td>
             <td><c-name-by-id :id="item.system_id"/></td>
             <td><c-name-by-id :id="item.region_id"/></td>
-            <td><c-route :destination="item.system_id"/></td>
           </tr>
         </tbody>
       </template>
     </v-simple-table>
+
+    <v-alert color="blue-grey" type="info" v-if="!busy && marketData.length === 0">
+      No orders
+    </v-alert>
   </div>
 </template>
 
@@ -53,12 +55,10 @@ export default class MarketOrders extends Vue {
   public async created() {
     this.busy = true;
 
-    this.marketData = (await axios.post('/api/v1/market', {
-      onlyBuyOrders: this.isBuyOrder,
-      onlySellOrders: !this.isBuyOrder,
-      ids: [Number(this.id)],
-      maxItems: 5,
-      sortPrice: this.type === 'high' ? 'DESC' : 'ASC'
+    this.marketData = (await axios.post(`/api/market/${this.id}/orders`, {
+      is_buy_order: this.isBuyOrder,
+      count: 5,
+      sort: this.type === 'high' ? 'DESC' : 'ASC'
     })).data;
 
     this.busy = false;

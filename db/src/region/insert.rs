@@ -1,7 +1,7 @@
 use crate::{Actions, RegionCache, RegionEntry};
 
 use async_trait::*;
-use cachem::{EmptyResponse, Insert, Parse, request};
+use cachem::{EmptyResponse, Insert, Parse, Storage, request};
 use std::collections::HashSet;
 
 #[async_trait]
@@ -16,6 +16,7 @@ impl Insert<InsertRegionReq> for RegionCache {
         }
 
         *self.0.write().await = new_data;
+        self.save_to_file().await.unwrap();
         Ok(EmptyResponse::default())
     }
 }

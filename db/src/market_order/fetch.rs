@@ -4,7 +4,9 @@ use crate::Actions;
 
 use async_trait::async_trait;
 use cachem::{EmptyResponse, Fetch, Parse, request};
+use metrix_exporter::metrix;
 use std::collections::HashMap;
+use std::time::Instant;
 
 #[async_trait]
 impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
@@ -12,6 +14,8 @@ impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
     type Response = FetchMarketOrderRes;
 
     async fn fetch(&self, input: FetchMarketOrderReq) -> Result<Self::Response, Self::Error> {
+        let insert_start = Instant::now();
+
         let item_id = input.0.item_id;
         let ts_start = input.0.ts_start;
         let ts_stop = input.0.ts_stop;
@@ -130,6 +134,8 @@ impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
             });
         }
         response.sort_by(|a, b| a.timestamp.partial_cmp(&b.timestamp).unwrap_or(std::cmp::Ordering::Equal));
+
+        metrix!(self, Self::METRIC_FETCH_DURATION, insert_start.elapsed().as_nanos());
         Ok(FetchMarketOrderRes(response))
     }
 }

@@ -1,6 +1,8 @@
 mod insert;
+mod storage;
 
 pub use self::insert::*;
+pub use self::storage::*;
 
 use cachem::Parse;
 use std::collections::HashMap;

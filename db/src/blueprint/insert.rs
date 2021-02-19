@@ -1,7 +1,7 @@
 use crate::{Actions, BlueprintCache, BlueprintEntry};
 
 use async_trait::async_trait;
-use cachem::{EmptyResponse, Insert, Parse, request};
+use cachem::{EmptyResponse, Insert, Parse, Storage, request};
 
 #[async_trait]
 impl Insert<InsertBlueprintReq> for BlueprintCache {
@@ -32,6 +32,7 @@ impl Insert<InsertBlueprintReq> for BlueprintCache {
         if changes > 0 {
             *self.0.write().await = old_data;
         }
+        self.save_to_file().await.unwrap();
         Ok(EmptyResponse::default())
     }
 }

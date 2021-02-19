@@ -1,7 +1,7 @@
 use crate::{Actions, StationCache, StationEntry};
 
 use async_trait::*;
-use cachem::{EmptyResponse, Insert, Parse, request};
+use cachem::{EmptyResponse, Insert, Parse, Storage, request};
 
 #[async_trait]
 impl Insert<InsertStationReq> for StationCache {
@@ -15,7 +15,7 @@ impl Insert<InsertStationReq> for StationCache {
 
         while let Some(x) = data.pop() {
             old_data
-                .entry(x.station_id)
+                .entry(x.system_id)
                 .and_modify(|entry| {
                     if *entry != x {
                         changes += 1;
@@ -32,6 +32,8 @@ impl Insert<InsertStationReq> for StationCache {
         if changes > 0 {
             *self.0.write().await = old_data;
         }
+
+        self.save_to_file().await.unwrap();
         Ok(EmptyResponse::default())
     }
 }

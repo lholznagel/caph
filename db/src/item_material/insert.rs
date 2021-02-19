@@ -1,7 +1,7 @@
 use crate::{Actions, ItemMaterialCache, ItemMaterialEntry};
 
 use async_trait::*;
-use cachem::{EmptyResponse, Insert, Parse, request};
+use cachem::{EmptyResponse, Insert, Parse, Storage, request};
 
 #[async_trait]
 impl Insert<InsertItemMaterialReq> for ItemMaterialCache {
@@ -10,21 +10,20 @@ impl Insert<InsertItemMaterialReq> for ItemMaterialCache {
 
     async fn insert(&self, input: InsertItemMaterialReq) -> Result<Self::Response, Self::Error> {
         let mut old_data = { self.0.read().await.clone() };
-        let mut data = input.0;
         let mut changes: usize = 0;
 
-        while let Some(x) = data.pop() {
+        for x in input.0.iter() {
             old_data
                 .entry(x.item_id)
                 .and_modify(|entry| {
-                    if *entry != x {
+                    if !entry.contains(&x) {
                         changes += 1;
-                        *entry = x.clone();
+                        entry.push(x.clone());
                     }
                 })
                 .or_insert({
                     changes += 1;
-                    x
+                    vec![*x]
                 });
         }
 
@@ -32,6 +31,7 @@ impl Insert<InsertItemMaterialReq> for ItemMaterialCache {
         if changes > 0 {
             *self.0.write().await = old_data;
         }
+        self.save_to_file().await.unwrap();
         Ok(EmptyResponse::default())
     }
 }

@@ -15,7 +15,7 @@ export default class NameById extends Vue {
   public name: string = '';
 
   public async created() {
-    this.name = (await axios.get(`/api/v1/resolve/${this.id}`)).data.name;
+    this.name = (await axios.get(`/api/items/${this.id}/resolve`)).data.name;
   }
 }
 </script>

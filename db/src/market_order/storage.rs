@@ -29,6 +29,7 @@ impl Storage for MarketOrderCache {
             Ok(MarketOrderCache {
                 current: RwLock::new(HashMap::new()),
                 history: RwLock::new(map),
+                metrix: None,
             })
         } else {
             Ok(MarketOrderCache::default())

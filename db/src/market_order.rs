@@ -1,25 +1,39 @@
 mod fetch;
+mod fetch_latest;
 mod insert;
 mod storage;
 
 pub use self::fetch::*;
+pub use self::fetch_latest::*;
 pub use self::insert::*;
 pub use self::storage::*;
 
-use cachem::Parse;
+use cachem::{CachemError, Parse, Storage};
+use metrix_exporter::MetrixSender;
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 
 #[derive(Default)]
 pub struct MarketOrderCache {
-    current: RwLock<HashMap<u64, MarketOrderEntry>>,
+    current: RwLock<HashMap<u32, Vec<MarketOrderEntry>>>,
     history: RwLock<HashMap<u32, Vec<MarketItemOrderId>>>,
+    metrix: Option<MetrixSender>,
 }
 
 impl MarketOrderCache {
     pub const CAPACITY: usize = 1_000_000;
+
+    const METRIC_INSERT_DURATION: &'static str = "caph_db::market_order::insert::duration";
+    const METRIC_FETCH_DURATION: &'static str  = "caph_db::market_order::fetch::duration";
+
+    pub async fn new(metrix_sender: MetrixSender) -> Result<Self, CachemError> {
+        let mut _self = Self::load_from_file().await?;
+        _self.metrix = Some(metrix_sender);
+        Ok(_self)
+    }
 }
 
+#[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Copy, Clone, Debug, PartialEq, Parse)]
 pub struct MarketOrderEntry {
     pub order_id:      u64,

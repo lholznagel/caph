@@ -1,12 +1,12 @@
 [package]
-name = "caph_api_server"
+name = "caph_server"
 version = "0.1.0"
 authors = ["lholznagel <contact@lholznagel.info>"]
 edition = "2018"
 
 [dependencies]
 cachem = { path = "../../cachem/cachem", features = ["derive"] }
-caph_db = { path = "../db" }
+caph_db = { path = "../db", features = ["with_serde"] }
 caph_eve_online_api = { path = "../eve_api" }
 log = "0.4.14"
 morgan = { git = "https://github.com/lholznagel/morgan.git", rev = "624526038c210b142d2835fa77965064771ac192" }

@@ -1,32 +1,40 @@
-use serde::Serialize;
-use sqlx::{Pool, Postgres};
-use std::collections::HashMap;
+use crate::error::EveServerError;
+use crate::reprocessing::calc_reprocessing;
 
-use crate::{error::EveServerError, reprocessing::calc_reprocessing};
+use cachem::{ConnectionPool, Protocol};
+use caph_db::{FetchIdNameReq, FetchIdNameRes, FetchItemMaterialReq, FetchItemMaterialRes, FetchItemReq, FetchItemRes, IdNameEntry, ItemEntry};
+use serde::Serialize;
 
 #[derive(Clone)]
-pub struct ItemService(Pool<Postgres>);
+pub struct ItemService(ConnectionPool);
 
 impl ItemService {
-    pub fn new(db: Pool<Postgres>) -> Self {
-        Self(db)
+    pub fn new(pool: ConnectionPool) -> Self {
+        Self(pool)
     }
 
-    pub async fn all(&self) -> Result<Vec<Item>, EveServerError> {
+    pub async fn by_id(&self, id: u32) -> Result<ItemEntry, EveServerError> {
         let mut conn = self.0.acquire().await?;
-        sqlx::query_as::<_, Item>("SELECT id, name, volume FROM items")
-            .fetch_all(&mut conn)
-            .await
-            .map_err(|x| x.into())
+
+        Protocol::request::<_, FetchItemRes>(
+            &mut conn,
+            FetchItemReq(id)
+        )
+        .await
+        .map(|x| x.0)
+        .map_err(Into::into)
     }
 
-    pub async fn by_id(&self, id: u32) -> Result<Item, EveServerError> {
+    pub async fn resolve_id(&self, id: u32) -> Result<IdNameEntry, EveServerError> {
         let mut conn = self.0.acquire().await?;
-        sqlx::query_as::<_, Item>("SELECT id, name, volume FROM items WHERE id = $1")
-            .bind(id)
-            .fetch_one(&mut conn)
-            .await
-            .map_err(|x| x.into())
+
+        Protocol::request::<_, FetchIdNameRes>(
+            &mut conn,
+            FetchIdNameReq(id)
+        )
+        .await
+        .map(|x| x.0)
+        .map_err(Into::into)
     }
 
     pub async fn reprocessing(
@@ -35,122 +43,31 @@ impl ItemService {
     ) -> Result<Vec<ItemReprocessingResult>, EveServerError> {
         let mut conn = self.0.acquire().await?;
 
-        let result = sqlx::query_as::<_, ItemReprocessing>(
-            "SELECT id, material_id, quantity FROM item_materials WHERE id = $1",
+        let ret = Protocol::request::<_, FetchItemMaterialRes>(
+            &mut conn,
+            FetchItemMaterialReq(id)
         )
-        .bind(id)
-        .fetch_all(&mut conn)
         .await
-        .unwrap()
+        .map(|x| x.0)?
         .iter()
         .map(|x| {
             let modifier = calc_reprocessing(50, 0, 0, 0);
             ItemReprocessingResult {
-                id: x.id,
+                id: x.item_id,
                 material_id: x.material_id,
                 quantity: x.quantity,
                 reprocessed: x.quantity as f32 * (modifier / 100f32),
             }
         })
-        .collect::<Vec<ItemReprocessingResult>>();
-        Ok(result)
-    }
-
-    pub async fn fetch_my_items(&self) -> Result<Vec<MyItem>, EveServerError> {
-        let mut conn = self.0.acquire().await?;
-        sqlx::query_as::<_, MyItem>("SELECT id, quantity FROM user_items")
-            .fetch_all(&mut conn)
-            .await
-            .map_err(|x| x.into())
-    }
-
-    pub async fn fetch_my_item(&self, id: u32) -> Result<MyItem, EveServerError> {
-        let mut conn = self.0.acquire().await?;
-        sqlx::query_as::<_, MyItem>("SELECT id, quantity FROM user_items WHERE id = $1")
-            .bind(id as i32)
-            .fetch_one(&mut conn)
-            .await
-            .map_err(|x| x.into())
-    }
-
-    pub async fn push_my_items(&self, items: HashMap<u32, u64>) -> Result<(), EveServerError> {
-        let mut conn = self.0.acquire().await?;
-
-        let ids = items
-            .clone()
-            .into_iter()
-            .map(|(x, _)| x as i32)
-            .collect::<Vec<i32>>();
-        let quantities = items
-            .into_iter()
-            .map(|(_, x)| x as i64)
-            .collect::<Vec<i64>>();
-
-        sqlx::query(&format!(
-            "DELETE FROM user_items WHERE id = ANY(ARRAY {:?})",
-            ids
-        ))
-        .execute(&mut conn)
-        .await?;
-
-        sqlx::query(
-            r#"INSERT INTO user_items (id, quantity)
-            SELECT * FROM UNNEST($1, $2)
-            RETURNING id, quantity"#,
-        )
-        .bind(&ids)
-        .bind(&quantities)
-        .execute(&mut *conn)
-        .await?;
-
-        Ok(())
-    }
-
-    pub async fn search(&self, exact: bool, name: &str) -> Result<Vec<Item>, EveServerError> {
-        let mut conn = self.0.acquire().await?;
-
-        if exact {
-            sqlx::query_as::<_, Item>("SELECT id, name, volume FROM items WHERE name = $1")
-                .bind(name)
-                .fetch_all(&mut conn)
-                .await
-                .map_err(|x| x.into())
-        } else {
-            sqlx::query_as::<_, Item>(&format!(
-                "SELECT id, name FROM items WHERE name ILIKE '%{}%'",
-                name
-            ))
-            .fetch_all(&mut conn)
-            .await
-            .map_err(|x| x.into())
-        }
+        .collect::<Vec<_>>();
+        Ok(ret)
     }
 }
 
-#[derive(Clone, Debug, Serialize, sqlx::FromRow)]
-pub struct Item {
-    pub id: i32,
-    pub name: String,
-    pub volume: f32,
-}
-
-#[derive(Clone, Debug, Serialize, sqlx::FromRow)]
-pub struct ItemReprocessing {
-    pub id: i32,
-    pub material_id: i32,
-    pub quantity: i32,
-}
-
-#[derive(Clone, Debug, Serialize, sqlx::FromRow)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ItemReprocessingResult {
-    pub id: i32,
-    pub material_id: i32,
-    pub quantity: i32,
+    pub id:          u32,
+    pub material_id: u32,
+    pub quantity:    u32,
     pub reprocessed: f32,
-}
-
-#[derive(Clone, Debug, Serialize, sqlx::FromRow)]
-pub struct MyItem {
-    pub id: i32,
-    pub quantity: i64,
 }
