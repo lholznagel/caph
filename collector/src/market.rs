@@ -20,7 +20,7 @@ impl Market {
     }
 
     pub async fn task(&mut self) -> Result<(), CollectorError> {
-        let timestamp = previous_30_minute(Utc::now().timestamp() as u64);
+        let timestamp = previous_30_minute(Utc::now().timestamp() as u64) * 1_000;
         let client = EveClient::default();
 
         let mut requests = FuturesUnordered::new();

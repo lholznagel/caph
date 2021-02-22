@@ -12,6 +12,7 @@
     "sourceMap": true,
     "resolveJsonModule": true,
     "noImplicitAny": false,
+    "skipLibCheck": true,
     "baseUrl": ".",
     "types": [
       "node",

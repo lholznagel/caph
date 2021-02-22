@@ -2,14 +2,18 @@ import Vue from 'vue';
 import App from './App.vue';
 import router from './router';
 import vuetify from './plugins/vuetify';
-import VueApexCharts from 'vue-apexcharts';
+import ECharts from 'vue-echarts';
+import VueCompositionAPI from '@vue/composition-api';
+
+import 'echarts';
 
 export const HOME_SYSTEM: number = 30002755;
 
 Vue.config.productionTip = false;
 
-Vue.use(VueApexCharts);
-Vue.component('apexchart', VueApexCharts);
+Vue.use(VueCompositionAPI);
+
+Vue.component('v-chart', ECharts);
 
 Vue.component('c-format-number', () => import('@/components/FormatNumber.vue'));
 Vue.component('c-name-by-id', () => import('@/components/NameById.vue'));

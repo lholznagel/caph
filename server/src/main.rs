@@ -5,6 +5,7 @@ mod services;
 use self::services::*;
 
 use cachem::ConnectionPool;
+use serde::Deserialize;
 use warp::{Filter, Rejection, Reply};
 
 #[tokio::main]
@@ -92,9 +93,16 @@ impl ApiServer {
             .and(warp::post())
             .and(warp::body::json())
             .and_then(Self::market_top_order);
+        let market_history = market
+            .clone()
+            .and(warp::path!(u32 / "historic"))
+            .and(warp::query())
+            .and(warp::get())
+            .and_then(Self::market_historic);
         let market = market_stats_buy
             .or(market_stats_sell)
-            .or(market_top_order);
+            .or(market_top_order)
+            .or(market_history);
 
         let api = item
             .or(market);
@@ -175,4 +183,22 @@ impl ApiServer {
             .map(|x| warp::reply::json(&x))
             .map_err(Into::into)
     }
+
+    async fn market_historic(
+        self: Self,
+        item_id: u32,
+        query: MarketQuery,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .market
+            .historic(item_id, query.buy)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+}
+
+#[derive(Deserialize)]
+struct MarketQuery {
+    buy: bool,
 }

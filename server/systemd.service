@@ -1,0 +1,14 @@
+[Unit]
+Description=Caph server
+After=caph_db.service
+
+[Service]
+Type=simple
+Environment=MORGAN_COLOR=false
+Environment=RUST_BACKTRACE=1
+ExecStartPre=/bin/sleep 2
+ExecStart=/opt/caph/caph_server
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

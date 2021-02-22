@@ -8,6 +8,7 @@ edition = "2018"
 cachem = { path = "../../cachem/cachem", features = ["derive"] }
 caph_db = { path = "../db", features = ["with_serde"] }
 caph_eve_online_api = { path = "../eve_api" }
+chrono = "0.4.19"
 log = "0.4.14"
 morgan = { git = "https://github.com/lholznagel/morgan.git", rev = "624526038c210b142d2835fa77965064771ac192" }
 serde = { version = "1.0.123", features = ["derive"] }

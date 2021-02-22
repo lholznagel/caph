@@ -80,19 +80,25 @@
     </v-card>
 
     <v-card class="mt-5">
-      <v-card-title>Historic Price</v-card-title>
+      <v-card-title>Historic</v-card-title>
 
       <v-expansion-panels accordion>
         <v-expansion-panel>
           <v-expansion-panel-header>Buy</v-expansion-panel-header>
           <v-expansion-panel-content>
-            <c-market-charts></c-market-charts>
+            <c-market-charts
+              :id="$route.params.id"
+              :is-buy-order="true"
+            />
           </v-expansion-panel-content>
         </v-expansion-panel>
         <v-expansion-panel>
           <v-expansion-panel-header>Sell</v-expansion-panel-header>
           <v-expansion-panel-content>
-            <c-market-charts></c-market-charts>
+            <c-market-charts
+              :id="$route.params.id"
+              :is-buy-order="false"
+            />
           </v-expansion-panel-content>
         </v-expansion-panel>
       </v-expansion-panels>
@@ -102,12 +108,9 @@
 </template>
 
 <script lang="ts">
-import axios from 'axios';
 import { Component, Vue } from 'vue-property-decorator';
 
 @Component
 export default class ItemInfo extends Vue {
-  // TODO: what?
-  public quantity: number = 0;
 }
 </script>

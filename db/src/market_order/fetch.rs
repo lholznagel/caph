@@ -115,8 +115,8 @@ impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
             // Add the items with the current ts into the return map
             ret.insert(ts_current, items_filter);
 
-            // Increase the timestamp to the next 30 minute mark
-            ts_current += 1800;
+            // Increase the timestamp to the next 30 minute mark in milliseconds
+            ts_current += 1_800 * 1_000;
         }
 
         let mut response = Vec::with_capacity(ret.len());

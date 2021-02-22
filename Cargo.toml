@@ -1,7 +1,7 @@
 [profile.release]
 lto = true
 panic = 'abort'
-opt-level = 'z'
+opt-level = 3
 codegen-units = 1
 
 [workspace]
