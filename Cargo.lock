@@ -127,8 +127,8 @@ dependencies = [
  "async-trait",
  "cachem_derive",
  "log",
+ "metrix_exporter",
  "tokio",
- "uuid",
 ]
 
 [[package]]
@@ -152,6 +152,7 @@ dependencies = [
  "chrono",
  "futures",
  "log",
+ "metrix_exporter",
  "morgan",
  "tokio",
 ]
@@ -198,6 +199,7 @@ dependencies = [
  "caph_eve_online_api",
  "chrono",
  "log",
+ "metrix_exporter",
  "morgan",
  "serde",
  "tokio",
@@ -667,24 +669,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ee1c47aaa256ecabcaea351eae4a9b01ef39ed810004e298d2511ed284b1525"
 
 [[package]]
-name = "metrix_db"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "cachem",
- "chrono",
- "morgan",
- "tokio",
- "uuid",
-]
-
-[[package]]
 name = "metrix_exporter"
 version = "0.1.0"
 dependencies = [
- "cachem",
  "log",
- "metrix_db",
+ "reqwest",
  "tokio",
  "uuid",
 ]
@@ -1052,9 +1041,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd281b1030aa675fb90aa994d07187645bb3c8fc756ca766e7c3070b439de9de"
+checksum = "0460542b551950620a3648c6aa23318ac6b3cd779114bd873209e6e8b5eb1c34"
 dependencies = [
  "base64",
  "bytes",
@@ -1170,9 +1159,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.61"
+version = "1.0.62"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fceb2595057b6891a4ee808f70054bd2d12f0e97f1cbb78689b59f676df325a"
+checksum = "ea1c6153794552ea7cf7cf63b1231a25de00ec90db326ba6264440fa08e31486"
 dependencies = [
  "itoa",
  "ryu",
@@ -1539,7 +1528,7 @@ version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
- "getrandom 0.2.2",
+ "serde",
 ]
 
 [[package]]

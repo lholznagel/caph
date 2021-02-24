@@ -6,20 +6,39 @@ use caph_eve_online_api::{EveClient, MarketOrder};
 use caph_db::*;
 use chrono::Utc;
 use futures::stream::{FuturesUnordered, StreamExt};
+use metrix_exporter::MetrixSender;
 use std::time::Instant;
 
 pub struct Market {
+    metrix: MetrixSender,
     pool: ConnectionPool,
 }
 
 impl Market {
-    pub fn new(pool: ConnectionPool) -> Self {
+    const METRIC_MARKET:              &'static str = "market::time::complete";
+    const METRIC_FETCHED_REGION:      &'static str = "market::time::fetch_region";
+    const METRIC_FETCH_MARKET_DATA:   &'static str = "market::time::market_data::fetch";
+    const METRIC_INSERT_MARKET_DATA:  &'static str = "market::time::market_data::insert";
+    const METRIC_PREPARE_ORDER_ID:    &'static str = "market::time::prep::order_id";
+    const METRIC_PREPARE_MARKET_INFO: &'static str = "market::time::prep::market_info";
+    const METRIC_PREPARE_MARKET_DATA: &'static str = "market::time::prep::market_data";
+    const METRIC_SEND_MARKET_INFO:    &'static str = "market::time::send::market_info";
+    const METRIC_SEND_MARKET_DATA:    &'static str = "market::time::send::market_data";
+    const METRIC_COUNT_ORDER_ID:      &'static str = "market::count::order_id";
+    const METRIC_COUNT_MARKET_INFO:   &'static str = "market::count::market_info";
+    const METRIC_COUNT_MARKET_DATA:   &'static str = "market::count::market_data";
+
+    pub fn new(metrix: MetrixSender, pool: ConnectionPool) -> Self {
         Self {
+            metrix,
             pool
         }
     }
 
     pub async fn task(&mut self) -> Result<(), CollectorError> {
+        let start = Instant::now();
+        let timer = Instant::now();
+
         let timestamp = previous_30_minute(Utc::now().timestamp() as u64) * 1_000;
         let client = EveClient::default();
 
@@ -31,6 +50,9 @@ impl Market {
         )
         .await
         .unwrap();
+
+        self.metrix.send_time(Self::METRIC_FETCHED_REGION, timer).await;
+        let timer = Instant::now();
 
         for region in regions.0 {
             requests.push(client.fetch_market_orders(region.into()));
@@ -47,7 +69,12 @@ impl Market {
             }
         }
 
+        self.metrix.send_time(Self::METRIC_FETCH_MARKET_DATA, timer).await;
+        let timer = Instant::now();
+
         self.market_info(results, timestamp).await?;
+        self.metrix.send_time(Self::METRIC_INSERT_MARKET_DATA, timer).await;
+        self.metrix.send_time(Self::METRIC_MARKET, start).await;
 
         Ok(())
     }
@@ -57,28 +84,16 @@ impl Market {
         entries: Vec<MarketOrder>,
         timestamp: u64
     ) -> Result<(), CollectorError> {
-        log::info!("Starting market import");
-        let start = Instant::now();
+        let timer = Instant::now();
 
-        //let mut lookup_ids = Vec::with_capacity(MarketOrderInfoCache::CAPACITY);
         let mut ids = Vec::with_capacity(MarketOrderInfoCache::CAPACITY);
         for entry in entries.iter() {
-            // lookup_ids.push(entry.order_id);
             ids.push(entry.order_id);
         }
-        //log::info!("Looking up {} ids", lookup_ids.len());
+        self.metrix.send_time(Self::METRIC_PREPARE_ORDER_ID, timer).await;
+        self.metrix.send_len(Self::METRIC_COUNT_ORDER_ID, ids.len()).await;
+        let timer = Instant::now();
 
-        //let mut conn = self.pool.acquire().await.unwrap();
-        /*let ids = Protocol::request::<_, LookupMarketOrderInfoEntries>(
-            &mut conn,
-            LookupMarketOrderInfoEntries(lookup_ids)
-        )
-        .await
-        .unwrap().0;
-        log::info!("Lookup took {}ms", start.elapsed().as_millis());*/
-
-        log::info!("Starting import of {}", ids.len());
-        // TODO: Add metrics
         let mut market_order_infos = Vec::with_capacity(MarketOrderCache::CAPACITY);
         for entry in entries.iter() {
             if !ids.contains(&entry.order_id.into()) {
@@ -97,7 +112,10 @@ impl Market {
             );
             market_order_infos.push(market_order_info);
         }
-        log::info!("After prep vec {}ms", start.elapsed().as_millis());
+
+        self.metrix.send_time(Self::METRIC_PREPARE_MARKET_INFO, timer).await;
+        self.metrix.send_len(Self::METRIC_COUNT_MARKET_INFO, market_order_infos.len()).await;
+        let timer = Instant::now();
 
         if market_order_infos.len() > 0 {
             let mut conn = self.pool.acquire().await.unwrap();
@@ -107,12 +125,13 @@ impl Market {
             )
             .await
             .unwrap();
-            log::info!("Send all market infos to db {}ms", start.elapsed().as_millis());
         } else {
             log::warn!("Market orders was empty");
         }
 
-        let start = Instant::now();
+        self.metrix.send_time(Self::METRIC_SEND_MARKET_INFO, timer).await;
+        let timer = Instant::now();
+
         let mut market_orders = Vec::with_capacity(MarketOrderCache::CAPACITY);
         for entry in entries {
             let market_order = MarketOrderEntry::new(
@@ -123,7 +142,10 @@ impl Market {
             );
             market_orders.push(market_order);
         }
-        log::info!("Preparing vec took {}ms", start.elapsed().as_millis());
+
+        self.metrix.send_time(Self::METRIC_PREPARE_MARKET_DATA, timer).await;
+        self.metrix.send_len(Self::METRIC_COUNT_MARKET_DATA, market_orders.len()).await;
+        let timer = Instant::now();
 
         if market_orders.len() > 0 {
             let mut conn = self.pool.acquire().await.unwrap();
@@ -137,7 +159,7 @@ impl Market {
             log::warn!("Market orders was empty");
         }
 
-        log::info!("Importing market done. Took {}ms", start.elapsed().as_millis());
+        self.metrix.send_time(Self::METRIC_SEND_MARKET_DATA, timer).await;
         Ok(())
     }
 }

@@ -7,7 +7,7 @@ use std::sync::Arc;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     morgan::Morgan::init(vec![]);
 
-    let metrix = Metrix::new("0.0.0.0:8888").await?;
+    let metrix = Metrix::new(env!("CARGO_PKG_NAME").into(), "0.0.0.0:8889").await?;
 
     let blueprint_cache = Arc::new(BlueprintCache::load_from_file().await?);
     let id_name_cache = Arc::new(IdNameCache::load_from_file().await?);

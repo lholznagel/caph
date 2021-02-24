@@ -56,13 +56,6 @@ impl MarketService {
     ) -> Result<Vec<TopOrder>, EveServerError> {
         let mut conn = self.0.acquire().await?;
 
-        let station = Protocol::request::<_, FetchStationRes>(
-            &mut conn,
-            FetchStationReq(30004147)
-        )
-        .await
-        .map(|x| x.0)?;
-
         let market_data = Protocol::request::<_, FetchLatestMarketOrderRes>(
             &mut conn,
             FetchLatestMarketOrdersReq(item_id)

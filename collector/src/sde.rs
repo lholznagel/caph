@@ -3,6 +3,7 @@ use caph_eve_sde_parser::{
     Blueprint, ParseRequest, ParseResult, Schematic, Station, TypeIds, TypeMaterial, UniqueName,
 };
 use caph_db::*;
+use metrix_exporter::MetrixSender;
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
 use std::time::Instant;
@@ -19,22 +20,45 @@ pub enum Action {
 }
 
 pub struct Sde {
+    metrix: MetrixSender,
     pool: ConnectionPool,
 }
 
 impl Sde {
-    pub async fn new(pool: ConnectionPool) -> Self {
-        Self { pool }
+    const METRIC_SDE:                  &'static str = "sde::time::complete";
+    const METRIC_FETCH_SDE:            &'static str = "sde::time::fetch";
+    const METRIC_PARSE_SDE:            &'static str = "sde::time::parse";
+    const METRIC_PROCESSING:           &'static str = "sde::time::processing";
+    const METRIC_PROCESSING_ID_NAME:   &'static str = "sde::time::processing::id_name";
+    const METRIC_PROCESSING_ITEM:      &'static str = "sde::time::processing::item";
+    const METRIC_PROCESSING_MATERIAL:  &'static str = "sde::time::processing::material";
+    const METRIC_PROCESSING_STATION:   &'static str = "sde::time::processing::station";
+    const METRIC_PROCESSING_BLUEPRINT: &'static str = "sde::time::processing::blueprint";
+    const METRIC_PROCESSING_REGION:    &'static str = "sde::time::processing::region";
+    const METRIC_ID_NAME_COUNT:        &'static str = "sde::count::id_name";
+    const METRIC_ITEM_NAME_COUNT:      &'static str = "sde::count::item_name";
+    const METRIC_ITEM_VOLUME_COUNT:    &'static str = "sde::count::item_volume";
+    const METRIC_MATERIAL_COUNT:       &'static str = "sde::count::material";
+    const METRIC_STATION_COUNT:        &'static str = "sde::count::station";
+    const METRIC_BLUEPRINT_COUNT:      &'static str = "sde::count::blueprint";
+    const METRIC_SCHEMATIC_COUNT:      &'static str = "sde::count::schematic";
+    const METRIC_REGION_COUNT:         &'static str = "sde::count::region";
+
+    pub async fn new(metrix: MetrixSender, pool: ConnectionPool) -> Self {
+        Self { metrix, pool }
     }
 
     pub async fn run(&mut self) -> CollectorResult<()> {
-        log::debug!("Fetching sde zip");
+        let start = Instant::now();
+        let timer = Instant::now();
+
         let zip = caph_eve_sde_parser::fetch_zip()
             .await
             .map_err(|_| CollectorError::DownloadSdeZip)?;
-        log::debug!("Fetched sde zip");
 
-        log::debug!("Parsing sde zip");
+        self.metrix.send_time(Self::METRIC_FETCH_SDE, timer).await;
+        let timer = Instant::now();
+
         let parse_results = caph_eve_sde_parser::from_reader(
             &mut Cursor::new(zip),
             vec![
@@ -47,9 +71,10 @@ impl Sde {
             ],
         )
         .map_err(CollectorError::SdeParserError)?;
-        log::debug!("Parsed sde zip");
 
-        let start = std::time::Instant::now();
+        self.metrix.send_time(Self::METRIC_PARSE_SDE, timer).await;
+        let timer = Instant::now();
+
         // collects all actions that need to be perfomed
         let mut actions: Vec<Action> = Vec::new();
         //let mut conn = self.pool.acquire().await?;
@@ -64,75 +89,69 @@ impl Sde {
             };
             actions.extend(x);
         }
-        log::info!("After parse {}", start.elapsed().as_millis());
+        self.metrix.send_time(Self::METRIC_PROCESSING, timer).await;
 
         for action in actions {
             let mut conn = self.pool.acquire().await?;
             match action {
                 Action::IdName(x) => {
-                    log::info!("Starting name import");
-                    let start = Instant::now();
+                    let timer = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
                         InsertIdNameReq(x)
                     )
                     .await?;
-                    log::info!("After send id names {}", start.elapsed().as_millis());
+                    self.metrix.send_time(Self::METRIC_PROCESSING_ID_NAME, timer).await;
                 },
                 Action::Item(x) => {
-                    log::info!("Starting item import");
-                    let start = Instant::now();
+                    let timer = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
                         InsertItemReq(x)
                     )
                     .await?;
-                    log::info!("After send items {}", start.elapsed().as_millis());
+                    self.metrix.send_time(Self::METRIC_PROCESSING_ITEM, timer).await;
                 },
                 Action::ItemMaterial(x) => {
-                    log::info!("Starting item material import");
-                    let start = Instant::now();
+                    let timer = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
                         InsertItemMaterialReq(x)
                     )
                     .await?;
-                    log::info!("After send item materials {}", start.elapsed().as_millis());
+                    self.metrix.send_time(Self::METRIC_PROCESSING_MATERIAL, timer).await;
                 },
                 Action::Station(x) => {
-                    log::info!("Starting station import");
-                    let start = Instant::now();
+                    let timer = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
                         InsertStationReq(x)
                     )
                     .await?;
-                    log::info!("After send stations {}", start.elapsed().as_millis());
+                    self.metrix.send_time(Self::METRIC_PROCESSING_STATION, timer).await;
                 },
                 Action::Blueprint(x) => {
-                    log::info!("Starting blueprint import");
-                    let start = Instant::now();
+                    let timer = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
                         InsertBlueprintReq(x)
                     )
                     .await?;
-                    log::info!("After send blueprints {}", start.elapsed().as_millis());
+                    self.metrix.send_time(Self::METRIC_PROCESSING_BLUEPRINT, timer).await;
                 }
                 Action::Region(x) => {
-                    log::info!("Starting region import");
-                    let start = Instant::now();
+                    let timer = Instant::now();
                     Protocol::request::<_, EmptyResponse>(
                         &mut conn,
                         InsertRegionReq(x)
                     )
                     .await?;
-                    log::info!("After send regions {}", start.elapsed().as_millis());
+                    self.metrix.send_time(Self::METRIC_PROCESSING_REGION, timer).await;
                 }
             }
         }
 
-        log::info!("Took {}", start.elapsed().as_millis());
+        self.metrix.send_time(Self::METRIC_SDE, start).await;
 
         Ok(())
     }
@@ -142,8 +161,8 @@ impl Sde {
         items: HashMap<u32, TypeIds>,
     ) -> Result<Vec<Action>, CollectorError> {
         // We know the roughly how many items there are, so we allocate accordingly
-        let mut id_name_actions = Vec::with_capacity(ItemCache::CAPACITY);
-        let mut item_actions = Vec::with_capacity(ItemCache::CAPACITY);
+        let mut item_name_actions = Vec::with_capacity(ItemCache::CAPACITY);
+        let mut item_volume_actions = Vec::with_capacity(ItemCache::CAPACITY);
 
         for (id, type_id) in items {
             let name = type_id
@@ -151,17 +170,19 @@ impl Sde {
                 .get("en")
                 .map(|x| x.clone())
                 .unwrap_or_default();
-            id_name_actions.push(IdNameEntry::new(id, name));
+            item_name_actions.push(IdNameEntry::new(id, name));
 
             let volume = type_id.volume.unwrap_or(0f32);
-            item_actions.push(ItemEntry::new(id, volume));
+            item_volume_actions.push(ItemEntry::new(id, volume));
         }
+        self.metrix.send_len(Self::METRIC_ITEM_NAME_COUNT, item_name_actions.len()).await;
+        self.metrix.send_len(Self::METRIC_ITEM_VOLUME_COUNT, item_volume_actions.len()).await;
 
-        let id_name_actions = Action::IdName(id_name_actions);
-        let item_actions = Action::Item(item_actions);
+        let item_name_actions = Action::IdName(item_name_actions);
+        let item_volume_actions = Action::Item(item_volume_actions);
         Ok(vec![
-            item_actions,
-            id_name_actions,
+            item_volume_actions,
+            item_name_actions,
         ])
     }
 
@@ -180,6 +201,7 @@ impl Sde {
                 item_material_actions.push(ItemMaterialEntry::new(id, material_id, quantity));
             }
         }
+        self.metrix.send_len(Self::METRIC_MATERIAL_COUNT, item_material_actions.len()).await;
 
         let item_material_actions = Action::ItemMaterial(item_material_actions);
         Ok(vec![
@@ -199,6 +221,7 @@ impl Sde {
             let name = name.item_name;
             id_name_actions.push(IdNameEntry::new(id, name));
         }
+        self.metrix.send_len(Self::METRIC_ID_NAME_COUNT, id_name_actions.len()).await;
 
         let id_name_actions = Action::IdName(id_name_actions);
         Ok(vec![
@@ -226,6 +249,8 @@ impl Sde {
                 RegionEntry::new(station.region_id)
             );
         }
+        self.metrix.send_len(Self::METRIC_REGION_COUNT, region_actions.len()).await;
+        self.metrix.send_len(Self::METRIC_STATION_COUNT, station_actions.len()).await;
 
         let region_actions = Action::Region(region_actions);
         let station_actions = Action::Station(station_actions);
@@ -268,6 +293,7 @@ impl Sde {
                 BlueprintEntry::new(id, time, materials)
             );
         }
+        self.metrix.send_len(Self::METRIC_BLUEPRINT_COUNT, blueprint_actions.len()).await;
 
         let blueprint_actions = Action::Blueprint(blueprint_actions);
         Ok(vec![
@@ -297,6 +323,7 @@ impl Sde {
                 BlueprintEntry::new(id, time, materials)
             );
         }
+        self.metrix.send_len(Self::METRIC_SCHEMATIC_COUNT, schematic_actions.len()).await;
 
         let schematic_actions = Action::Blueprint(schematic_actions);
         Ok(vec![

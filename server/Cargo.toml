@@ -11,6 +11,7 @@ caph_eve_online_api = { path = "../eve_api" }
 chrono = "0.4.19"
 log = "0.4.14"
 morgan = { git = "https://github.com/lholznagel/morgan.git", rev = "624526038c210b142d2835fa77965064771ac192" }
+metrix_exporter = { path = "../../metrix/exporter" }
 serde = { version = "1.0.123", features = ["derive"] }
 tokio = { version = "1.2.0", features = ["full"] }
 warp = "0.3.0"

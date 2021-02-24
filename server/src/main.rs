@@ -5,6 +5,7 @@ mod services;
 use self::services::*;
 
 use cachem::ConnectionPool;
+use metrix_exporter::Metrix;
 use serde::Deserialize;
 use warp::{Filter, Rejection, Reply};
 
@@ -12,7 +13,8 @@ use warp::{Filter, Rejection, Reply};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     morgan::Morgan::init(vec!["tracing".into()]);
 
-    let pool = ConnectionPool::new("0.0.0.0:9999".into(), 10).await?;
+    let metrix = Metrix::new(env!("CARGO_PKG_NAME").into(), "0.0.0.0:8889").await?;
+    let pool = ConnectionPool::new("0.0.0.0:9999".into(), metrix.get_sender(), 10).await?;
 
     let item_service = ItemService::new(pool.clone());
     let market_service = MarketService::new(pool);

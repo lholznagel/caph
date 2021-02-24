@@ -27,9 +27,9 @@ deploy-web:
 	sudo rsync --recursive --update --inplace --delete web/dist/ /opt/caph/web
 
 deploy:
-	deploy-db
-	deploy-collector
-	deploy-server
+	make deploy-db
+	make deploy-collector
+	make deploy-server
 
 copy_systemd:
 	sudo cp collector/systemd.service /usr/lib/systemd/system/caph_collector.service
