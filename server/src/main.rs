@@ -54,6 +54,23 @@ impl ApiServer {
             .map(move || _self.clone())
             .and(warp::path!("api" / ..));
 
+        let eve = root
+            .clone()
+            .and(warp::path!("eve" / ..));
+        let eve_auth = eve
+            .clone()
+            .and(warp::path!("auth"))
+            .and(warp::get())
+            .and(warp::query())
+            .and_then(Self::eve_auth);
+        let eve_login = eve
+            .clone()
+            .and(warp::path!("login"))
+            .and(warp::get())
+            .and_then(Self::eve_login);
+        let eve = eve_auth
+            .or(eve_login);
+
         let item = root
             .clone()
             .and(warp::path!("items" / ..));
@@ -106,7 +123,8 @@ impl ApiServer {
             .or(market_top_order)
             .or(market_history);
 
-        let api = item
+        let api = eve
+            .or(item)
             .or(market);
         warp::serve(api)
             .run(([0, 0, 0, 0], 10101))
@@ -198,9 +216,41 @@ impl ApiServer {
             .map(|x| warp::reply::json(&x))
             .map_err(Into::into)
     }
+
+    async fn eve_auth(
+        self: Self,
+        query: EveQuery,
+    ) -> Result<impl Reply, Rejection> {
+        let token = caph_eve_online_api::retrieve_authorization_token(&query.code).await.unwrap();
+        dbg!(&token);
+        dbg!(&token.payload());
+
+        Ok(warp::redirect::redirect(warp::http::Uri::from_static("https://eve.caph.xyz")))
+    }
+
+    async fn eve_login(
+        self: Self,
+    ) -> Result<impl Reply, Rejection> {
+        let auth_uri = caph_eve_online_api::eve_auth_uri().unwrap();
+
+        let uri = warp::http::uri::Builder::new()
+            .scheme(auth_uri.scheme())
+            .authority(auth_uri.host_str().unwrap_or_default())
+            .path_and_query(&format!("{}?{}", auth_uri.path(), auth_uri.query().unwrap_or_default()))
+            .build()
+            .unwrap();
+
+        Ok(warp::redirect::redirect(uri))
+    }
 }
 
 #[derive(Deserialize)]
 struct MarketQuery {
     buy: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct EveQuery {
+    code: String,
+    state: String,
 }

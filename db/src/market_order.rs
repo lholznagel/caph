@@ -8,16 +8,15 @@ pub use self::fetch_latest::*;
 pub use self::insert::*;
 pub use self::storage::*;
 
-use cachem::{CachemError, Parse, Storage};
+use cachem::Parse;
 use metrix_exporter::MetrixSender;
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 
-#[derive(Default)]
 pub struct MarketOrderCache {
     current: RwLock<HashMap<u32, Vec<MarketOrderEntry>>>,
     history: RwLock<HashMap<u32, Vec<MarketItemOrderId>>>,
-    metrix: Option<MetrixSender>,
+    metrix: MetrixSender,
 }
 
 impl MarketOrderCache {
@@ -26,10 +25,12 @@ impl MarketOrderCache {
     const METRIC_INSERT_DURATION: &'static str = "caph_db::market_order::insert::duration";
     const METRIC_FETCH_DURATION: &'static str  = "caph_db::market_order::fetch::duration";
 
-    pub async fn new(metrix_sender: MetrixSender) -> Result<Self, CachemError> {
-        let mut _self = Self::load_from_file().await?;
-        _self.metrix = Some(metrix_sender);
-        Ok(_self)
+    pub fn new(metrix: MetrixSender) -> Self {
+        Self {
+            current: RwLock::new(HashMap::new()),
+            history: RwLock::new(HashMap::new()),
+            metrix,
+        }
     }
 }
 

@@ -31,11 +31,5 @@ deploy:
 	make deploy-collector
 	make deploy-server
 
-copy_systemd:
-	sudo cp collector/systemd.service /usr/lib/systemd/system/caph_collector.service
-	sudo cp db/systemd.service /usr/lib/systemd/system/caph_db.service
-	sudo cp server/systemd.service /usr/lib/systemd/system/caph_server.service
-	sudo systemctl daemon-reload
-
 sync-virgo:
 	rsync --recursive --update --inplace --delete --quiet --exclude={'.git','target','web/node_modules'} . virgo:dev/caph

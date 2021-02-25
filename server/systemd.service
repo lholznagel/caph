@@ -6,6 +6,9 @@ After=caph_db.service
 Type=simple
 Environment=MORGAN_COLOR=false
 Environment=RUST_BACKTRACE=1
+Environment=EVE_REDIRECT_URL=
+Environment=EVE_CLIENT_ID=
+Environment=EVE_SECRET_KEY=
 ExecStartPre=/bin/sleep 2
 ExecStart=/opt/caph/caph_server
 Restart=always

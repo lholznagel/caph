@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use cachem::{CachemError, Parse, Storage};
 use std::collections::HashMap;
 use tokio::io::{AsyncBufRead, AsyncRead, AsyncWrite};
-use tokio::sync::RwLock;
 
 #[async_trait]
 impl Storage for MarketOrderCache {
@@ -12,7 +11,7 @@ impl Storage for MarketOrderCache {
         "./db/storage/market_orders.cachem"
     }
 
-    async fn load<B>(buf: &mut B) -> Result<Self, CachemError>
+    async fn load<B>(&self, buf: &mut B) -> Result<(), CachemError>
         where B: AsyncBufRead + AsyncRead + Send + Unpin {
 
         if let Ok(entries) = SaveMarketHistory::read(buf).await {
@@ -26,14 +25,9 @@ impl Storage for MarketOrderCache {
                 map.insert(entry.item_id, entries);
             }
 
-            Ok(MarketOrderCache {
-                current: RwLock::new(HashMap::new()),
-                history: RwLock::new(map),
-                metrix: None,
-            })
-        } else {
-            Ok(MarketOrderCache::default())
+            *self.history.write().await = map;
         }
+        Ok(())
     }
 
     async fn save<B>(&self, buf: &mut B) -> Result<(), CachemError>

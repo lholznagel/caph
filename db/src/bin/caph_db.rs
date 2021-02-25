@@ -9,14 +9,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let metrix = Metrix::new(env!("CARGO_PKG_NAME").into(), "0.0.0.0:8889").await?;
 
-    let blueprint_cache = Arc::new(BlueprintCache::load_from_file().await?);
-    let id_name_cache = Arc::new(IdNameCache::load_from_file().await?);
-    let item_cache = Arc::new(ItemCache::load_from_file().await?);
-    let item_material_cache = Arc::new(ItemMaterialCache::load_from_file().await?);
-    let market_order_cache = Arc::new(MarketOrderCache::new(metrix.get_sender()).await?);
-    let market_order_info_cache = Arc::new(MarketOrderInfoCache::load_from_file().await?);
-    let region_cache = Arc::new(RegionCache::load_from_file().await?);
-    let station_cache = Arc::new(StationCache::load_from_file().await?);
+    let blueprint_cache = BlueprintCache::default();
+    blueprint_cache.load_from_file().await?;
+    let blueprint_cache = Arc::new(blueprint_cache);
+
+    let id_name_cache = IdNameCache::default();
+    id_name_cache.load_from_file().await?;
+    let id_name_cache = Arc::new(id_name_cache);
+
+    let item_cache = ItemCache::default();
+    item_cache.load_from_file().await?;
+    let item_cache = Arc::new(item_cache);
+
+    let item_material_cache = ItemMaterialCache::default();
+    item_material_cache.load_from_file().await?;
+    let item_material_cache = Arc::new(item_material_cache);
+
+    let market_order_cache = MarketOrderCache::new(metrix.get_sender());
+    market_order_cache.load_from_file().await?;
+    let market_order_cache = Arc::new(market_order_cache);
+
+    let market_order_info_cache = MarketOrderInfoCache::default();
+    market_order_info_cache.load_from_file().await?;
+    let market_order_info_cache = Arc::new(market_order_info_cache);
+
+    let region_cache = RegionCache::default();
+    region_cache.load_from_file().await?;
+    let region_cache = Arc::new(region_cache);
+
+    let station_cache = StationCache::default();
+    station_cache.load_from_file().await?;
+    let station_cache = Arc::new(station_cache);
 
     tokio::task::spawn(async move {
         metrix.listen().await

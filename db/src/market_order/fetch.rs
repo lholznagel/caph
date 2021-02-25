@@ -135,9 +135,7 @@ impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
         response.sort_by(|a, b| a.timestamp.partial_cmp(&b.timestamp).unwrap_or(std::cmp::Ordering::Equal));
 
         self.metrix
-            .as_ref()
-            .unwrap()
-            .send(Self::METRIC_FETCH_DURATION, insert_start.elapsed().as_nanos())
+            .send_time(Self::METRIC_FETCH_DURATION, insert_start)
             .await;
         Ok(FetchMarketOrderRes(response))
     }

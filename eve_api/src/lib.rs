@@ -1,6 +1,8 @@
 mod error;
+mod oauth;
 
 use self::error::*;
+pub use self::oauth::*;
 
 use reqwest::Response;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};

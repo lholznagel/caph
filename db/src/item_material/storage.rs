@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use cachem::{CachemError, Parse, Storage};
 use std::collections::HashMap;
 use tokio::io::{AsyncBufRead, AsyncRead, AsyncWrite};
-use tokio::sync::RwLock;
 
 #[async_trait]
 impl Storage for ItemMaterialCache {
@@ -12,7 +11,7 @@ impl Storage for ItemMaterialCache {
         "./db/storage/item_material.cachem"
     }
 
-    async fn load<B>(buf: &mut B) -> Result<Self, CachemError>
+    async fn load<B>(&self, buf: &mut B) -> Result<(), CachemError>
         where B: AsyncBufRead + AsyncRead + Send + Unpin {
 
         if let Ok(entries) = SaveItemMaterial::read(buf).await {
@@ -30,10 +29,9 @@ impl Storage for ItemMaterialCache {
                     });
             }
 
-            Ok(ItemMaterialCache(RwLock::new(map)))
-        } else {
-            Ok(ItemMaterialCache::default())
+            *self.0.write().await = map;
         }
+        Ok(())
     }
 
     async fn save<B>(&self, buf: &mut B) -> Result<(), CachemError>

@@ -59,9 +59,7 @@ impl Insert<InsertMarketOrderReq> for MarketOrderCache {
         self.save_to_file().await.unwrap();
 
         self.metrix
-            .as_ref()
-            .unwrap()
-            .send(Self::METRIC_INSERT_DURATION, insert_start.elapsed().as_nanos())
+            .send_time(Self::METRIC_INSERT_DURATION, insert_start)
             .await;
         Ok(EmptyResponse::default())
     }

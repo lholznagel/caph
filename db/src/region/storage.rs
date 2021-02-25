@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use cachem::{CachemError, Parse, Storage};
 use std::collections::HashSet;
 use tokio::io::{AsyncBufRead, AsyncRead, AsyncWrite};
-use tokio::sync::RwLock;
 
 #[async_trait]
 impl Storage for RegionCache {
@@ -12,14 +11,13 @@ impl Storage for RegionCache {
         "./db/storage/regions.cachem"
     }
 
-    async fn load<B>(buf: &mut B) -> Result<Self, CachemError>
+    async fn load<B>(&self, buf: &mut B) -> Result<(), CachemError>
         where B: AsyncBufRead + AsyncRead + Send + Unpin {
 
         if let Ok(entries) = SaveRegion::read(buf).await {
-            Ok(RegionCache(RwLock::new(entries.0)))
-        } else {
-            Ok(RegionCache::default())
+            *self.0.write().await = entries.0;
         }
+        Ok(())
     }
 
     async fn save<B>(&self, buf: &mut B) -> Result<(), CachemError>
