@@ -22,9 +22,6 @@ pub struct MarketOrderCache {
 impl MarketOrderCache {
     pub const CAPACITY: usize = 1_000_000;
 
-    const METRIC_INSERT_DURATION: &'static str = "caph_db::market_order::insert::duration";
-    const METRIC_FETCH_DURATION: &'static str  = "caph_db::market_order::fetch::duration";
-
     pub fn new(metrix: MetrixSender) -> Self {
         Self {
             current: RwLock::new(HashMap::new()),

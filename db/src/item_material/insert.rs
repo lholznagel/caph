@@ -1,38 +1,40 @@
+use std::collections::HashMap;
+use std::time::Instant;
+
 use crate::{Actions, ItemMaterialCache, ItemMaterialEntry};
 
 use async_trait::*;
-use cachem::{EmptyResponse, Insert, Parse, Storage, request};
+use cachem::{EmptyMsg, Insert, Parse, Storage, request};
+
+const METRIC_INSERT:         &'static str = "insert::item_material::complete";
+const METRIC_INSERT_ENTRIES: &'static str = "insert::item_material::entries";
 
 #[async_trait]
 impl Insert<InsertItemMaterialReq> for ItemMaterialCache {
-    type Error    = EmptyResponse;
-    type Response = EmptyResponse;
+    type Error    = EmptyMsg;
+    type Response = EmptyMsg;
 
     async fn insert(&self, input: InsertItemMaterialReq) -> Result<Self::Response, Self::Error> {
-        let mut old_data = { self.0.read().await.clone() };
-        let mut changes: usize = 0;
+        let timer = Instant::now();
+        let mut map = HashMap::new();
 
         for x in input.0.iter() {
-            old_data
+            map
                 .entry(x.item_id)
-                .and_modify(|entry| {
+                .and_modify(|entry: &mut Vec<ItemMaterialEntry>| {
                     if !entry.contains(&x) {
-                        changes += 1;
                         entry.push(x.clone());
                     }
                 })
-                .or_insert({
-                    changes += 1;
-                    vec![*x]
-                });
+                .or_insert(vec![*x]);
         }
 
-        // there where some changes, so we apply those to the main structure
-        if changes > 0 {
-            *self.0.write().await = old_data;
-        }
+        self.metrix.send_len(METRIC_INSERT_ENTRIES, map.len()).await;
+        *self.cache.write().await = map;
         self.save_to_file().await.unwrap();
-        Ok(EmptyResponse::default())
+
+        self.metrix.send_time(METRIC_INSERT, timer).await;
+        Ok(EmptyMsg::default())
     }
 }
 

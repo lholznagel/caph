@@ -7,14 +7,24 @@ pub use self::insert::*;
 pub use self::storage::*;
 
 use cachem::Parse;
+use metrix_exporter::MetrixSender;
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 
-#[derive(Default)]
-pub struct StationCache(RwLock<HashMap<u32, StationEntry>>);
+pub struct StationCache {
+    cache: RwLock<HashMap<u32, StationEntry>>,
+    metrix: MetrixSender,
+}
 
 impl StationCache {
     pub const CAPACITY: usize = 6_000;
+
+    pub fn new(metrix: MetrixSender) -> Self {
+        Self {
+            cache: RwLock::new(HashMap::new()),
+            metrix,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Parse)]

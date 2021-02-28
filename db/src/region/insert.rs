@@ -1,23 +1,31 @@
 use crate::{Actions, RegionCache, RegionEntry};
 
 use async_trait::*;
-use cachem::{EmptyResponse, Insert, Parse, Storage, request};
+use cachem::{EmptyMsg, Insert, Parse, Storage, request};
 use std::collections::HashSet;
+use std::time::Instant;
+
+const METRIC_INSERT:         &'static str = "insert::region::complete";
+const METRIC_INSERT_ENTRIES: &'static str = "insert::region::entries";
 
 #[async_trait]
 impl Insert<InsertRegionReq> for RegionCache {
-    type Error    = EmptyResponse;
-    type Response = EmptyResponse;
+    type Error    = EmptyMsg;
+    type Response = EmptyMsg;
 
     async fn insert(&self, input: InsertRegionReq) -> Result<Self::Response, Self::Error> {
-        let mut new_data = HashSet::with_capacity(input.0.len());
+        let timer = Instant::now();
+        let mut map = HashSet::with_capacity(input.0.len());
         for x in input.0 {
-            new_data.insert(x.region_id.into());
+            map.insert(x.region_id.into());
         }
 
-        *self.0.write().await = new_data;
+        self.metrix.send_len(METRIC_INSERT_ENTRIES, map.len()).await;
+        *self.cache.write().await = map;
         self.save_to_file().await.unwrap();
-        Ok(EmptyResponse::default())
+
+        self.metrix.send_time(METRIC_INSERT, timer).await;
+        Ok(EmptyMsg::default())
     }
 }
 

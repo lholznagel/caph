@@ -3,13 +3,15 @@ use super::MarketOrderCache;
 use crate::Actions;
 
 use async_trait::async_trait;
-use cachem::{EmptyResponse, Fetch, Parse, request};
+use cachem::{EmptyMsg, Fetch, Parse, request};
 use std::collections::HashMap;
 use std::time::Instant;
 
+const METRIC_FETCH: &'static str  = "fetch::market_order::complete";
+
 #[async_trait]
 impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
-    type Error    = EmptyResponse;
+    type Error    = EmptyMsg;
     type Response = FetchMarketOrderRes;
 
     async fn fetch(&self, input: FetchMarketOrderReq) -> Result<Self::Response, Self::Error> {
@@ -135,7 +137,7 @@ impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
         response.sort_by(|a, b| a.timestamp.partial_cmp(&b.timestamp).unwrap_or(std::cmp::Ordering::Equal));
 
         self.metrix
-            .send_time(Self::METRIC_FETCH_DURATION, insert_start)
+            .send_time(METRIC_FETCH, insert_start)
             .await;
         Ok(FetchMarketOrderRes(response))
     }

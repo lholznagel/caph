@@ -1,22 +1,29 @@
+use std::time::Instant;
+
 use crate::{Actions, MarketOrderInfoCache, MarketOrderInfoEntry};
 
 use async_trait::async_trait;
-use cachem::{EmptyResponse, Fetch, Parse, request};
+use cachem::{EmptyMsg, Fetch, Parse, request};
+
+const METRIC_FETCH: &'static str = "fetch::market_order_info::bulk::complete";
 
 #[async_trait]
 impl Fetch<FetchMarketOrderInfoBulkReq> for MarketOrderInfoCache {
-    type Error    = EmptyResponse;
+    type Error    = EmptyMsg;
     type Response = FetchMarketOrderInfoResBulk;
 
     async fn fetch(&self, input: FetchMarketOrderInfoBulkReq) -> Result<Self::Response, Self::Error> {
+        let timer = Instant::now();
         let mut ret = Vec::with_capacity(input.0.len());
 
         for x in input.0 {
-            if let Some(x) = self.0.read().await.get(&x) {
+            if let Some(x) = self.cache.read().await.get(&x) {
                 ret.push(x.clone());
             }
         }
-        Ok(FetchMarketOrderInfoResBulk(ret))
+        let res = FetchMarketOrderInfoResBulk(ret);
+        self.metrix.send_time(METRIC_FETCH, timer).await;
+        Ok(res)
     }
 }
 

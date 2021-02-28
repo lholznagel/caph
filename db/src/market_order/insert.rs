@@ -3,17 +3,20 @@ use super::{MarketOrderCache, MarketOrderEntry, MarketItemOrderId};
 use crate::Actions;
 
 use async_trait::async_trait;
-use cachem::{EmptyResponse, Insert, Parse, Storage, request};
+use cachem::{EmptyMsg, Insert, Parse, Storage, request};
 use std::collections::HashMap;
 use std::time::Instant;
 
+const METRIC_INSERT:         &'static str = "insert::market_order::current::complete";
+const METRIC_INSERT_ENTRIES: &'static str = "insert::market_order::current::entries";
+
 #[async_trait]
 impl Insert<InsertMarketOrderReq> for MarketOrderCache {
-    type Error    = EmptyResponse;
-    type Response = EmptyResponse;
+    type Error    = EmptyMsg;
+    type Response = EmptyMsg;
 
     async fn insert(&self, input: InsertMarketOrderReq) -> Result<Self::Response, Self::Error> {
-        let insert_start = Instant::now();
+        let timer = Instant::now();
         let mut current = HashMap::new();
 
         for entry in input.0 {
@@ -55,13 +58,14 @@ impl Insert<InsertMarketOrderReq> for MarketOrderCache {
                 .or_insert(vec![entry]);
         }
 
+        self.metrix.send_len(METRIC_INSERT_ENTRIES, current.len()).await;
         *self.current.write().await = current;
         self.save_to_file().await.unwrap();
 
         self.metrix
-            .send_time(Self::METRIC_INSERT_DURATION, insert_start)
+            .send_time(METRIC_INSERT, timer)
             .await;
-        Ok(EmptyResponse::default())
+        Ok(EmptyMsg::default())
     }
 }
 

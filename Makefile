@@ -24,7 +24,7 @@ deploy-server: musl
 
 deploy-web:
 	cd web; npm run build
-	sudo rsync --recursive --update --inplace --delete web/dist/ /opt/caph/web
+	sudo rsync --recursive --inplace --delete web/dist/ /opt/caph/web
 
 deploy:
 	make deploy-db
@@ -32,4 +32,4 @@ deploy:
 	make deploy-server
 
 sync-virgo:
-	rsync --recursive --update --inplace --delete --quiet --exclude={'.git','target','web/node_modules'} . virgo:dev/caph
+	rsync --recursive --inplace --delete --quiet --exclude={'.git','target','web/node_modules'} . virgo:dev/caph

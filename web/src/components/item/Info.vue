@@ -8,7 +8,7 @@
 
     <div v-if="!busy">
       <v-img
-        :src="'https://image.eveonline.com/Type/' + id + '_128.png'"
+        :src="'https://images.evetech.net/types/' + id + '/icon?size=1024'"
         max-height="128"
         max-width="128"
       ></v-img>

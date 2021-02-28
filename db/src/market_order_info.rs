@@ -9,14 +9,24 @@ pub use self::insert::*;
 pub use self::storage::*;
 
 use cachem::Parse;
+use metrix_exporter::MetrixSender;
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 
-#[derive(Default)]
-pub struct MarketOrderInfoCache(RwLock<HashMap<u64, MarketOrderInfoEntry>>);
+pub struct MarketOrderInfoCache {
+    cache: RwLock<HashMap<u64, MarketOrderInfoEntry>>,
+    metrix: MetrixSender,
+}
 
 impl MarketOrderInfoCache {
     pub const CAPACITY: usize = 1_000_000;
+
+    pub fn new(metrix: MetrixSender) -> Self {
+        Self {
+            cache: RwLock::new(HashMap::new()),
+            metrix,
+        }
+    }
 }
 
 #[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]

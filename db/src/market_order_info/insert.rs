@@ -1,39 +1,41 @@
+use std::collections::HashMap;
+use std::time::Instant;
+
 use crate::{Actions, MarketOrderInfoCache, MarketOrderInfoEntry};
 
 use async_trait::async_trait;
-use cachem::{EmptyResponse, Insert, Parse, Storage, request};
+use cachem::{EmptyMsg, Insert, Parse, Storage, request};
+
+const METRIC_INSERT:         &'static str = "insert::market_order_info::complete";
+const METRIC_INSERT_ENTRIES: &'static str = "insert::market_order_info::entries";
 
 #[async_trait]
 impl Insert<InsertMarketOrderInfoReq> for MarketOrderInfoCache {
-    type Error    = EmptyResponse;
-    type Response = EmptyResponse;
+    type Error    = EmptyMsg;
+    type Response = EmptyMsg;
 
     async fn insert(&self, input: InsertMarketOrderInfoReq) -> Result<Self::Response, Self::Error> {
-        let mut old_data = { self.0.read().await.clone() };
+        let timer = Instant::now();
+        let mut map = HashMap::new();
         let mut data = input.0;
-        let mut changes: usize = 0;
 
         while let Some(x) = data.pop() {
-            old_data
+            map
                 .entry(x.order_id)
                 .and_modify(|entry| {
                     if *entry != x {
-                        changes += 1;
                         *entry = x.clone();
                     }
                 })
-                .or_insert({
-                    changes += 1;
-                    x
-                });
+                .or_insert(x);
         }
 
-        // there where some changes, so we apply those to the main structure
-        if changes > 0 {
-            *self.0.write().await = old_data;
-        }
+        self.metrix.send_len(METRIC_INSERT_ENTRIES, map.len()).await;
+        *self.cache.write().await = map;
         self.save_to_file().await.unwrap();
-        Ok(EmptyResponse::default())
+
+        self.metrix.send_time(METRIC_INSERT, timer).await;
+        Ok(EmptyMsg::default())
     }
 }
 

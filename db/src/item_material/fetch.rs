@@ -1,18 +1,26 @@
+use std::time::Instant;
+
 use crate::{Actions, ItemMaterialCache, ItemMaterialEntry};
 
 use async_trait::*;
-use cachem::{EmptyResponse, Fetch, Parse, request};
+use cachem::{EmptyMsg, Fetch, Parse, request};
+
+const METRIC_FETCH: &'static str = "fetch::item_material::complete";
 
 #[async_trait]
 impl Fetch<FetchItemMaterialReq> for ItemMaterialCache {
-    type Error    = EmptyResponse;
+    type Error    = EmptyMsg;
     type Response = FetchItemMaterialRes;
 
     async fn fetch(&self, input: FetchItemMaterialReq) -> Result<Self::Response, Self::Error> {
-        if let Some(x) = self.0.read().await.get(&input.0) {
-            return Ok(FetchItemMaterialRes(x.clone()))
+        let timer = Instant::now();
+        if let Some(x) = self.cache.read().await.get(&input.0) {
+            let res = FetchItemMaterialRes(x.clone());
+            self.metrix.send_time(METRIC_FETCH, timer).await;
+            Ok(res)
         } else {
-            return Err(EmptyResponse::default())
+            self.metrix.send_time(METRIC_FETCH, timer).await;
+            Err(EmptyMsg::default())
         }
     }
 }

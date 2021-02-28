@@ -16,7 +16,9 @@ pub use self::market_order_info::*;
 pub use self::region::*;
 pub use self::station::*;
 
-#[derive(Debug)]
+use cachem::Action;
+
+#[derive(Debug, Action)]
 pub enum Actions {
     InsertBlueprints,
 
@@ -46,6 +48,7 @@ pub enum Actions {
     Invalid,
 }
 
+/*
 impl Into<u16> for Actions {
     fn into(self) -> u16 {
         match self {
@@ -113,3 +116,4 @@ impl From<u16> for Actions {
         }
     }
 }
+*/

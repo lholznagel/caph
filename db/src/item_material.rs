@@ -7,14 +7,24 @@ pub use self::insert::*;
 pub use self::storage::*;
 
 use cachem::Parse;
+use metrix_exporter::MetrixSender;
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 
-#[derive(Default)]
-pub struct ItemMaterialCache(RwLock<HashMap<u32, Vec<ItemMaterialEntry>>>);
+pub struct ItemMaterialCache {
+    cache: RwLock<HashMap<u32, Vec<ItemMaterialEntry>>>,
+    metrix: MetrixSender,
+}
 
 impl ItemMaterialCache {
     pub const CAPACITY: usize = 45_000;
+
+    pub fn new(metrix: MetrixSender) -> Self {
+        Self {
+            cache: RwLock::new(HashMap::new()),
+            metrix,
+        }
+    }
 }
 
 #[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]

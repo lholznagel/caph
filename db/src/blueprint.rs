@@ -5,14 +5,24 @@ pub use self::insert::*;
 pub use self::storage::*;
 
 use cachem::Parse;
+use metrix_exporter::MetrixSender;
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 
-#[derive(Default)]
-pub struct BlueprintCache(RwLock<HashMap<u32, BlueprintEntry>>);
+pub struct BlueprintCache{
+    cache: RwLock<HashMap<u32, BlueprintEntry>>,
+    metrix: MetrixSender,
+}
 
 impl BlueprintCache {
     pub const CAPACITY: usize = 100_000;
+
+    pub fn new(metrix: MetrixSender) -> Self {
+        Self {
+            cache: RwLock::new(HashMap::new()),
+            metrix,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Parse)]

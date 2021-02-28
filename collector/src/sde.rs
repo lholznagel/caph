@@ -1,4 +1,4 @@
-use cachem::{ConnectionPool, EmptyResponse, Protocol};
+use cachem::{ConnectionPool, EmptyMsg, Protocol};
 use caph_eve_sde_parser::{
     Blueprint, ParseRequest, ParseResult, Schematic, Station, TypeIds, TypeMaterial, UniqueName,
 };
@@ -96,7 +96,7 @@ impl Sde {
             match action {
                 Action::IdName(x) => {
                     let timer = Instant::now();
-                    Protocol::request::<_, EmptyResponse>(
+                    Protocol::request::<_, EmptyMsg>(
                         &mut conn,
                         InsertIdNameReq(x)
                     )
@@ -105,7 +105,7 @@ impl Sde {
                 },
                 Action::Item(x) => {
                     let timer = Instant::now();
-                    Protocol::request::<_, EmptyResponse>(
+                    Protocol::request::<_, EmptyMsg>(
                         &mut conn,
                         InsertItemReq(x)
                     )
@@ -114,7 +114,7 @@ impl Sde {
                 },
                 Action::ItemMaterial(x) => {
                     let timer = Instant::now();
-                    Protocol::request::<_, EmptyResponse>(
+                    Protocol::request::<_, EmptyMsg>(
                         &mut conn,
                         InsertItemMaterialReq(x)
                     )
@@ -123,7 +123,7 @@ impl Sde {
                 },
                 Action::Station(x) => {
                     let timer = Instant::now();
-                    Protocol::request::<_, EmptyResponse>(
+                    Protocol::request::<_, EmptyMsg>(
                         &mut conn,
                         InsertStationReq(x)
                     )
@@ -132,7 +132,7 @@ impl Sde {
                 },
                 Action::Blueprint(x) => {
                     let timer = Instant::now();
-                    Protocol::request::<_, EmptyResponse>(
+                    Protocol::request::<_, EmptyMsg>(
                         &mut conn,
                         InsertBlueprintReq(x)
                     )
@@ -141,7 +141,7 @@ impl Sde {
                 }
                 Action::Region(x) => {
                     let timer = Instant::now();
-                    Protocol::request::<_, EmptyResponse>(
+                    Protocol::request::<_, EmptyMsg>(
                         &mut conn,
                         InsertRegionReq(x)
                     )
