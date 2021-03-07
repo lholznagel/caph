@@ -178,6 +178,7 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "log",
+ "metrix_exporter",
  "reqwest",
  "serde",
  "serde_json",

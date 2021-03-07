@@ -11,10 +11,9 @@ const METRIC_INSERT_ENTRIES: &'static str = "insert::item_material::entries";
 
 #[async_trait]
 impl Insert<InsertItemMaterialReq> for ItemMaterialCache {
-    type Error    = EmptyMsg;
     type Response = EmptyMsg;
 
-    async fn insert(&self, input: InsertItemMaterialReq) -> Result<Self::Response, Self::Error> {
+    async fn insert(&self, input: InsertItemMaterialReq) -> Self::Response {
         let timer = Instant::now();
         let mut map = HashMap::new();
 
@@ -34,7 +33,7 @@ impl Insert<InsertItemMaterialReq> for ItemMaterialCache {
         self.save_to_file().await.unwrap();
 
         self.metrix.send_time(METRIC_INSERT, timer).await;
-        Ok(EmptyMsg::default())
+        EmptyMsg::default()
     }
 }
 

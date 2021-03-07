@@ -1,7 +1,7 @@
 use crate::error::EveServerError;
 
 use cachem::{ConnectionPool, Protocol};
-use caph_db::{FetchLatestMarketOrderRes, FetchLatestMarketOrdersReq, FetchMarketOrderFilter, FetchMarketOrderInfoBulkReq, FetchMarketOrderInfoResBulk, FetchMarketOrderReq, FetchMarketOrderRes, FetchStationReq, FetchStationRes};
+use caph_db::{FetchLatestMarketOrderRes, FetchLatestMarketOrdersReq, FetchMarketOrderInfoBulkReq, FetchMarketOrderInfoResBulk, FetchMarketOrderReq, FetchMarketOrderRes, FetchStationReq, FetchStationRes};
 use chrono::{NaiveDateTime, NaiveTime, Timelike};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -61,7 +61,12 @@ impl MarketService {
             FetchLatestMarketOrdersReq(item_id)
         )
         .await
-        .map(|x| x.0)?;
+        .map(|x| {
+            match x {
+                FetchLatestMarketOrderRes::Ok(x) => x,
+                _ => Vec::new()
+            }
+        })?;
 
         let order_ids = market_data.iter().map(|x| x.order_id).collect::<Vec<_>>();
         let market_infos = Protocol::request::<_, FetchMarketOrderInfoResBulk>(
@@ -110,7 +115,12 @@ impl MarketService {
                 FetchStationReq(x.system_id)
             )
             .await
-            .map(|x| x.0)?;
+            .map(|x| {
+                match x {
+                    FetchStationRes::Ok(x) => x,
+                    _ => panic!("No station") // FIXME
+                }
+            })?;
 
             let data = market_data.iter().find(|x| x.order_id == x.order_id).unwrap();
             let order = TopOrder {
@@ -150,11 +160,11 @@ impl MarketService {
 
         let market_data = Protocol::request::<_, FetchMarketOrderRes>(
             &mut conn,
-            FetchMarketOrderReq(FetchMarketOrderFilter {
+            FetchMarketOrderReq {
                 item_id,
                 ts_start: start_ts,
                 ts_stop: ts
-            })
+            }
         )
         .await
         .map(|x| x.0)?;
@@ -324,7 +334,12 @@ impl MarketService {
             FetchLatestMarketOrdersReq(item_id)
         )
         .await
-        .map(|x| x.0)?;
+        .map(|x| {
+            match x {
+                FetchLatestMarketOrderRes::Ok(x) => x,
+                _ => panic!("NO latest market value") // FIXME
+            }
+        })?;
 
         let order_ids = market_data.iter().map(|x| x.order_id).collect::<Vec<_>>();
         let market_infos = Protocol::request::<_, FetchMarketOrderInfoResBulk>(

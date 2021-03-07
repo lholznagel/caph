@@ -12,10 +12,9 @@ const METRIC_INSERT_ENTRIES: &'static str = "insert::market_order::current::entr
 
 #[async_trait]
 impl Insert<InsertMarketOrderReq> for MarketOrderCache {
-    type Error    = EmptyMsg;
     type Response = EmptyMsg;
 
-    async fn insert(&self, input: InsertMarketOrderReq) -> Result<Self::Response, Self::Error> {
+    async fn insert(&self, input: InsertMarketOrderReq) -> Self::Response {
         let timer = Instant::now();
         let mut current = HashMap::new();
 
@@ -65,7 +64,7 @@ impl Insert<InsertMarketOrderReq> for MarketOrderCache {
         self.metrix
             .send_time(METRIC_INSERT, timer)
             .await;
-        Ok(EmptyMsg::default())
+        EmptyMsg::default()
     }
 }
 

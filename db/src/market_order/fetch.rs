@@ -3,7 +3,7 @@ use super::MarketOrderCache;
 use crate::Actions;
 
 use async_trait::async_trait;
-use cachem::{EmptyMsg, Fetch, Parse, request};
+use cachem::{Fetch, Parse, request};
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -11,15 +11,14 @@ const METRIC_FETCH: &'static str  = "fetch::market_order::complete";
 
 #[async_trait]
 impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
-    type Error    = EmptyMsg;
     type Response = FetchMarketOrderRes;
 
-    async fn fetch(&self, input: FetchMarketOrderReq) -> Result<Self::Response, Self::Error> {
+    async fn fetch(&self, input: FetchMarketOrderReq) -> Self::Response{
         let insert_start = Instant::now();
 
-        let item_id = input.0.item_id;
-        let ts_start = input.0.ts_start;
-        let ts_stop = input.0.ts_stop;
+        let item_id = input.item_id;
+        let ts_start = input.ts_start;
+        let ts_stop = input.ts_stop;
 
         // Get all item entries that are newer than the given start timestamp
         let items = self
@@ -139,16 +138,13 @@ impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
         self.metrix
             .send_time(METRIC_FETCH, insert_start)
             .await;
-        Ok(FetchMarketOrderRes(response))
+        FetchMarketOrderRes(response)
     }
 }
 
 #[request(Actions::FetchMarketOrder)]
 #[derive(Debug, Parse)]
-pub struct FetchMarketOrderReq(pub FetchMarketOrderFilter);
-
-#[derive(Debug, Parse)]
-pub struct FetchMarketOrderFilter {
+pub struct FetchMarketOrderReq {
     pub item_id: u32,
     pub ts_start: u64,
     pub ts_stop: u64,

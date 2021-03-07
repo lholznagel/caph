@@ -16,7 +16,7 @@ pub struct Market {
 
 impl Market {
     const METRIC_MARKET:              &'static str = "market::time::complete";
-    const METRIC_FETCHED_REGION:      &'static str = "market::time::fetch_region";
+    const METRIC_FETCHED_REGION:      &'static str = "market::time::region::fetch";
     const METRIC_FETCH_MARKET_DATA:   &'static str = "market::time::market_data::fetch";
     const METRIC_INSERT_MARKET_DATA:  &'static str = "market::time::market_data::insert";
     const METRIC_PREPARE_ORDER_ID:    &'static str = "market::time::prep::order_id";

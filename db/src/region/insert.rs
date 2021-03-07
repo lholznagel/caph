@@ -10,10 +10,9 @@ const METRIC_INSERT_ENTRIES: &'static str = "insert::region::entries";
 
 #[async_trait]
 impl Insert<InsertRegionReq> for RegionCache {
-    type Error    = EmptyMsg;
     type Response = EmptyMsg;
 
-    async fn insert(&self, input: InsertRegionReq) -> Result<Self::Response, Self::Error> {
+    async fn insert(&self, input: InsertRegionReq) -> Self::Response {
         let timer = Instant::now();
         let mut map = HashSet::with_capacity(input.0.len());
         for x in input.0 {
@@ -25,7 +24,7 @@ impl Insert<InsertRegionReq> for RegionCache {
         self.save_to_file().await.unwrap();
 
         self.metrix.send_time(METRIC_INSERT, timer).await;
-        Ok(EmptyMsg::default())
+        EmptyMsg::default()
     }
 }
 

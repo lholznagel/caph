@@ -11,18 +11,17 @@ const METRIC_FETCH: &'static str = "fetch::market_order::latest::complete";
 
 #[async_trait]
 impl Fetch<FetchLatestMarketOrdersReq> for MarketOrderCache {
-    type Error    = EmptyMsg;
     type Response = FetchLatestMarketOrderRes;
 
-    async fn fetch(&self, input: FetchLatestMarketOrdersReq) -> Result<Self::Response, Self::Error> {
+    async fn fetch(&self, input: FetchLatestMarketOrdersReq) -> Self::Response {
         let timer = Instant::now();
         if let Some(x) = self.current.read().await.get(&input.0) {
-            let res = FetchLatestMarketOrderRes(x.clone());
+            let res = x.clone();
             self.metrix.send_time(METRIC_FETCH, timer).await;
-            Ok(res)
+            FetchLatestMarketOrderRes::Ok(res)
         } else {
             self.metrix.send_time(METRIC_FETCH, timer).await;
-            Err(EmptyMsg::default())
+            FetchLatestMarketOrderRes::Err(EmptyMsg::default())
         }
     }
 }
@@ -32,4 +31,7 @@ impl Fetch<FetchLatestMarketOrdersReq> for MarketOrderCache {
 pub struct FetchLatestMarketOrdersReq(pub u32);
 
 #[derive(Debug, Parse)]
-pub struct FetchLatestMarketOrderRes(pub Vec<MarketOrderEntry>);
+pub enum FetchLatestMarketOrderRes {
+    Ok(Vec<MarketOrderEntry>),
+    Err(EmptyMsg),
+}

@@ -3,16 +3,15 @@ use std::time::Instant;
 use crate::{Actions, MarketOrderInfoCache, MarketOrderInfoEntry};
 
 use async_trait::async_trait;
-use cachem::{EmptyMsg, Fetch, Parse, request};
+use cachem::{Fetch, Parse, request};
 
 const METRIC_FETCH: &'static str = "fetch::market_order_info::bulk::complete";
 
 #[async_trait]
 impl Fetch<FetchMarketOrderInfoBulkReq> for MarketOrderInfoCache {
-    type Error    = EmptyMsg;
     type Response = FetchMarketOrderInfoResBulk;
 
-    async fn fetch(&self, input: FetchMarketOrderInfoBulkReq) -> Result<Self::Response, Self::Error> {
+    async fn fetch(&self, input: FetchMarketOrderInfoBulkReq) -> Self::Response {
         let timer = Instant::now();
         let mut ret = Vec::with_capacity(input.0.len());
 
@@ -23,7 +22,7 @@ impl Fetch<FetchMarketOrderInfoBulkReq> for MarketOrderInfoCache {
         }
         let res = FetchMarketOrderInfoResBulk(ret);
         self.metrix.send_time(METRIC_FETCH, timer).await;
-        Ok(res)
+        res
     }
 }
 

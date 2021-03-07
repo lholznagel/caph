@@ -9,18 +9,17 @@ const METRIC_FETCH: &'static str = "fetch::item_material::complete";
 
 #[async_trait]
 impl Fetch<FetchItemMaterialReq> for ItemMaterialCache {
-    type Error    = EmptyMsg;
     type Response = FetchItemMaterialRes;
 
-    async fn fetch(&self, input: FetchItemMaterialReq) -> Result<Self::Response, Self::Error> {
+    async fn fetch(&self, input: FetchItemMaterialReq) -> Self::Response {
         let timer = Instant::now();
         if let Some(x) = self.cache.read().await.get(&input.0) {
-            let res = FetchItemMaterialRes(x.clone());
+            let res = x.clone();
             self.metrix.send_time(METRIC_FETCH, timer).await;
-            Ok(res)
+            FetchItemMaterialRes::Ok(res)
         } else {
             self.metrix.send_time(METRIC_FETCH, timer).await;
-            Err(EmptyMsg::default())
+            FetchItemMaterialRes::Err(EmptyMsg::default())
         }
     }
 }
@@ -30,4 +29,7 @@ impl Fetch<FetchItemMaterialReq> for ItemMaterialCache {
 pub struct FetchItemMaterialReq(pub u32);
 
 #[derive(Debug, Parse)]
-pub struct FetchItemMaterialRes(pub Vec<ItemMaterialEntry>);
+pub enum FetchItemMaterialRes {
+    Ok(Vec<ItemMaterialEntry>),
+    Err(EmptyMsg),
+}

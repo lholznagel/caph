@@ -11,10 +11,9 @@ const METRIC_INSERT_ENTRIES: &'static str = "insert::blueprint::entries";
 
 #[async_trait]
 impl Insert<InsertBlueprintReq> for BlueprintCache {
-    type Error    = EmptyMsg;
     type Response = EmptyMsg;
 
-    async fn insert(&self, input: InsertBlueprintReq) -> Result<Self::Response, Self::Error> {
+    async fn insert(&self, input: InsertBlueprintReq) -> Self::Response {
         let timer = Instant::now();
         let mut map = HashMap::new();
         let mut data = input.0;
@@ -35,7 +34,7 @@ impl Insert<InsertBlueprintReq> for BlueprintCache {
         self.save_to_file().await.unwrap();
 
         self.metrix.send_time(METRIC_INSERT, timer).await;
-        Ok(EmptyMsg::default())
+        EmptyMsg::default()
     }
 }
 

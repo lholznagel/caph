@@ -9,18 +9,17 @@ const METRIC_FETCH: &'static str = "fetch::id_name::complete";
 
 #[async_trait]
 impl Fetch<FetchIdNameReq> for IdNameCache {
-    type Error    = EmptyMsg;
     type Response = FetchIdNameRes;
 
-    async fn fetch(&self, input: FetchIdNameReq) -> Result<Self::Response, Self::Error> {
+    async fn fetch(&self, input: FetchIdNameReq) -> Self::Response {
         let timer = Instant::now();
         if let Some(x) = self.cache.read().await.get(&input.0) {
-            let res = FetchIdNameRes(x.clone());
+            let res = x.clone();
             self.metrix.send_time(METRIC_FETCH, timer).await;
-            Ok(res)
+            FetchIdNameRes::Ok(res)
         } else {
             self.metrix.send_time(METRIC_FETCH, timer).await;
-            Err(EmptyMsg::default())
+            FetchIdNameRes::Err(EmptyMsg::default())
         }
     }
 }
@@ -30,4 +29,7 @@ impl Fetch<FetchIdNameReq> for IdNameCache {
 pub struct FetchIdNameReq(pub u32);
 
 #[derive(Debug, Parse)]
-pub struct FetchIdNameRes(pub IdNameEntry);
+pub enum FetchIdNameRes {
+    Ok(IdNameEntry),
+    Err(EmptyMsg),
+}

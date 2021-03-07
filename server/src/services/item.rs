@@ -13,7 +13,7 @@ impl ItemService {
         Self(pool)
     }
 
-    pub async fn by_id(&self, id: u32) -> Result<ItemEntry, EveServerError> {
+    pub async fn by_id(&self, id: u32) -> Result<Option<ItemEntry>, EveServerError> {
         let mut conn = self.0.acquire().await?;
 
         Protocol::request::<_, FetchItemRes>(
@@ -21,11 +21,16 @@ impl ItemService {
             FetchItemReq(id)
         )
         .await
-        .map(|x| x.0)
+        .map(|x| {
+            match x {
+                FetchItemRes::Ok(x) => Some(x),
+                _ => None
+            }
+        })
         .map_err(Into::into)
     }
 
-    pub async fn resolve_id(&self, id: u32) -> Result<IdNameEntry, EveServerError> {
+    pub async fn resolve_id(&self, id: u32) -> Result<Option<IdNameEntry>, EveServerError> {
         let mut conn = self.0.acquire().await?;
 
         Protocol::request::<_, FetchIdNameRes>(
@@ -33,7 +38,12 @@ impl ItemService {
             FetchIdNameReq(id)
         )
         .await
-        .map(|x| x.0)
+        .map(|x| {
+            match x {
+                FetchIdNameRes::Ok(x) => Some(x),
+                _ => None,
+            }
+        })
         .map_err(Into::into)
     }
 
@@ -48,7 +58,13 @@ impl ItemService {
             FetchItemMaterialReq(id)
         )
         .await
-        .map(|x| x.0)?
+        .map(|x| {
+            if let FetchItemMaterialRes::Ok(x) = x {
+                x
+            } else {
+                Vec::new()
+            }
+        })?
         .iter()
         .map(|x| {
             let modifier = calc_reprocessing(50, 0, 0, 0);
