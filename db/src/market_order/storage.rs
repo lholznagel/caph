@@ -1,3 +1,5 @@
+use crate::MarketItemOrderId;
+
 use super::{MarketOrderCache, MarketOrderSaveEntry};
 
 use async_trait::async_trait;
@@ -24,11 +26,14 @@ impl Storage for MarketOrderCache {
             let mut map = HashMap::new();
 
             for entry in entries.0 {
-                let mut entries = Vec::with_capacity(entry.entries.len());
+                let mut orders = HashMap::new();
                 for x in entry.entries {
-                    entries.push(x);
+                    orders
+                        .entry(x.order_id)
+                        .and_modify(|y: &mut Vec<MarketItemOrderId>| y.push(x.clone()))
+                        .or_insert(vec![x]);
                 }
-                map.insert(entry.item_id, entries);
+                map.insert(entry.item_id, orders);
             }
 
             *self.history.write().await = map;
@@ -46,9 +51,14 @@ impl Storage for MarketOrderCache {
 
         let mut save_entries = Vec::with_capacity(data_copy.len());
         for (item, history) in self.history.read().await.iter() {
+            let mut values = Vec::new();
+            for (_, e) in history {
+                values.extend(e.clone());
+            }
+
             save_entries.push(MarketOrderSaveEntry {
                 item_id: *item,
-                entries: history.clone(),
+                entries: values,
             });
         }
 

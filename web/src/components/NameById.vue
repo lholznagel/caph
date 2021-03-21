@@ -6,6 +6,7 @@
 import axios from 'axios';
 
 import { Component, Prop, Vue } from 'vue-property-decorator';
+import { IdNameCache } from '../services/resolve_names';
 
 @Component
 export default class NameById extends Vue {
@@ -15,7 +16,7 @@ export default class NameById extends Vue {
   public name: string = '';
 
   public async created() {
-    this.name = (await axios.get(`/api/items/${this.id}/resolve`)).data.name;
+    this.name = (await IdNameCache.resolve(this.id));
   }
 }
 </script>

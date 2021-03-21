@@ -5,8 +5,10 @@ use warp::reject::Reject;
 
 #[derive(Debug)]
 pub enum EveServerError {
+    EveApiError(caph_eve_online_api::EveApiError),
     IoError(std::io::Error),
     CachemError(cachem::CachemError),
+    UserNotFound,
 }
 
 impl Error for EveServerError {}
@@ -15,13 +17,19 @@ impl Reject for EveServerError {}
 
 impl From<std::io::Error> for EveServerError {
     fn from(e: std::io::Error) -> Self {
-        EveServerError::IoError(e)
+        Self::IoError(e)
     }
 }
 
 impl From<cachem::CachemError> for EveServerError {
     fn from(e: cachem::CachemError) -> Self {
-        EveServerError::CachemError(e)
+        Self::CachemError(e)
+    }
+}
+
+impl From<caph_eve_online_api::EveApiError> for EveServerError {
+    fn from(e: caph_eve_online_api::EveApiError) -> Self {
+        Self::EveApiError(e)
     }
 }
 

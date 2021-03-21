@@ -1,0 +1,109 @@
+set nocompatible            " disable compatibility to old-time vi
+set showmatch               " show matching brackets.
+set ignorecase              " case insensitive matching
+set mouse=n                 " middle-click paste with mouse
+set hlsearch                " highlight search results
+set tabstop=4               " number of columns occupied by a tab character
+set softtabstop=4           " see multiple spaces as tabstops so <BS> does the right thing
+set expandtab               " converts tabs to white space
+set shiftwidth=4            " width for autoindents
+set autoindent              " indent a new line the same amount as the line just typed
+set number                  " add line numbers
+set wildmode=longest,list   " get bash-like tab completions
+set cc=80                   " set an 80 column border for good coding style
+set noswapfile              " disable swap files
+set hidden                  " TextEdit might fail if hidden is not set.
+set nobackup                " Disable backups
+set nowritebackup           " Disable backups
+set updatetime=300          " Shorten the updatetime for better experience
+set noshowmode              " Mode is in lightline
+set lcs+=space:·            " Visible spaces
+set list                    " Enable list
+set wildignorecase          " Ignore cases when opening files
+filetype plugin indent on   " allows auto-indenting depending on file type
+syntax on                   " syntax highlighting
+
+call plug#begin(stdpath('data') . '/plugged')
+
+Plug 'neoclide/coc.nvim', {'branch': 'release'}
+Plug 'fannheyward/coc-rust-analyzer'
+Plug 'leafgarland/typescript-vim'
+Plug 'neoclide/coc-vetur'
+Plug 'cespare/vim-toml'
+Plug 'stephpy/vim-yaml'
+Plug 'plasticboy/vim-markdown'
+
+" Ui
+Plug 'ayu-theme/ayu-vim'
+Plug 'itchyny/lightline.vim'
+
+call plug#end()
+
+" Use tab for trigger completion with characters ahead and navigate.
+" NOTE: Use command ':verbose imap <tab>' to make sure tab is not mapped by
+" other plugin before putting this into your config.
+inoremap <silent><expr> <TAB>
+      \ pumvisible() ? "\<C-n>" :
+      \ <SID>check_back_space() ? "\<TAB>" :
+      \ coc#refresh()
+inoremap <expr><S-TAB> pumvisible() ? "\<C-p>" : "\<C-h>"
+
+function! s:check_back_space() abort
+  let col = col('.') - 1
+  return !col || getline('.')[col - 1]  =~# '\s'
+endfunction
+
+" Use <c-space> to trigger completion.
+if has('nvim')
+  inoremap <silent><expr> <c-space> coc#refresh()
+else
+  inoremap <silent><expr> <c-@> coc#refresh()
+endif
+
+" Make <CR> auto-select the first completion item and notify coc.nvim to
+" format on enter, <cr> could be remapped by other vim plugin
+inoremap <silent><expr> <cr> pumvisible() ? coc#_select_confirm()
+                              \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
+
+" ayu
+set termguicolors
+let ayucolor="mirage"
+colorscheme ayu
+
+" lightline
+" Lightline
+let g:lightline = {
+      \ 'active': {
+      \   'left': [ [ 'mode', 'paste' ],
+      \             [ 'cocstatus', 'readonly', 'filename', 'modified' ] ]
+      \ },
+      \ 'component_function': {
+      \   'filename': 'LightlineFilename',
+      \   'cocstatus': 'coc#status'
+      \ },
+      \ }
+function! LightlineFilename()
+  return expand('%:t') !=# '' ? @% : '[No Name]'
+endfunction
+
+inoremap {      {}<Left>
+inoremap {<CR>  {<CR>}<Esc>O
+inoremap {{     {
+inoremap {}     {}
+
+inoremap (      ()<Left>
+inoremap (<CR>  (<CR>)<Esc>O
+inoremap ((     (
+inoremap ()     ()
+
+inoremap [      []<Left>
+inoremap [<CR>  [<CR>]<Esc>O
+inoremap [[     [
+inoremap []     []
+
+inoremap "      ""<Left>
+inoremap "<CR>  "<CR>"<Esc>O
+inoremap ""     "
+inoremap ""     ""
+
+

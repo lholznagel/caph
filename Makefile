@@ -1,4 +1,4 @@
-.PHONY: musl deploy-collector
+.PHONY: docs docs-open musl deploy-collector deploy-db deploy-server deploy-web deploy sync-virgo
 
 docs:
 	cargo doc --no-deps --document-private-items --all-features
@@ -30,6 +30,7 @@ deploy:
 	make deploy-db
 	make deploy-collector
 	make deploy-server
+	make deploy-web
 
 sync-virgo:
-	rsync --recursive --inplace --delete --quiet --exclude={'.git','target','web/node_modules'} . virgo:dev/caph
+	rsync --recursive --inplace --delete --quiet --exclude={'target','web/node_modules'} . virgo:dev/caph

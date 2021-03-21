@@ -42,8 +42,8 @@ import { Component, Prop, Vue } from 'vue-property-decorator';
 
 @Component
 export default class MarketOrders extends Vue {
-  @Prop(String)
-  public id!: string;
+  @Prop(Number)
+  public id!: number;
   @Prop(String)
   public type!: string; // low, high
   @Prop(Boolean)

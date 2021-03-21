@@ -1,4 +1,6 @@
 mod blueprint;
+mod category_ids;
+mod group_ids;
 mod schematic;
 mod station;
 mod type_ids;
@@ -9,6 +11,8 @@ use crate::error::*;
 use crate::reader::*;
 
 pub use self::blueprint::*;
+pub use self::category_ids::*;
+pub use self::group_ids::*;
 pub use self::schematic::*;
 pub use self::station::*;
 pub use self::type_ids::*;
@@ -65,6 +69,12 @@ impl EveSdeParser {
                         ParseRequest::Blueprints => results.push(ParseResult::Blueprints(
                             serde_yaml::from_slice(&data).unwrap(),
                         )),
+                        ParseRequest::CategoryIds => results.push(ParseResult::CategoryIds(
+                            serde_yaml::from_slice(&data).unwrap(),
+                        )),
+                        ParseRequest::GroupIds => results.push(ParseResult::GroupIds(
+                            serde_yaml::from_slice(&data).unwrap(),
+                        )),
                         ParseRequest::Schematics => results.push(ParseResult::Schematic(
                             serde_yaml::from_slice(&data).unwrap(),
                         )),
@@ -88,8 +98,11 @@ impl EveSdeParser {
     }
 }
 
+#[derive(Clone)]
 pub enum ParseResult {
     Blueprints(HashMap<u32, Blueprint>),
+    CategoryIds(HashMap<u32, CategoryIds>),
+    GroupIds(HashMap<u32, GroupIds>),
     Schematic(HashMap<u32, Schematic>),
     TypeIds(HashMap<u32, TypeIds>),
     TypeMaterials(HashMap<u32, TypeMaterial>),
@@ -99,6 +112,8 @@ pub enum ParseResult {
 
 pub enum ParseRequest {
     Blueprints,
+    CategoryIds,
+    GroupIds,
     Schematics,
     Stations,
     TypeIds,
@@ -109,12 +124,14 @@ pub enum ParseRequest {
 impl ParseRequest {
     pub fn path(&self) -> String {
         match self {
-            Self::Blueprints => "sde/fsd/blueprints.yaml".into(),
-            Self::Schematics => "sde/fsd/planetSchematics.yaml".into(),
-            Self::Stations => "sde/bsd/staStations.yaml".into(),
-            Self::TypeIds => "sde/fsd/typeIDs.yaml".into(),
+            Self::Blueprints    => "sde/fsd/blueprints.yaml".into(),
+            Self::CategoryIds   => "sde/fsd/categoryIDs.yaml".into(),
+            Self::GroupIds      => "sde/fsd/groupIDs.yaml".into(),
+            Self::Schematics    => "sde/fsd/planetSchematics.yaml".into(),
+            Self::Stations      => "sde/bsd/staStations.yaml".into(),
+            Self::TypeIds       => "sde/fsd/typeIDs.yaml".into(),
             Self::TypeMaterials => "sde/fsd/typeMaterials.yaml".into(),
-            Self::UniqueNames => "sde/bsd/invUniqueNames".into(),
+            Self::UniqueNames   => "sde/bsd/invUniqueNames".into(),
         }
     }
 }

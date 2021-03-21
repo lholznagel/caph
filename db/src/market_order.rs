@@ -1,9 +1,11 @@
 mod fetch;
+mod fetch_item_ids;
 mod fetch_latest;
 mod insert;
 mod storage;
 
 pub use self::fetch::*;
+pub use self::fetch_item_ids::*;
 pub use self::fetch_latest::*;
 pub use self::insert::*;
 pub use self::storage::*;
@@ -13,9 +15,12 @@ use metrix_exporter::MetrixSender;
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 
+type ItemId  = u32;
+type OrderId = u64;
+
 pub struct MarketOrderCache {
-    current: RwLock<HashMap<u32, Vec<MarketOrderEntry>>>,
-    history: RwLock<HashMap<u32, Vec<MarketItemOrderId>>>,
+    current: RwLock<HashMap<ItemId, Vec<MarketOrderEntry>>>,
+    history: RwLock<HashMap<ItemId, HashMap<OrderId, Vec<MarketItemOrderId>>>>,
     metrix: MetrixSender,
 }
 
@@ -62,7 +67,7 @@ pub struct MarketOrderSaveEntry {
     pub entries: Vec<MarketItemOrderId>,
 }
 
-#[derive(Clone, Debug, Parse)]
+#[derive(Clone, Debug, Parse, PartialEq)]
 pub struct MarketItemOrderId {
     pub timestamp: u64,
     pub order_id: u64,

@@ -41,6 +41,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     station_cache.load_from_file().await?;
     let station_cache = Arc::new(station_cache);
 
+    let user_cache = UserCache::new(metrix.get_sender());
+    user_cache.load_from_file().await?;
+    let user_cache = Arc::new(user_cache);
+
     tokio::task::spawn(async move {
         metrix.listen().await
     });
@@ -56,10 +60,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let market_order_info_copy = market_order_info_cache.clone();
         let region_copy = region_cache.clone();
         let station_copy = station_cache.clone();
+        let user_copy = user_cache.clone();
 
+        - Actions::FetchBlueprint           => (blueprint_copy, fetch, FetchBlueprintReq),
         - Actions::InsertBlueprints         => (blueprint_copy, insert, InsertBlueprintReq),
 
         - Actions::FetchIdName              => (id_name_copy, fetch, FetchIdNameReq),
+        - Actions::FetchIdNameBulk          => (id_name_copy, fetch, FetchIdNameBulkReq),
         - Actions::InsertIdNames            => (id_name_copy, insert, InsertIdNameReq),
 
         - Actions::FetchItem                => (item_copy, fetch, FetchItemReq),
@@ -69,6 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         - Actions::InsertItemMaterials      => (item_material_copy, insert, InsertItemMaterialReq),
 
         - Actions::FetchMarketOrder         => (market_order_copy, fetch, FetchMarketOrderReq),
+        - Actions::FetchMarketOrderItemIds  => (market_order_copy, fetch, FetchMarketOrderItemIdsReq),
         - Actions::FetchLatestMarketOrders  => (market_order_copy, fetch, FetchLatestMarketOrdersReq),
         - Actions::InsertMarketOrders       => (market_order_copy, insert, InsertMarketOrderReq),
 
@@ -81,5 +89,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         - Actions::FetchStation             => (station_copy, fetch, FetchStationReq),
         - Actions::InsertStations           => (station_copy, insert, InsertStationReq),
+
+        - Actions::FetchUser                => (user_copy, fetch, FetchUserReq),
+        - Actions::InsertUser               => (user_copy, insert, InsertUserReq),
     };
 }

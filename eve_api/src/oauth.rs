@@ -1,3 +1,5 @@
+use crate::error::*;
+
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -9,11 +11,13 @@ const ENV_REDIRECT:   &'static str = "EVE_REDIRECT_URL";
 const ENV_CLIENT_ID:  &'static str = "EVE_CLIENT_ID";
 const ENV_SECRET_KEY: &'static str = "EVE_SECRET_KEY";
 
-pub fn eve_auth_uri() -> Result<Url, Box<dyn std::error::Error>> {
+pub fn eve_auth_uri() -> Result<Url, EveApiError> {
     let mut url = Url::parse(EVE_LOGIN_URL).unwrap();
 
-    let redirect_uri = std::env::var(ENV_REDIRECT)?;
-    let client_id = std::env::var(ENV_CLIENT_ID)?;
+    let client_id    = std::env::var(ENV_CLIENT_ID)
+        .map_err(|_| EveApiError::EnvError(format!("ENV var {} not present", ENV_CLIENT_ID)))?;
+    let redirect_uri = std::env::var(ENV_REDIRECT)
+        .map_err(|_| EveApiError::EnvError(format!("ENV var {} not present", ENV_REDIRECT)))?;
 
     url.query_pairs_mut()
         .append_pair("response_type", "code")
@@ -25,26 +29,30 @@ pub fn eve_auth_uri() -> Result<Url, Box<dyn std::error::Error>> {
 }
 
 // https://docs.esi.evetech.net/docs/sso/web_based_sso_flow.html
-pub async fn retrieve_authorization_token(code: &str) -> Result<EveOAuthToken, Box<dyn std::error::Error>> {
+pub async fn retrieve_authorization_token(code: &str) -> Result<EveOAuthUser, EveApiError> {
     let mut map = HashMap::new();
     map.insert("grant_type", "authorization_code");
     map.insert("code", code);
 
-    send(map).await
+    let result = send(map).await?;
+    Ok(EveOAuthUser::from(result))
 }
 
-// https://docs.esi.evetech.net/docs/sso/refreshing_access_tokens.html
-pub async fn retrieve_refresh_token(refresh_token: &str) -> Result<EveOAuthToken, Box<dyn std::error::Error>> {
+// https://docs.esi.evetech.net/docs/sso/refreshing_access_tokens.htmlEveOAuthUser
+pub async fn retrieve_refresh_token(refresh_token: &str) -> Result<EveOAuthUser, EveApiError> {
     let mut map = HashMap::new();
     map.insert("grant_type", "refresh_token");
     map.insert("refresh_token", refresh_token);
 
-    send(map).await
+    let result = send(map).await?;
+    Ok(EveOAuthUser::from(result))
 }
 
-async fn send<T: Serialize>(form: T) -> Result<EveOAuthToken, Box<dyn std::error::Error>> {
-    let client_id = std::env::var(ENV_CLIENT_ID)?;
-    let secret_key = std::env::var(ENV_SECRET_KEY)?;
+async fn send<T: Serialize>(form: T) -> Result<EveOAuthToken, EveApiError> {
+    let client_id = std::env::var(ENV_CLIENT_ID)
+        .map_err(|_| EveApiError::EnvError(format!("ENV var {} not present", ENV_CLIENT_ID)))?;
+    let secret_key = std::env::var(ENV_SECRET_KEY)
+        .map_err(|_| EveApiError::EnvError(format!("ENV var {} not present", ENV_SECRET_KEY)))?;
 
     Client::new()
         .post(EVE_TOKEN_URL)
@@ -92,19 +100,37 @@ pub struct EveOAuthPayload {
 
 #[derive(Debug, Default, Deserialize)]
 pub struct EveOAuthToken {
-    pub access_token: serde_json::Value,
+    pub access_token: String,
     pub expires_in: u32,
     pub token_type: String,
     pub refresh_token: String
 }
 
 impl EveOAuthToken {
-    pub fn payload(&self) -> Result<EveOAuthPayload, Box<dyn std::error::Error>> {
+    pub fn payload(&self) -> Result<EveOAuthPayload, EveApiError> {
         let payload = self.access_token.to_string();
         let payload = payload.split('.').collect::<Vec<_>>();
         let payload = payload.get(1).map(|x| *x).unwrap_or_default();
-        let decoded = base64::decode(payload)?;
+        let decoded = base64::decode(payload)
+            .map_err(|_| EveApiError::OAuthPayload("Failed to decode base64".into()))?;
         serde_json::from_slice(&decoded).map_err(Into::into)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct EveOAuthUser {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub user_id: u32,
+}
+
+impl From<EveOAuthToken> for EveOAuthUser {
+    fn from(x: EveOAuthToken) -> Self {
+        Self {
+            access_token: x.access_token.clone(),
+            refresh_token: x.refresh_token.clone(),
+            user_id: x.payload().unwrap().sub.replace("CHARACTER:EVE:", "").parse().unwrap_or_default(),
+        }
     }
 }
 

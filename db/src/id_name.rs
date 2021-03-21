@@ -1,8 +1,10 @@
 mod fetch;
+mod fetch_bulk;
 mod insert;
 mod storage;
 
 pub use self::fetch::*;
+pub use self::fetch_bulk::*;
 pub use self::insert::*;
 pub use self::storage::*;
 

@@ -21,15 +21,29 @@ impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
         let ts_stop = input.ts_stop;
 
         // Get all item entries that are newer than the given start timestamp
-        let items = self
+        let historic = self
             .history
             .read()
             .await;
-        let items = items.get(&item_id)
-            .unwrap()
-            .into_iter()
-            .filter(|x| x.timestamp >= ts_start)
-            .collect::<Vec<_>>();
+
+        let mut items = Vec::new();
+        for (_, entries) in historic.get(&item_id).unwrap().iter() {
+            let mut index = 0;
+            loop {
+                if let Some(x) = entries.get(index) {
+                    if x.timestamp < ts_start {
+                        index += 1;
+                    } else {
+                        break;
+                    }
+                } else {
+                    // our timeslot is one back
+                    index -= 1;
+                    break;
+                }
+            }
+            items.extend(entries[index..].to_vec());
+        }
 
         // Get a list of all order ids and make sure that every id only exist once
         // This is needed to detect missing entries
@@ -83,8 +97,10 @@ impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
                         let mut items = items
                             .get(&item_id)
                             .unwrap()
-                            .iter()
-                            .filter(|x| x.order_id == *order_id)
+                            .get(order_id)
+                            .unwrap()
+                            .into_iter()
+                            //.filter(|x| x.order_id == *order_id)
                             .filter(|x| x.timestamp < ts_current)
                             .collect::<Vec<_>>();
                         if items.len() > 0 {
@@ -163,4 +179,97 @@ pub struct FetchMarketOrderResponseTs {
 pub struct FetchMarketOrderResponseEntries {
     pub order_id: u64,
     pub volume: u32,
+}
+
+
+#[cfg(test)]
+mod tests_fetch_market_orders {
+    use super::*;
+
+    use crate::MarketItemOrderId;
+
+    use metrix_exporter::MetrixSender;
+    use tokio::sync::RwLock;
+
+    // Timeslots that don´t contain a change should be the same as the last known
+    // timeslot
+    #[tokio::test]
+    async fn one_value_three_timeslots() {
+        let mut history = HashMap::new();
+        let mut orders = HashMap::new();
+        orders.insert(0u64, vec![
+            MarketItemOrderId {
+                timestamp: 0 * 1800 * 1000,
+                order_id: 0u64,
+                volume: 100u32,
+            }
+        ]);
+        history.insert(0u32, orders);
+
+        let metrix = MetrixSender::new_test();
+        let cache = MarketOrderCache {
+            current: RwLock::new(HashMap::new()),
+            history: RwLock::new(history),
+            metrix,
+        };
+
+        let req = FetchMarketOrderReq {
+            item_id: 0u32,
+            ts_start: 0u64,
+            ts_stop: 2 * 1800 * 1000,
+        };
+
+        let res = cache.fetch(req).await.0;
+        assert_eq!(res.len(), 3);
+        for x in res.iter() {
+            assert_eq!(x.entries.len(), 1);
+        }
+    }
+
+    // A order that is before the requested time, that has some volume but doesn´t
+    // have any changes should still be in the result because its an active order.
+    #[tokio::test]
+    async fn value_before_requested_timeslot() {
+        let mut history = HashMap::new();
+        let mut orders = HashMap::new();
+        orders.insert(0u64, vec![
+            MarketItemOrderId {
+                timestamp: 0 * 1800 * 1000,
+                order_id: 0u64,
+                volume: 100u32,
+            },
+            MarketItemOrderId {
+                timestamp: 2 * 1800 * 1000,
+                order_id: 0u64,
+                volume: 99u32,
+            }
+        ]);
+        orders.insert(1u64, vec![
+            MarketItemOrderId {
+                timestamp: 0 * 1800 * 1000,
+                order_id: 1u64,
+                volume: 50u32,
+            }
+        ]);
+        history.insert(0u32, orders);
+
+        let metrix = MetrixSender::new_test();
+        let cache = MarketOrderCache {
+            current: RwLock::new(HashMap::new()),
+            history: RwLock::new(history),
+            metrix,
+        };
+
+        let req = FetchMarketOrderReq {
+            item_id: 0u32,
+            ts_start: 1 * 1800 * 1000,
+            ts_stop: 3 * 1800 * 1000,
+        };
+
+        let res = cache.fetch(req).await.0;
+        assert_eq!(res.len(), 3);
+        for x in res.iter() {
+            assert_eq!(x.entries.len(), 2);
+        }
+    }
 }

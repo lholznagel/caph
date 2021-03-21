@@ -1,8 +1,9 @@
 <template>
   <div>
     <v-card>
-      <v-card-title
-        >Market info for "<c-name-by-id :id="Number($route.params.id)"/>"</v-card-title>
+      <v-card-title>
+        Market info for "<c-name-by-id :id="Number($route.params.id)"/>"
+      </v-card-title>
 
       <v-row dense>
         <v-col cols="3" style="flex-direction:column">
@@ -41,7 +42,7 @@
           <v-expansion-panel-content>
             <c-market-orders
               type="high"
-              :id=$route.params.id
+              :id="Number($route.params.id)"
               :is-buy-order="true"
             />
           </v-expansion-panel-content>
@@ -51,7 +52,7 @@
           <v-expansion-panel-content>
             <c-market-orders
               type="high"
-              :id="$route.params.id"
+              :id="Number($route.params.id)"
               :is-buy-order="false"
             />
           </v-expansion-panel-content>
@@ -61,7 +62,7 @@
           <v-expansion-panel-content>
             <c-market-orders
               type="low"
-              :id="$route.params.id"
+              :id="Number($route.params.id)"
               :is-buy-order="true"
             />
           </v-expansion-panel-content>
@@ -71,7 +72,7 @@
           <v-expansion-panel-content>
             <c-market-orders
               type="low"
-              :id="$route.params.id"
+              :id="Number($route.params.id)"
               :is-buy-order="false"
             />
           </v-expansion-panel-content>
@@ -86,8 +87,8 @@
         <v-expansion-panel>
           <v-expansion-panel-header>Buy</v-expansion-panel-header>
           <v-expansion-panel-content>
-            <c-market-charts
-              :id="$route.params.id"
+            <c-market-chart-historic
+              :id="Number($route.params.id)"
               :is-buy-order="true"
             />
           </v-expansion-panel-content>
@@ -95,8 +96,8 @@
         <v-expansion-panel>
           <v-expansion-panel-header>Sell</v-expansion-panel-header>
           <v-expansion-panel-content>
-            <c-market-charts
-              :id="$route.params.id"
+            <c-market-chart-historic
+              :id="Number($route.params.id)"
               :is-buy-order="false"
             />
           </v-expansion-panel-content>
@@ -111,6 +112,6 @@
 import { Component, Vue } from 'vue-property-decorator';
 
 @Component
-export default class ItemInfo extends Vue {
+export default class MarketInfo extends Vue {
 }
 </script>

@@ -1,7 +1,5 @@
 use cachem::{ConnectionPool, EmptyMsg, Protocol};
-use caph_eve_sde_parser::{
-    Blueprint, ParseRequest, ParseResult, Schematic, Station, TypeIds, TypeMaterial, UniqueName,
-};
+use caph_eve_sde_parser::{Blueprint, CategoryIds, GroupIds, ParseRequest, ParseResult, Schematic, Station, TypeIds, TypeMaterial, UniqueName};
 use caph_db::*;
 use metrix_exporter::MetrixSender;
 use std::collections::{HashMap, HashSet};
@@ -12,6 +10,7 @@ use crate::error::{CollectorError, CollectorResult};
 
 pub enum Action {
     Blueprint(Vec<BlueprintEntry>),
+    GroupCategory(HashMap<u32, u32>),
     IdName(Vec<IdNameEntry>),
     Item(Vec<ItemEntry>),
     ItemMaterial(Vec<ItemMaterialEntry>),
@@ -43,6 +42,8 @@ impl Sde {
     const METRIC_BLUEPRINT_COUNT:      &'static str = "sde::count::blueprint";
     const METRIC_SCHEMATIC_COUNT:      &'static str = "sde::count::schematic";
     const METRIC_REGION_COUNT:         &'static str = "sde::count::region";
+    const METRIC_GROUP_COUNT:          &'static str = "sde::count::group";
+    const METRIC_CATEGORY_COUNT:       &'static str = "sde::count::category";
 
     pub async fn new(metrix: MetrixSender, pool: ConnectionPool) -> Self {
         Self { metrix, pool }
@@ -62,6 +63,8 @@ impl Sde {
         let parse_results = caph_eve_sde_parser::from_reader(
             &mut Cursor::new(zip),
             vec![
+                ParseRequest::GroupIds,
+                ParseRequest::CategoryIds,
                 ParseRequest::TypeIds,
                 ParseRequest::TypeMaterials,
                 ParseRequest::UniqueNames,
@@ -75,17 +78,26 @@ impl Sde {
         self.metrix.send_time(Self::METRIC_PARSE_SDE, timer).await;
         let timer = Instant::now();
 
+        let mut group_category = HashMap::new();
         // collects all actions that need to be perfomed
         let mut actions: Vec<Action> = Vec::new();
         //let mut conn = self.pool.acquire().await?;
         for parse_result in parse_results {
+            if let ParseResult::GroupIds(y) = parse_result.clone() {
+                if let Some(Action::GroupCategory(z)) = self.groups(y).await?.get(1) {
+                    group_category = z.clone();
+                }
+            }
+
             let x = match parse_result {
-                ParseResult::TypeIds(x) => self.items(x).await?,
+                ParseResult::TypeIds(x) => self.items(x, group_category.clone()).await?,
                 ParseResult::TypeMaterials(x) => self.item_materials(x).await?,
                 ParseResult::UniqueNames(x) => self.unique_names(x).await?,
                 ParseResult::Stations(x) => self.stations(x).await?,
                 ParseResult::Blueprints(x) => self.blueprints(x).await?,
                 ParseResult::Schematic(x) => self.schematics(x).await?,
+                ParseResult::CategoryIds(x) => self.categories(x).await?,
+                ParseResult::GroupIds(x) => self.groups(x).await?,
             };
             actions.extend(x);
         }
@@ -138,7 +150,7 @@ impl Sde {
                     )
                     .await?;
                     self.metrix.send_time(Self::METRIC_PROCESSING_BLUEPRINT, timer).await;
-                }
+                },
                 Action::Region(x) => {
                     let timer = Instant::now();
                     Protocol::request::<_, EmptyMsg>(
@@ -147,7 +159,9 @@ impl Sde {
                     )
                     .await?;
                     self.metrix.send_time(Self::METRIC_PROCESSING_REGION, timer).await;
-                }
+                },
+                // Only needed as lookup
+                Action::GroupCategory(_) => (),
             }
         }
 
@@ -159,6 +173,7 @@ impl Sde {
     async fn items(
         &mut self,
         items: HashMap<u32, TypeIds>,
+        group_category: HashMap<u32, u32>,
     ) -> Result<Vec<Action>, CollectorError> {
         // We know the roughly how many items there are, so we allocate accordingly
         let mut item_name_actions = Vec::with_capacity(ItemCache::CAPACITY);
@@ -173,7 +188,8 @@ impl Sde {
             item_name_actions.push(IdNameEntry::new(id, name));
 
             let volume = type_id.volume.unwrap_or(0f32);
-            item_volume_actions.push(ItemEntry::new(id, volume));
+            let category = group_category.get(&type_id.group_id).map(|x| *x).unwrap_or_default();
+            item_volume_actions.push(ItemEntry::new(category, type_id.group_id, id, volume));
         }
         self.metrix.send_len(Self::METRIC_ITEM_NAME_COUNT, item_name_actions.len()).await;
         self.metrix.send_len(Self::METRIC_ITEM_VOLUME_COUNT, item_volume_actions.len()).await;
@@ -328,6 +344,49 @@ impl Sde {
         let schematic_actions = Action::Blueprint(schematic_actions);
         Ok(vec![
             schematic_actions
+        ])
+    }
+
+    async fn categories(
+        &mut self,
+        categories: HashMap<u32, CategoryIds>,
+    ) -> Result<Vec<Action>, CollectorError> {
+        let mut id_name_actions = Vec::new();
+
+        for (id, category) in categories {
+            let id = id;
+            let name = category.name.get("en").map(|x| x.clone()).unwrap_or_default();
+            id_name_actions.push(IdNameEntry::new(id, name));
+        }
+        self.metrix.send_len(Self::METRIC_CATEGORY_COUNT, id_name_actions.len()).await;
+
+        let id_name_actions = Action::IdName(id_name_actions);
+        Ok(vec![
+            id_name_actions
+        ])
+    }
+
+    async fn groups(
+        &mut self,
+        groups: HashMap<u32, GroupIds>,
+    ) -> Result<Vec<Action>, CollectorError> {
+        let mut id_name_actions = Vec::new();
+        let mut group_category_actions = HashMap::new();
+
+        for (id, group) in groups {
+            let id = id;
+            let name = group.name.get("en").map(|x| x.clone()).unwrap_or_default();
+            id_name_actions.push(IdNameEntry::new(id, name));
+
+            group_category_actions.insert(id, group.category_id);
+        }
+        self.metrix.send_len(Self::METRIC_GROUP_COUNT, id_name_actions.len()).await;
+
+        let id_name_actions = Action::IdName(id_name_actions);
+        let group_category_actions = Action::GroupCategory(group_category_actions);
+        Ok(vec![
+            id_name_actions,
+            group_category_actions
         ])
     }
 }

@@ -62,7 +62,7 @@ impl Market {
         while let Some(return_val) = requests.next().await {
             match return_val {
                 Ok(result) => {
-                    results.extend(result.unwrap_or_default());
+                    results.extend(result);
                 }
                 // if you dont handle errors, there are non
                 _ => (),

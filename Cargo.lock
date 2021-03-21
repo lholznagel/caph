@@ -207,6 +207,7 @@ dependencies = [
  "metrix_exporter",
  "morgan",
  "serde",
+ "serde_json",
  "tokio",
  "warp",
 ]

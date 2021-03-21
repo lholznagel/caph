@@ -1,11 +1,7 @@
-//mod blueprint;
+mod character;
 mod item;
 mod market;
-//mod region;
-//mod resolve;
 
-//pub use self::blueprint::*;
+pub use self::character::*;
 pub use self::item::*;
 pub use self::market::*;
-//pub use self::region::*;
-//pub use self::resolve::*;

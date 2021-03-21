@@ -1,7 +1,7 @@
 use crate::error::EveServerError;
 
 use cachem::{ConnectionPool, Protocol};
-use caph_db::{FetchLatestMarketOrderRes, FetchLatestMarketOrdersReq, FetchMarketOrderInfoBulkReq, FetchMarketOrderInfoResBulk, FetchMarketOrderReq, FetchMarketOrderRes, FetchStationReq, FetchStationRes};
+use caph_db::{FetchLatestMarketOrderRes, FetchLatestMarketOrdersReq, FetchMarketOrderInfoBulkReq, FetchMarketOrderInfoResBulk, FetchMarketOrderItemIdsReq, FetchMarketOrderItemIdsRes, FetchMarketOrderReq, FetchMarketOrderRes, FetchStationReq, FetchStationRes};
 use chrono::{NaiveDateTime, NaiveTime, Timelike};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -47,6 +47,20 @@ pub struct MarketService(ConnectionPool);
 impl MarketService {
     pub fn new(pool: ConnectionPool) -> Self {
         Self(pool)
+    }
+
+    pub async fn items(
+        &self,
+    ) -> Result<Vec<u32>, EveServerError> {
+        let mut conn = self.0.acquire().await?;
+
+        Protocol::request::<_, FetchMarketOrderItemIdsRes>(
+            &mut conn,
+            FetchMarketOrderItemIdsReq { }
+        )
+        .await
+        .map(|x| x.0)
+        .map_err(Into::into)
     }
 
     pub async fn top_orders(
@@ -156,7 +170,7 @@ impl MarketService {
         let mut conn = self.0.acquire().await?;
         let ts = chrono::Utc::now().timestamp() as u64;
         let ts = Self::previous_30_minute(ts);
-        let start_ts = ts - (1 * 24 * 1800 * 1000);
+        let start_ts = ts - (7 * 48 * 1800 * 1000);
 
         let market_data = Protocol::request::<_, FetchMarketOrderRes>(
             &mut conn,
@@ -211,6 +225,7 @@ impl MarketService {
                 )
                 .map(|x| x.price)
                 .unwrap_or_default();
+
             let lowest_price = market_infos_filter
                 .iter()
                 .min_by(|a, b| a
@@ -220,16 +235,17 @@ impl MarketService {
                 )
                 .map(|x| x.price)
                 .unwrap_or_default();
-            let average_price = market_infos_filter
-                .iter()
-                .map(|x| x.price)
-                .sum::<f32>() / market.len() as f32;
 
             let volume = market
                 .iter()
                 .filter(|x| x.volume > 0)
-                .map(|x| x.volume)
+                .map(|x| x.volume as u64)
                 .sum();
+
+            let average_price = market_infos_filter
+                .iter()
+                .map(|x| x.price)
+                .sum::<f32>() / volume as f32;
 
             ret.push(Historic {
                 ts: x.timestamp,
@@ -333,13 +349,18 @@ impl MarketService {
             &mut conn,
             FetchLatestMarketOrdersReq(item_id)
         )
-        .await
-        .map(|x| {
-            match x {
-                FetchLatestMarketOrderRes::Ok(x) => x,
-                _ => panic!("NO latest market value") // FIXME
-            }
-        })?;
+        .await?;
+        let market_data = if let FetchLatestMarketOrderRes::Ok(x) = market_data {
+            x
+        } else {
+            return Ok(MarketStats {
+                average_price: 0f32,
+                highest_price: 0f32,
+                lowest_price: 0f32,
+                order_count: 0u32,
+                total_volume: 0u64,
+            })
+        };
 
         let order_ids = market_data.iter().map(|x| x.order_id).collect::<Vec<_>>();
         let market_infos = Protocol::request::<_, FetchMarketOrderInfoResBulk>(
@@ -434,5 +455,5 @@ pub struct Historic {
     pub average_price: f32,
     pub highest_price: f32,
     pub lowest_price: f32,
-    pub volume: u32,
+    pub volume: u64,
 }

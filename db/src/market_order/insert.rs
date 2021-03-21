@@ -25,31 +25,43 @@ impl Insert<InsertMarketOrderReq> for MarketOrderCache {
                 .await
                 .entry(entry.item_id)
                 .and_modify(|x| {
-                    // Look if there is already an entry with the order id and
-                    // volume, if not insert it
-                    if let None = x
-                        .iter()
-                        .find(|y| 
-                            y.order_id == entry.order_id &&
-                            y.volume == entry.volume_remain
-                        ) {
-
-                        x.push(
+                    if let Some(y) = x.get_mut(&entry.order_id) {
+                        if y.last().unwrap().volume != entry.volume_remain {
+                            y.push(
+                                MarketItemOrderId {
+                                    timestamp: entry.timestamp,
+                                    order_id: entry.order_id,
+                                    volume: entry.volume_remain,
+                                }
+                            )
+                        }
+                    } else {
+                        x.insert(
+                            entry.order_id,
+                            vec![
+                                MarketItemOrderId {
+                                    timestamp: entry.timestamp,
+                                    order_id: entry.order_id,
+                                    volume: entry.volume_remain,
+                                }
+                            ]
+                        );
+                    }
+                })
+                .or_insert({
+                    let mut map = HashMap::new();
+                    map.insert(
+                        entry.order_id,
+                        vec![
                             MarketItemOrderId {
                                 timestamp: entry.timestamp,
                                 order_id: entry.order_id,
                                 volume: entry.volume_remain,
                             }
-                        )
-                    }
-                })
-                .or_insert(vec![
-                    MarketItemOrderId {
-                        timestamp: entry.timestamp,
-                        order_id: entry.order_id,
-                        volume: entry.volume_remain,
-                    }
-                ]);
+                        ]
+                    );
+                    map
+                });
 
             current
                 .entry(entry.item_id)
@@ -71,3 +83,60 @@ impl Insert<InsertMarketOrderReq> for MarketOrderCache {
 #[request(Actions::InsertMarketOrders)]
 #[derive(Debug, Parse)]
 pub struct InsertMarketOrderReq(pub Vec<MarketOrderEntry>);
+
+/*#[cfg(test)]
+mod tests_insert_market_orders {
+    use super::*;
+
+    use metrix_exporter::MetrixSender;
+    use tokio::sync::RwLock;
+
+    #[tokio::test]
+    async fn insert() {
+        let metrix = MetrixSender::new_test();
+        let cache = MarketOrderCache {
+            current: RwLock::new(HashMap::new()),
+            history: RwLock::new(HashMap::new()),
+            metrix,
+        };
+
+        let data = vec![
+            MarketOrderEntry {
+                order_id: 0u64,
+                timestamp: 0 * 1800 * 1000,
+                volume_remain: 100,
+                item_id: 1337
+            },
+            MarketOrderEntry {
+                order_id: 1u64,
+                timestamp: 0 * 1800 * 1000,
+                volume_remain: 50,
+                item_id: 1338
+            }
+        ];
+
+        cache.insert(InsertMarketOrderReq(data)).await;
+        
+        let mut history_expected = HashMap::new();
+        let mut orders_1_expected = HashMap::new();
+        let mut orders_2_expected = HashMap::new();
+        orders_1_expected.insert(0u64, vec![
+            MarketItemOrderId {
+                order_id: 0u64,
+                timestamp: 0 * 1800 * 1000,
+                volume: 100,
+            }
+        ]);
+        orders_2_expected.insert(1u64, vec![
+            MarketItemOrderId {
+                order_id: 1u64,
+                timestamp: 0 * 1800 * 1000,
+                volume: 50,
+            }
+        ]);
+        history_expected.insert(1337u32, orders_1_expected);
+        history_expected.insert(1338u32, orders_2_expected);
+        let is = &*cache.history.read().await;
+        assert_eq!(&history_expected, is);
+    }
+}*/

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::time::Instant;
 
 use crate::{Actions, BlueprintCache, BlueprintEntry};
@@ -15,7 +14,7 @@ impl Insert<InsertBlueprintReq> for BlueprintCache {
 
     async fn insert(&self, input: InsertBlueprintReq) -> Self::Response {
         let timer = Instant::now();
-        let mut map = HashMap::new();
+        let mut map = self.cache.read().await.clone();
         let mut data = input.0;
 
         while let Some(x) = data.pop() {
