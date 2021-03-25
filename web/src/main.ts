@@ -16,6 +16,8 @@ Vue.component('v-chart', ECharts);
 Vue.component('c-format-number', () => import('@/components/FormatNumber.vue'));
 Vue.component('c-name-by-id', () => import('@/components/NameById.vue'));
 
+Vue.component('c-blueprint-info', () => import('@/components/blueprint/Info.vue'));
+Vue.component('c-blueprint-graph', () => import('@/components/blueprint/Graph.vue'));
 Vue.component('c-blueprint-item', () => import('@/components/blueprint/Item.vue'));
 
 Vue.component('c-item-info', () => import('@/components/item/Info.vue'));

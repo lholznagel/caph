@@ -19,7 +19,7 @@ const routes: RouteConfig[] = [
     component: () => import(/* webpackChunkName: "market_info" */ '../views/MarketInfo.vue')
   },
   {
-    path: '/blueprint/:id',
+    path: '/blueprint/:id/:itemId?',
     name: 'BlueprintInfo',
     component: () => import( /* webpackChunkName: "blueprint_info" */ '../views/BlueprintInfo.vue')
   },

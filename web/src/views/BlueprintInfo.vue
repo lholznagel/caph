@@ -5,9 +5,22 @@
         Blueprint info for "<c-name-by-id :id="Number($route.params.id)"/>"
       </v-card-title>
 
-      <v-card-text>
-        <c-blueprint-item :blueprint-id="Number($route.params.id)" />
-      </v-card-text>
+      <v-row dense>
+        <v-col cols="3">
+          <v-card elevation="5" style="height: 100%" v-if="$route.params.itemId">
+            <v-card-title>Blueprint Info</v-card-title>
+            <c-blueprint-info
+              :blueprint-id="Number($route.params.id)"
+              :item-id="Number($route.params.itemId)" />
+          </v-card>
+        </v-col>
+        <v-col cols="3">
+          <v-card elevation="5" style="height: 100%">
+            <v-card-title>Item cost</v-card-title>
+            <c-blueprint-item :blueprint-id="Number($route.params.id)" />
+          </v-card>
+        </v-col>
+      </v-row>
     </v-card>
 
     <v-card class="mt-5">
@@ -16,41 +29,17 @@
       </v-card-title>
 
       <v-card-text>
-        <v-treeview
-          :activatable="false"
-          dense
-          :items="items"
-        >
-          <template v-slot:prepend="{ item }">
-            <c-item-icon  :id="Number(item.item_id)" />
-          </template>
-
-          <template v-slot:label="{ item }">
-            <c-name-by-id :id="Number(item.item_id)" />
-            (<c-format-number :value="Number(item.quantity)" />)
-          </template>
-        </v-treeview>
+        <c-blueprint-graph :blueprint-id="Number($route.params.id)" />
       </v-card-text>
     </v-card>
   </div>
 </template>
 
 <script lang="ts">
-import axios from 'axios';
 import { Component, Vue } from 'vue-property-decorator';
 
 @Component
 export default class BlueprintInfo extends Vue {
-  public items:              IGraph[] = [];
-
-  public async created() {
-    this.items = [(await axios.get(`/api/items/${this.$route.params.id}/blueprint/graph`)).data];
-  }
 }
 
-interface IGraph {
-  item_id: number;
-  quantity: number;
-  children: IGraph[];
-}
 </script>

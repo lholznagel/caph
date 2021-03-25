@@ -347,7 +347,7 @@ impl ApiServer {
         Ok(Response::builder()
             .status(StatusCode::MOVED_PERMANENTLY)
             .header("location", "https://eve.caph.xyz")
-            .header("Set-Cookie", format!("user={}; Path=/", user.user_id))
+            .header("Set-Cookie", format!("user={}; Path=/; Secure; HttpOnly; Max-Age={}", user.user_id, 60 * 60 * 24 * 31 * 12 * 100)) // seconds * minutes * hours * days * months * years
             .body("")
             .unwrap())
     }

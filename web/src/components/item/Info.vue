@@ -7,11 +7,12 @@
     ></v-skeleton-loader>
 
     <div v-if="!busy">
-      <v-img
-        :src="'https://images.evetech.net/types/' + id + '/icon?size=1024'"
-        max-height="128"
-        max-width="128"
-      ></v-img>
+      <c-item-icon
+        :id="Number(id)"
+        :max-height="Number(128)"
+        :max-width="Number(128)"
+        type="render"
+      />
 
       <v-simple-table>
         <template v-slot:default>

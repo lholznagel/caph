@@ -26,7 +26,7 @@
       >
 
         <template v-slot:item.type_id="{ item }">
-          <c-item-icon :id="item.type_id" />
+          <c-item-icon :id="item.type_id" type="icon" />
         </template>
 
         <template v-slot:item.quantity="{ item }">

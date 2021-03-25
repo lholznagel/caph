@@ -26,7 +26,7 @@
       >
 
         <template v-slot:item.img="{ item }">
-          <c-item-icon :id="item.itemId" />
+          <c-item-icon :id="item.itemId" type="icon" />
         </template>
 
         <template v-slot:item.marketInfoLink="{ item }">

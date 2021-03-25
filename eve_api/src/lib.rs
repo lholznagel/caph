@@ -9,32 +9,15 @@ pub use self::market::*;
 pub use self::oauth::*;
 
 use reqwest::{Response, StatusCode};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 
+/// This struct contains all functions for communicating with the Eve Online
+/// REST API.
 #[derive(Default)]
 pub struct EveClient;
 
 impl EveClient {
     const BASE_ADDR: &'static str = "https://esi.evetech.net/latest";
-
-    pub async fn fetch_route(
-        &self,
-        origin: u32,
-        destination: u32,
-        flag: Option<RouteFlag>,
-    ) -> Result<Vec<u32>, EveApiError> {
-        let flag = flag.unwrap_or_default().as_string();
-
-        let response = self
-            .fetch(&format!("route/{}/{}?flag={}", origin, destination, flag))
-            .await?;
-
-        if response.status() == StatusCode::NOT_FOUND {
-            return Ok(Vec::new());
-        }
-
-        Ok(response.json().await?)
-    }
 
     /// Wraps reqwest´s client
     /// When requesting the eve online API often the server returns 502 or 503
@@ -190,29 +173,5 @@ impl EveClient {
         } else {
             0u8
         }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum RouteFlag {
-    Shortest,
-    Secure,
-    Insecure,
-}
-
-impl RouteFlag {
-    pub fn as_string(self) -> String {
-        match self {
-            Self::Shortest => "shortest",
-            Self::Secure => "secure",
-            Self::Insecure => "insecure",
-        }
-        .into()
-    }
-}
-
-impl Default for RouteFlag {
-    fn default() -> Self {
-        Self::Shortest
     }
 }
