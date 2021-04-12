@@ -2,11 +2,13 @@ mod character;
 mod error;
 mod market;
 mod oauth;
+mod region;
 
 pub use self::character::*;
 pub use self::error::*;
 pub use self::market::*;
 pub use self::oauth::*;
+pub use self::region::*;
 
 use reqwest::{Response, StatusCode};
 use serde::de::DeserializeOwned;
@@ -17,7 +19,7 @@ use serde::de::DeserializeOwned;
 pub struct EveClient;
 
 impl EveClient {
-    const BASE_ADDR: &'static str = "https://esi.evetech.net/latest";
+    const BASE_ADDR:       &'static str = "https://esi.evetech.net/latest";
 
     /// Wraps reqwest´s client
     /// When requesting the eve online API often the server returns 502 or 503
@@ -33,7 +35,12 @@ impl EveClient {
                 return Err(EveApiError::TooManyRetries(url));
             }
 
-            let response = reqwest::get(&url).await;
+            let response = reqwest::Client::builder()
+                .user_agent("github.com/lholznagel")
+                .build()?
+                .get(&url)
+                .send()
+                .await;
             let response = response.map_err(EveApiError::ReqwestError)?;
 
             // status 200 and 404 are ok
@@ -65,7 +72,9 @@ impl EveClient {
                 return Err(EveApiError::TooManyRetries(url));
             }
 
-            let response = reqwest::Client::new()
+            let response = reqwest::Client::builder()
+                .user_agent("github.com/lholznagel")
+                .build()?
                 .get(&url)
                 .bearer_auth(token)
                 .send()

@@ -2,7 +2,7 @@ use crate::error::EveServerError;
 use crate::reprocessing::calc_reprocessing;
 
 use cachem::{ConnectionPool, Protocol};
-use caph_db::{BlueprintEntry, FetchBlueprintReq, FetchBlueprintRes, FetchIdNameBulkReq, FetchIdNameBulkRes, FetchIdNameReq, FetchIdNameRes, FetchItemMaterialReq, FetchItemMaterialRes, FetchItemReq, FetchItemRes, IdNameEntry, ItemEntry, Material};
+use caph_db::{BlueprintEntry, FetchBlueprintReq, FetchBlueprintRes, FetchItemMaterialReq, FetchItemMaterialRes, FetchItemReq, FetchItemRes, ItemEntry, Material};
 use serde::Serialize;
 
 #[derive(Clone)]
@@ -41,35 +41,6 @@ impl ItemService {
         }
 
         Ok(result)
-    }
-
-    pub async fn resolve_id(&self, id: u32) -> Result<Option<IdNameEntry>, EveServerError> {
-        let mut conn = self.0.acquire().await?;
-
-        Protocol::request::<_, FetchIdNameRes>(
-            &mut conn,
-            FetchIdNameReq(id)
-        )
-        .await
-        .map(|x| {
-            match x {
-                FetchIdNameRes::Ok(x) => Some(x),
-                _ => None,
-            }
-        })
-        .map_err(Into::into)
-    }
-
-    pub async fn resolve_bulk(&self, ids: Vec<u32>) -> Result<Vec<IdNameEntry>, EveServerError> {
-        let mut conn = self.0.acquire().await?;
-
-        Protocol::request::<_, FetchIdNameBulkRes>(
-            &mut conn,
-            FetchIdNameBulkReq(ids)
-        )
-        .await
-        .map(|x| x.0)
-        .map_err(Into::into)
     }
 
     pub async fn blueprint_graph(
@@ -204,6 +175,33 @@ impl ItemService {
         })
         .collect::<Vec<_>>();
         Ok(ret)
+    }
+
+    pub async fn blueprint_product(
+        &self,
+        bid: u32,
+    ) -> Result<u32, EveServerError> {
+        let mut conn = self.0.acquire().await?;
+
+        let blueprints = Protocol::request::<_, FetchBlueprintRes>(
+            &mut conn,
+            FetchBlueprintReq::default(),
+        )
+        .await
+        .map(|x| x.0)?;
+
+        let product = blueprints
+            .iter()
+            .find(|x| x.item_id == bid)
+            .unwrap();
+
+        let bp_result = product
+            .materials
+            .iter()
+            .find(|x| x.is_product)
+            .ok_or(EveServerError::NotFound)?;
+
+        Ok(bp_result.material_id)
     }
 }
 

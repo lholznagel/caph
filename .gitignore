@@ -3,6 +3,7 @@
 Cargo.lock
 pkg/
 dist/
-wasm-pack.log
 node_modules
-sde
+sde.zip
+sde.checksum
+db/db

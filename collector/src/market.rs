@@ -40,22 +40,16 @@ impl Market {
         let timer = Instant::now();
 
         let timestamp = previous_30_minute(Utc::now().timestamp() as u64) * 1_000;
-        let client = EveClient::default();
+        let eve_client = EveClient::default();
 
         let mut requests = FuturesUnordered::new();
-        let mut conn = self.pool.acquire().await?;
-        let regions = Protocol::request::<_, RegionEntries>(
-            &mut conn,
-            FetchRegionReq::default()
-        )
-        .await
-        .unwrap();
+        let regions = eve_client.fetch_regions().await.unwrap();
 
         self.metrix.send_time(Self::METRIC_FETCHED_REGION, timer).await;
         let timer = Instant::now();
 
-        for region in regions.0 {
-            requests.push(client.fetch_market_orders(region.into()));
+        for region in regions {
+            requests.push(eve_client.fetch_market_orders(region.into()));
         }
 
         let mut results = Vec::new();

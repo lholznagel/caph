@@ -28,26 +28,32 @@ impl ItemCache {
 }
 
 #[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Copy, Clone, Debug, PartialEq, Parse)]
+#[derive(Clone, Debug, PartialEq, Parse)]
 pub struct ItemEntry {
     pub category_id: u32,
     pub group_id:    u32,
     pub item_id:     u32,
     pub volume:      f32,
+    pub name:        String,
+    pub description: String,
 }
 
 impl ItemEntry {
     pub fn new(
         category_id: u32,
-        group_id: u32,
-        item_id: u32,
-        volume: f32,
+        group_id:    u32,
+        item_id:     u32,
+        volume:      f32,
+        name:        String,
+        description: String,
     ) -> Self {
         Self {
             category_id,
             group_id,
             item_id,
             volume,
+            name,
+            description,
         }
     }
 }

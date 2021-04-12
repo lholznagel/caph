@@ -9,7 +9,7 @@ async-trait = "0.1.42"
 cachem = { path = "../../cachem/cachem" }
 caph_db = { path = "../db" }
 caph_eve_online_api = { path = "../eve_api" }
-caph_eve_sde_parser = { path = "../eve_sde_parser" }
+caph_eve_sde_parser2 = { path = "../eve_sde_parser2" }
 chrono = "0.4.19"
 futures = "0.3.12"
 log = "0.4.14"

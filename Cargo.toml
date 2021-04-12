@@ -1,8 +1,9 @@
 [profile.release]
-lto = true
-panic = 'abort'
-opt-level = 3
 codegen-units = 1
+debug = true
+lto = true
+opt-level = 3
+panic = 'abort'
 
 [workspace]
 members = [
@@ -10,5 +11,6 @@ members = [
   'db',
   'eve_api',
   'eve_sde_parser',
+  'eve_sde_parser2',
   'server',
 ]

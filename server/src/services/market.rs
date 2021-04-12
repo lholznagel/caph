@@ -1,7 +1,8 @@
 use crate::error::EveServerError;
+use crate::ItemService;
 
 use cachem::{ConnectionPool, Protocol};
-use caph_db::{FetchLatestMarketOrderRes, FetchLatestMarketOrdersReq, FetchMarketOrderInfoBulkReq, FetchMarketOrderInfoResBulk, FetchMarketOrderItemIdsReq, FetchMarketOrderItemIdsRes, FetchMarketOrderReq, FetchMarketOrderRes, FetchStationReq, FetchStationRes};
+use caph_db::{FetchLatestMarketOrderRes, FetchLatestMarketOrdersReq, FetchMarketOrderInfoBulkReq, FetchMarketOrderInfoResBulk, FetchMarketOrderItemIdsReq, FetchMarketOrderItemIdsRes, FetchMarketOrderReq, FetchMarketOrderRes, FetchStationReq, FetchStationRes, ItemEntry};
 use chrono::{NaiveDateTime, NaiveTime, Timelike};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -42,25 +43,40 @@ pub enum Sort {
 }
 
 #[derive(Clone)]
-pub struct MarketService(ConnectionPool);
+pub struct MarketService {
+    pool:         ConnectionPool,
+    item_service: ItemService,
+}
 
 impl MarketService {
-    pub fn new(pool: ConnectionPool) -> Self {
-        Self(pool)
+    pub fn new(pool: ConnectionPool, item_service: ItemService) -> Self {
+        Self {
+            pool,
+            item_service,
+        }
     }
 
     pub async fn items(
         &self,
-    ) -> Result<Vec<u32>, EveServerError> {
-        let mut conn = self.0.acquire().await?;
+    ) -> Result<Vec<ItemEntry>, EveServerError> {
+        let mut conn = self.pool.acquire().await?;
 
-        Protocol::request::<_, FetchMarketOrderItemIdsRes>(
+        let ids = Protocol::request::<_, FetchMarketOrderItemIdsRes>(
             &mut conn,
             FetchMarketOrderItemIdsReq { }
         )
         .await
-        .map(|x| x.0)
-        .map_err(Into::into)
+        .map(|x| x.0)?;
+
+        let mut items = Vec::with_capacity(ids.len());
+        for id in ids {
+            let item = self.item_service.by_id(id).await?;
+            if let Some(x) = item {
+                items.push(x);
+            }
+        }
+
+        Ok(items)
     }
 
     pub async fn top_orders(
@@ -68,7 +84,7 @@ impl MarketService {
         item_id:u32,
         req: TopOrderReq,
     ) -> Result<Vec<TopOrder>, EveServerError> {
-        let mut conn = self.0.acquire().await?;
+        let mut conn = self.pool.acquire().await?;
 
         let market_data = Protocol::request::<_, FetchLatestMarketOrderRes>(
             &mut conn,
@@ -167,7 +183,7 @@ impl MarketService {
     }
 
     pub async fn historic(&self, item_id: u32, is_buy_order: bool) -> Result<Vec<Historic>, EveServerError> {
-        let mut conn = self.0.acquire().await?;
+        let mut conn = self.pool.acquire().await?;
         let ts = chrono::Utc::now().timestamp() as u64;
         let ts = Self::previous_30_minute(ts);
         let start_ts = ts - (7 * 48 * 1800 * 1000);
@@ -343,7 +359,7 @@ impl MarketService {
         item_id: u32,
         is_buy_order: bool,
     ) -> Result<MarketStats, EveServerError> {
-        let mut conn = self.0.acquire().await?;
+        let mut conn = self.pool.acquire().await?;
 
         let market_data = Protocol::request::<_, FetchLatestMarketOrderRes>(
             &mut conn,

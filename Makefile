@@ -1,9 +1,11 @@
 .PHONY: docs docs-open musl deploy-collector deploy-db deploy-server deploy-web deploy sync-virgo
 
 docs:
+	cargo clippy
 	cargo doc --no-deps --document-private-items --all-features
 
 docs-open:
+	cargo clippy
 	cargo doc --no-deps --document-private-items --all-features --open
 
 musl:
@@ -33,4 +35,4 @@ deploy:
 	make deploy-web
 
 sync-virgo:
-	rsync --recursive --inplace --delete --quiet --exclude={'target','web/node_modules'} . virgo:dev/caph
+	rsync --recursive --inplace --delete --quiet --exclude={'.git','target','web/node_modules'} . virgo:dev/caph

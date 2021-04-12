@@ -19,31 +19,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let metrix_sender = metrix.get_sender();
 
-    tokio::task::spawn(async { metrix.listen().await; });
-
-    log::info!("Start SDE");
-    let mut sde = Sde::new(metrix_sender.clone(), pool.clone()).await;
-    sde.run().await.unwrap();
-    log::info!("Done SDE");
+    let metrix = tokio::task::spawn(async { metrix.listen().await; });
 
     let metrix_copy = metrix_sender.clone();
     let pool_copy = pool.clone();
-    tokio::task::spawn(async {
+    let sde = tokio::task::spawn(async {
+        let mut sde = Sde::new(metrix_copy, pool_copy);
+
+        loop {
+            if let Err(e) = sde.run().await {
+                log::error!("Error running sde task {:?}", e);
+            }
+
+            let next_run = duration_next_sde_download();
+            tokio::time::sleep(next_run).await;
+        }
+    });
+
+    let metrix_copy = metrix_sender.clone();
+    let pool_copy = pool.clone();
+    let market = tokio::task::spawn(async {
         let mut market = Market::new(metrix_copy, pool_copy);
 
         loop {
-            log::info!("Start market");
             if let Err(e) = market.task().await {
                 log::error!("Error running market task {:?}", e);
             }
-            log::info!("Done market");
 
             let next_run = duration_to_next_30_minute();
             tokio::time::sleep(next_run).await; // Run on the next 30 minute interval
         }
-    })
-    .await
-    .unwrap();
+    });
+
+    let _ = tokio::join!(
+        market,
+        metrix,
+        sde,
+    );
 
     Ok(())
 }

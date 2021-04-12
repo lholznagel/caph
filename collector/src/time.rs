@@ -24,6 +24,29 @@ pub fn duration_to_next_30_minute() -> Duration {
     Duration::from_secs(diff)
 }
 
+/// Creates a new duration to the next 14:30:00 time.
+///
+/// Eve´s downtime is at 14:00, so giving them 30 minutes should be ok.
+pub fn duration_next_sde_download() -> Duration {
+    // Current timestamp
+    let timestamp = Utc::now().timestamp();
+    // Create a naive date time and add one day to it
+    let date_time = NaiveDateTime::from_timestamp(timestamp as i64, 0);
+    let date_time = date_time.checked_add_signed(chrono::Duration::days(1)).unwrap();
+
+    // Creates a new naive date time based on the date time that is one day
+    // ahead. We take the date and set the hms to 14:30:00.
+    let next = NaiveDateTime::new(
+        date_time.date(),
+        NaiveTime::from_hms(14, 30, 0)
+    )
+    .timestamp();
+
+    // Execute at exactly 14:30
+    let diff = next - timestamp;
+    Duration::from_secs(diff as u64)
+}
+
 /// Adds 30 minutes to the given timestamp
 fn next_30_minutes(timestamp: u64) -> u64 {
     let date_time = NaiveDateTime::from_timestamp(timestamp as i64, 0);
@@ -66,13 +89,4 @@ mod time_tests {
         let expected = 50 * 60;
         assert_eq!(is, expected);
     }
-
-    /*#[test]
-    fn next_30_min() {
-        let start = 0;
-        let is = next_30_minutes(start);
-
-        let expected = 1_800;
-        assert_eq!(is, expected);
-    }*/
 }

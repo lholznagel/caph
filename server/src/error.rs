@@ -9,6 +9,7 @@ pub enum EveServerError {
     IoError(std::io::Error),
     CachemError(cachem::CachemError),
     UserNotFound,
+    NotFound,
 }
 
 impl Error for EveServerError {}
