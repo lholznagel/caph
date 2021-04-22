@@ -1,0 +1,8 @@
+[package]
+name = "eve_missions"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+reqwest = { version = "0.11.3", default-features = false, features = ["json", "multipart", "rustls-tls"] }
+tokio = { version = "1.2.0", features = ["full"] }

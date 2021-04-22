@@ -35,6 +35,7 @@ pub struct MarketOrderInfoEntry {
     /// Timestamp in seconds
     pub issued:       u64,
     pub order_id:     u64,
+    // FIXME: this is the stationid and a u32
     pub location_id:  u64,
     pub system_id:    u32,
     pub item_id:      u32,

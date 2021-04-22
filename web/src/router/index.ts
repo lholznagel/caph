@@ -32,6 +32,11 @@ const routes: RouteConfig[] = [
     path: '/my/blueprints',
     name: 'CharacterBlueprints',
     component: () => import(/* webpackChunkName: "character_blueprints" */ '../views/CharacterBlueprints.vue')
+  },
+  {
+    path: '/missions',
+    name: 'Missions',
+    component: () => import(/* webpackChunkName: "missions" */ '../views/Missions.vue')
   }
 ];
 

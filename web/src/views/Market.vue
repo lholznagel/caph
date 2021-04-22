@@ -48,7 +48,7 @@
 import axios from 'axios';
 
 import { Component, Vue } from 'vue-property-decorator';
-import { IdNameCache, IIdName } from '../services/resolve_names';
+import { IdNameCache } from '../services/resolve_names';
 
 @Component
 export default class MyItems extends Vue {

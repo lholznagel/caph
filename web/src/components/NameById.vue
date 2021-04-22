@@ -3,8 +3,6 @@
 </template>
 
 <script lang="ts">
-import axios from 'axios';
-
 import { Component, Prop, Vue } from 'vue-property-decorator';
 import { IdNameCache } from '../services/resolve_names';
 

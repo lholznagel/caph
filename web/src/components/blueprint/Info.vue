@@ -7,11 +7,18 @@
     ></v-skeleton-loader>
 
     <div v-if="!busy">
-      <v-img
-        :src="`https://images.evetech.net/types/${blueprintId}/bp?size=1024`"
-        max-height="128"
-        max-width="128"
-      ></v-img>
+      <c-item-icon
+        v-if="blueprint.quantity !== -2"
+        :id="Number(blueprint.type_id)"
+        :type="'bp'"
+        :max-height="Number(128)"
+        :max-width="Number(128)" />
+      <c-item-icon
+        v-if="blueprint.quantity === -2"
+        :id="Number(blueprint.type_id)"
+        :type="'bpc'"
+        :max-height="Number(128)"
+        :max-width="Number(128)" />
 
       <v-simple-table>
         <template v-slot:default>
@@ -34,7 +41,7 @@
             </tr>
             <tr>
               <th>Runs</th>
-              <td>{{ blueprint.runs }}</td>
+              <td>{{ blueprint.runs === -1 ? '∞' : blueprint.runs }}</td>
             </tr>
           </tbody>
         </template>

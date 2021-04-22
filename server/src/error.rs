@@ -5,7 +5,7 @@ use warp::reject::Reject;
 
 #[derive(Debug)]
 pub enum EveServerError {
-    EveApiError(caph_eve_online_api::EveApiError),
+    EveConnectError(caph_eve_data_wrapper::EveConnectError),
     IoError(std::io::Error),
     CachemError(cachem::CachemError),
     UserNotFound,
@@ -28,9 +28,9 @@ impl From<cachem::CachemError> for EveServerError {
     }
 }
 
-impl From<caph_eve_online_api::EveApiError> for EveServerError {
-    fn from(e: caph_eve_online_api::EveApiError) -> Self {
-        Self::EveApiError(e)
+impl From<caph_eve_data_wrapper::EveConnectError> for EveServerError {
+    fn from(e: caph_eve_data_wrapper::EveConnectError) -> Self {
+        Self::EveConnectError(e)
     }
 }
 

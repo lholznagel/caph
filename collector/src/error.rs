@@ -5,7 +5,7 @@ use cachem::CachemError;
 /// All errors that can be thrown in this module
 #[derive(Debug)]
 pub enum CollectorError {
-    SdeError(caph_eve_sde_parser2::EveSdeParserError),
+    SdeError(caph_eve_data_wrapper::EveConnectError),
     // There was an error with the database connection pool
     DbConnectionPoolError(cachem::CachemError),
     // There was an error with the database protocol
@@ -28,8 +28,8 @@ impl From<cachem::CachemError> for CollectorError {
     }
 }
 
-impl From<caph_eve_sde_parser2::EveSdeParserError> for CollectorError {
-    fn from(x: caph_eve_sde_parser2::EveSdeParserError) -> Self {
+impl From<caph_eve_data_wrapper::EveConnectError> for CollectorError {
+    fn from(x: caph_eve_data_wrapper::EveConnectError) -> Self {
         Self::SdeError(x)
     }
 }

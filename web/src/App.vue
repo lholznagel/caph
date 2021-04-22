@@ -2,7 +2,7 @@
   <v-app id="app">
     <v-navigation-drawer clipped fixed app>
       <v-list>
-        <v-list-group no-action v-if="loggedIn">
+        <v-list-group no-action v-if="loggedIn" :value="true">
           <template v-slot:activator>
             <v-list-item-content>
               <v-list-item-title>My shit n stuff</v-list-item-title>
@@ -25,6 +25,12 @@
         <v-list-item to="/market">
           <v-list-item-content>
             <v-list-item-title>Market</v-list-item-title>
+          </v-list-item-content>
+        </v-list-item>
+
+        <v-list-item to="/missions">
+          <v-list-item-content>
+            <v-list-item-title>Missions</v-list-item-title>
           </v-list-item-content>
         </v-list-item>
       </v-list>

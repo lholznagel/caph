@@ -2,7 +2,7 @@ use crate::error::EveServerError;
 use crate::ItemService;
 
 use cachem::{ConnectionPool, Protocol};
-use caph_db::{FetchLatestMarketOrderRes, FetchLatestMarketOrdersReq, FetchMarketOrderInfoBulkReq, FetchMarketOrderInfoResBulk, FetchMarketOrderItemIdsReq, FetchMarketOrderItemIdsRes, FetchMarketOrderReq, FetchMarketOrderRes, FetchStationReq, FetchStationRes, ItemEntry};
+use caph_db::{FetchLatestMarketOrderRes, FetchLatestMarketOrdersReq, FetchMarketOrderInfoBulkReq, FetchMarketOrderInfoResBulk, FetchMarketOrderItemIdsReq, FetchMarketOrderItemIdsRes, FetchMarketOrderReq, FetchMarketOrderRes, FetchSystemRegionReq, FetchSystemRegionRes};
 use chrono::{NaiveDateTime, NaiveTime, Timelike};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -44,12 +44,15 @@ pub enum Sort {
 
 #[derive(Clone)]
 pub struct MarketService {
-    pool:         ConnectionPool,
-    item_service: ItemService,
+    pool:           ConnectionPool,
+    item_service:   ItemService,
 }
 
 impl MarketService {
-    pub fn new(pool: ConnectionPool, item_service: ItemService) -> Self {
+    pub fn new(
+        pool:            ConnectionPool,
+        item_service:    ItemService,
+    ) -> Self {
         Self {
             pool,
             item_service,
@@ -58,7 +61,7 @@ impl MarketService {
 
     pub async fn items(
         &self,
-    ) -> Result<Vec<ItemEntry>, EveServerError> {
+    ) -> Result<Vec<u32>, EveServerError> {
         let mut conn = self.pool.acquire().await?;
 
         let ids = Protocol::request::<_, FetchMarketOrderItemIdsRes>(
@@ -68,15 +71,7 @@ impl MarketService {
         .await
         .map(|x| x.0)?;
 
-        let mut items = Vec::with_capacity(ids.len());
-        for id in ids {
-            let item = self.item_service.by_id(id).await?;
-            if let Some(x) = item {
-                items.push(x);
-            }
-        }
-
-        Ok(items)
+        Ok(ids)
     }
 
     pub async fn top_orders(
@@ -140,24 +135,24 @@ impl MarketService {
 
         let mut ret = Vec::with_capacity(subset.len());
         for x in subset {
-            let station = Protocol::request::<_, FetchStationRes>(
+            let system_region = Protocol::request::<_, FetchSystemRegionRes>(
                 &mut conn,
-                FetchStationReq(x.system_id)
+                FetchSystemRegionReq(x.system_id)
             )
             .await
             .map(|x| {
                 match x {
-                    FetchStationRes::Ok(x) => x,
-                    _ => panic!("No station") // FIXME
+                    FetchSystemRegionRes::Ok(x) => x,
+                    _ => panic!("unknown system id")
                 }
             })?;
 
             let data = market_data.iter().find(|x| x.order_id == x.order_id).unwrap();
             let order = TopOrder {
                 price: x.price,
-                region_id: station.region_id,
+                region_id: system_region.region_id,
                 order_id: x.order_id,
-                security: station.security,
+                security: system_region.security,
                 system_id: x.system_id,
                 timestamp: data.timestamp,
                 volume_remain: data.volume_remain,

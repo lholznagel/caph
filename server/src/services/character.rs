@@ -2,23 +2,29 @@ use std::collections::HashMap;
 
 use cachem::{ConnectionPool, EmptyMsg, Protocol};
 use caph_db::{FetchUserReq, FetchUserRes, InsertUserReq, UserEntry};
-use caph_eve_online_api::{CharacterAsset, CharacterBlueprint, EveApiError, EveClient, EveOAuthUser};
+use caph_eve_data_wrapper::{CharacterAsset, CharacterBlueprint, EveClient, EveConnectError, EveDataWrapper, EveOAuthUser};
 
 use crate::error::EveServerError;
 
 #[derive(Clone)]
-pub struct CharacterService(ConnectionPool);
+pub struct CharacterService {
+    eve:  EveDataWrapper,
+    pool: ConnectionPool,
+}
 
 impl CharacterService {
-    pub fn new(pool: ConnectionPool) -> Self {
-        Self(pool)
+    pub fn new(eve: EveDataWrapper, pool: ConnectionPool) -> Self {
+        Self {
+            eve,
+            pool,
+        }
     }
 
     pub async fn save_login(
         &self,
         character: EveOAuthUser,
     ) -> Result<(), EveServerError> {
-        let mut conn = self.0.acquire().await?;
+        let mut conn = self.pool.acquire().await?;
 
         if let Some(x) = self.lookup(character.user_id).await? {
             Protocol::request::<_, EmptyMsg>(
@@ -51,7 +57,7 @@ impl CharacterService {
         &self,
         character_id: u32,
     ) -> Result<Option<UserEntry>, EveServerError> {
-        let mut conn = self.0.acquire().await?;
+        let mut conn = self.pool.acquire().await?;
 
         Protocol::request::<_, FetchUserRes>(
             &mut conn,
@@ -72,23 +78,23 @@ impl CharacterService {
         character_id: u32,
     ) -> Result<String, EveServerError> {
         let oauth = self.lookup(character_id).await?.ok_or(EveServerError::UserNotFound)?;
-        let eve = EveClient::default();
+        let charater_service = self.eve.character().await?;
 
-        let whoami = eve.whoami(&oauth.access_token, character_id).await;
-        let name = if let Err(EveApiError::Unauthorized) = whoami {
-            let user = caph_eve_online_api::retrieve_refresh_token(&oauth.refresh_token)
+        let whoami = charater_service.whoami(&oauth.access_token, character_id).await;
+        let name = if let Err(EveConnectError::Unauthorized) = whoami {
+            let user = EveClient::retrieve_refresh_token(&oauth.refresh_token)
                 .await
                 .map_err(EveServerError::from)?;
             
             self.save_login(user.clone()).await?;
 
-            eve.whoami(&user.access_token, character_id)
+            charater_service.whoami(&user.access_token, character_id)
                 .await
                 .map_err(EveServerError::from)?
         } else if let Ok(x) = whoami {
             x
         } else {
-            return Err(EveServerError::EveApiError(EveApiError::Unauthorized).into());
+            return Err(EveServerError::EveConnectError(EveConnectError::Unauthorized).into());
         };
 
         Ok(name)
@@ -99,23 +105,23 @@ impl CharacterService {
         character_id: u32,
     ) -> Result<String, EveServerError> {
         let oauth = self.lookup(character_id).await?.ok_or(EveServerError::UserNotFound)?;
-        let eve = EveClient::default();
+        let character_service = self.eve.character().await?;
 
-        let portrait = eve.portrait(&oauth.access_token, character_id).await;
-        let name = if let Err(EveApiError::Unauthorized) = portrait {
-            let user = caph_eve_online_api::retrieve_refresh_token(&oauth.refresh_token)
+        let portrait = character_service.portrait(&oauth.access_token, character_id).await;
+        let name = if let Err(EveConnectError::Unauthorized) = portrait {
+            let user = EveClient::retrieve_refresh_token(&oauth.refresh_token)
                 .await
                 .map_err(EveServerError::from)?;
 
             self.save_login(user.clone()).await?;
 
-            eve.portrait(&user.access_token, character_id)
+            character_service.portrait(&user.access_token, character_id)
                 .await
                 .map_err(EveServerError::from)?
         } else if let Ok(x) = portrait {
             x
         } else {
-            return Err(EveServerError::EveApiError(EveApiError::Unauthorized).into());
+            return Err(EveServerError::EveConnectError(EveConnectError::Unauthorized).into());
         };
 
         Ok(name)
@@ -126,23 +132,23 @@ impl CharacterService {
         character_id: u32,
     ) -> Result<Vec<CharacterAsset>, EveServerError> {
         let oauth = self.lookup(character_id).await?.ok_or(EveServerError::UserNotFound)?;
-        let eve = EveClient::default();
+        let character_service = self.eve.character().await?;
 
-        let assets = eve.assets(&oauth.access_token, character_id).await;
-        let assets = if let Err(EveApiError::Unauthorized) = assets {
-            let user = caph_eve_online_api::retrieve_refresh_token(&oauth.refresh_token)
+        let assets = character_service.assets(&oauth.access_token, character_id).await;
+        let assets = if let Err(EveConnectError::Unauthorized) = assets {
+            let user = EveClient::retrieve_refresh_token(&oauth.refresh_token)
                 .await
                 .map_err(EveServerError::from)?;
-            
+
             self.save_login(user.clone()).await?;
 
-            eve.assets(&user.access_token, character_id)
+            character_service.assets(&user.access_token, character_id)
                 .await
                 .map_err(EveServerError::from)?
         } else if let Ok(x) = assets {
             x
         } else {
-            return Err(EveServerError::EveApiError(EveApiError::Unauthorized).into());
+            return Err(EveServerError::EveConnectError(EveConnectError::Unauthorized).into());
         };
 
         let mut result = HashMap::new();
@@ -165,23 +171,23 @@ impl CharacterService {
         character_id: u32,
     ) -> Result<Vec<CharacterBlueprint>, EveServerError> {
         let oauth = self.lookup(character_id).await?.ok_or(EveServerError::UserNotFound)?;
-        let eve = EveClient::default();
+        let character_service = self.eve.character().await?;
 
-        let blueprints = eve.blueprints(&oauth.access_token, character_id).await;
-        let blueprints = if let Err(EveApiError::Unauthorized) = blueprints {
-            let user = caph_eve_online_api::retrieve_refresh_token(&oauth.refresh_token)
+        let blueprints = character_service.blueprints(&oauth.access_token, character_id).await;
+        let blueprints = if let Err(EveConnectError::Unauthorized) = blueprints {
+            let user = EveClient::retrieve_refresh_token(&oauth.refresh_token)
                 .await
                 .map_err(EveServerError::from)?;
 
             self.save_login(user.clone()).await?;
 
-            eve.blueprints(&user.access_token, character_id)
+            character_service.blueprints(&user.access_token, character_id)
                 .await
                 .map_err(EveServerError::from)?
         } else if let Ok(x) = blueprints {
             x
         } else {
-            return Err(EveServerError::EveApiError(EveApiError::Unauthorized).into());
+            return Err(EveServerError::EveConnectError(EveConnectError::Unauthorized).into());
         };
 
         Ok(blueprints)

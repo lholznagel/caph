@@ -5,6 +5,7 @@ mod services;
 use self::services::*;
 
 use cachem::ConnectionPool;
+use caph_eve_data_wrapper::{EveClient, EveDataWrapper};
 use metrix_exporter::Metrix;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -19,9 +20,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let metrix = Metrix::new(env!("CARGO_PKG_NAME").into(), "0.0.0.0:8889").await?;
     let pool = ConnectionPool::new("0.0.0.0:9999", metrix.get_sender(), 10).await?;
 
-    let character_service = CharacterService::new(pool.clone());
+    let eve = EveDataWrapper::new().await?;
+
+    let character_service = CharacterService::new(eve.clone(), pool.clone());
     let item_service = ItemService::new(pool.clone());
-    let market_service = MarketService::new(pool, item_service.clone());
+    let market_service = MarketService::new(
+        pool,
+        item_service.clone(),
+    );
 
     log::info!("Starting server");
 
@@ -134,6 +140,17 @@ impl ApiServer {
             .and(warp::post())
             .and(warp::body::json())
             .and_then(Self::item_bulk);
+        let item_resolve = item
+            .clone()
+            .and(warp::path!("resolve" / u32))
+            .and(warp::get())
+            .and_then(Self::item_resolve);
+        let item_resolve_bulk = item
+            .clone()
+            .and(warp::path!("resolve" / "bulk"))
+            .and(warp::post())
+            .and(warp::body::json())
+            .and_then(Self::item_resolve_bulk);
         let item_blueprint_graph = item
             .clone()
             .and(warp::path!(u32 / "blueprint" / "graph"))
@@ -151,6 +168,8 @@ impl ApiServer {
             .and_then(Self::item_reprocessing);
         let item = item_by_id
             .or(item_bulk)
+            .or(item_resolve)
+            .or(item_resolve_bulk)
             .or(item_blueprint_graph)
             .or(item_blueprint_product)
             .or(item_reprocessing);
@@ -224,13 +243,37 @@ impl ApiServer {
             .map_err(Into::into)
     }
 
-    async fn item_blueprint_graph(
+    async fn item_resolve(
         self: Arc<Self>,
         item_id: u32,
     ) -> Result<impl Reply, Rejection> {
         self
             .items
-            .blueprint_graph(item_id)
+            .resolve_id(item_id)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn item_resolve_bulk(
+        self: Arc<Self>,
+        ids: Vec<u32>
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .items
+            .resolve_bulk(ids)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn item_blueprint_graph(
+        self: Arc<Self>,
+        tid: u32,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .items
+            .blueprint_graph(tid)
             .await
             .map(|x| warp::reply::json(&x))
             .map_err(Into::into)
@@ -238,11 +281,11 @@ impl ApiServer {
 
     async fn item_blueprint_product(
         self: Arc<Self>,
-        item_id: u32,
+        tid: u32,
     ) -> Result<impl Reply, Rejection> {
         self
             .items
-            .blueprint_product(item_id)
+            .blueprint_product(tid)
             .await
             .map(|x| warp::reply::json(&x))
             .map_err(Into::into)
@@ -325,7 +368,7 @@ impl ApiServer {
         self: Arc<Self>,
         query: EveQuery,
     ) -> Result<impl Reply, Rejection> {
-        let user = caph_eve_online_api::retrieve_authorization_token(&query.code).await.unwrap();
+        let user = EveClient::retrieve_authorization_token(&query.code).await.unwrap();
         self.character.save_login(user.clone()).await?;
 
         Ok(Response::builder()
@@ -339,7 +382,7 @@ impl ApiServer {
     async fn eve_login(
         self: Arc<Self>,
     ) -> Result<impl Reply, Rejection> {
-        let auth_uri = caph_eve_online_api::eve_auth_uri().unwrap();
+        let auth_uri = EveClient::eve_auth_uri().unwrap();
 
         let uri = warp::http::uri::Builder::new()
             .scheme(auth_uri.scheme())

@@ -2,7 +2,7 @@ use crate::error::EveServerError;
 use crate::reprocessing::calc_reprocessing;
 
 use cachem::{ConnectionPool, Protocol};
-use caph_db::{BlueprintEntry, FetchBlueprintReq, FetchBlueprintRes, FetchItemMaterialReq, FetchItemMaterialRes, FetchItemReq, FetchItemRes, ItemEntry, Material};
+use caph_db::{BlueprintEntry, FetchBlueprintReq, FetchBlueprintRes, FetchItemMaterialReq, FetchItemMaterialRes, FetchItemReq, FetchItemRes, ItemEntry, Material, IdNameEntry, FetchIdNameRes, FetchIdNameReq, FetchIdNameBulkRes, FetchIdNameBulkReq};
 use serde::Serialize;
 
 #[derive(Clone)]
@@ -41,6 +41,35 @@ impl ItemService {
         }
 
         Ok(result)
+    }
+
+    pub async fn resolve_id(&self, id: u32) -> Result<Option<IdNameEntry>, EveServerError> {
+        let mut conn = self.0.acquire().await?;
+
+        Protocol::request::<_, FetchIdNameRes>(
+            &mut conn,
+            FetchIdNameReq(id)
+        )
+        .await
+        .map(|x| {
+            match x {
+                FetchIdNameRes::Ok(x) => Some(x),
+                _ => None,
+            }
+        })
+        .map_err(Into::into)
+    }
+
+    pub async fn resolve_bulk(&self, ids: Vec<u32>) -> Result<Vec<IdNameEntry>, EveServerError> {
+        let mut conn = self.0.acquire().await?;
+
+        Protocol::request::<_, FetchIdNameBulkRes>(
+            &mut conn,
+            FetchIdNameBulkReq(ids)
+        )
+        .await
+        .map(|x| x.0)
+        .map_err(Into::into)
     }
 
     pub async fn blueprint_graph(

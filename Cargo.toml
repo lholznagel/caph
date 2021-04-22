@@ -9,8 +9,7 @@ panic = 'abort'
 members = [
   'collector',
   'db',
-  'eve_api',
-  'eve_sde_parser',
-  'eve_sde_parser2',
+  'eve_data_wrapper',
+  'eve_missions',
   'server',
 ]

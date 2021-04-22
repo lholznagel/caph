@@ -2,7 +2,7 @@ use crate::error::CollectorError;
 use crate::time::previous_30_minute;
 
 use cachem::{ConnectionPool, EmptyMsg, Protocol};
-use caph_eve_online_api::{EveClient, MarketOrder};
+use caph_eve_data_wrapper::{EveDataWrapper, MarketOrder};
 use caph_db::*;
 use chrono::Utc;
 use futures::stream::{FuturesUnordered, StreamExt};
@@ -10,6 +10,7 @@ use metrix_exporter::MetrixSender;
 use std::time::Instant;
 
 pub struct Market {
+    eve:    EveDataWrapper,
     metrix: MetrixSender,
     pool: ConnectionPool,
 }
@@ -28,8 +29,9 @@ impl Market {
     const METRIC_COUNT_MARKET_INFO:   &'static str = "market::count::market_info";
     const METRIC_COUNT_MARKET_DATA:   &'static str = "market::count::market_data";
 
-    pub fn new(metrix: MetrixSender, pool: ConnectionPool) -> Self {
+    pub fn new(eve: EveDataWrapper, metrix: MetrixSender, pool: ConnectionPool) -> Self {
         Self {
+            eve,
             metrix,
             pool
         }
@@ -39,17 +41,21 @@ impl Market {
         let start = Instant::now();
         let timer = Instant::now();
 
+        log::info!("Loading eve services");
+        let market_service = self.eve.market().await?;
+        let system_service = self.eve.systems().await?;
+        log::info!("Services loaded");
+
         let timestamp = previous_30_minute(Utc::now().timestamp() as u64) * 1_000;
-        let eve_client = EveClient::default();
 
         let mut requests = FuturesUnordered::new();
-        let regions = eve_client.fetch_regions().await.unwrap();
+        let regions = system_service.region_ids();
 
         self.metrix.send_time(Self::METRIC_FETCHED_REGION, timer).await;
         let timer = Instant::now();
 
         for region in regions {
-            requests.push(eve_client.fetch_market_orders(region.into()));
+            requests.push(market_service.orders(*region));
         }
 
         let mut results = Vec::new();

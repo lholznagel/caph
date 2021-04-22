@@ -26,7 +26,8 @@
       >
 
         <template v-slot:item.type_id="{ item }">
-          <c-item-icon :id="Number(item.type_id)" />
+          <c-item-icon :id="Number(item.type_id)" :type="'bp'"  v-if="item.quantity !== -2" />
+          <c-item-icon :id="Number(item.type_id)" :type="'bpc'" v-if="item.quantity === -2" />
         </template>
 
         <template v-slot:item.runs="{ item }">
