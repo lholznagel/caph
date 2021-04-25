@@ -20,8 +20,8 @@ const routes: RouteConfig[] = [
   },
   {
     path: '/blueprint/:id/:itemId?',
-    name: 'BlueprintInfo',
-    component: () => import( /* webpackChunkName: "blueprint_info" */ '../views/BlueprintInfo.vue')
+    name: 'Blueprint',
+    component: () => import( /* webpackChunkName: "blueprint" */ '../views/Blueprint.vue')
   },
   {
     path: '/my/assets',
@@ -32,11 +32,6 @@ const routes: RouteConfig[] = [
     path: '/my/blueprints',
     name: 'CharacterBlueprints',
     component: () => import(/* webpackChunkName: "character_blueprints" */ '../views/CharacterBlueprints.vue')
-  },
-  {
-    path: '/missions',
-    name: 'Missions',
-    component: () => import(/* webpackChunkName: "missions" */ '../views/Missions.vue')
   }
 ];
 

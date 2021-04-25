@@ -23,9 +23,10 @@ pub use self::service::*;
 
 use chrono::{NaiveDateTime, NaiveTime, Utc};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use std::{io::Cursor, time::Duration};
+use std::path::Path;
 use std::sync::Arc;
 use std::{collections::HashMap, io::Read};
+use std::{fs, io::Cursor, time::Duration};
 use tokio::sync::RwLock;
 use zip::ZipArchive;
 
@@ -71,26 +72,24 @@ pub struct EveDataWrapper {
 }
 
 impl EveDataWrapper {
-    const ZIP_URL: &'static str = "https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/sde.zip";
+    const ZIP_URL:  &'static str = "https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/sde.zip";
+    const ZIP_PATH: &'static str = "./sde.zip";
 
     /// Creates a new service loader instance.
     ///
     /// Downloads the zip archive from eve.
     pub async fn new() -> Result<Self, EveConnectError> {
-        let zip = reqwest::get(Self::ZIP_URL)
-            .await?
-            .bytes()
-            .await
-            .map(|x| x.to_vec())
-            .map(Cursor::new)?;
+        let zip = if Path::new(Self::ZIP_PATH).exists() {
+            fs::read("./sde.zip").map(Cursor::new)?
+        } else {
+            Self::download_zip().await?
+        };
+
         let x = Self {
             eve_client: EveClient::new()?,
             services:   Arc::new(RwLock::new(HashMap::new())),
             zip:        ZipArchive::new(zip)?,
         };
-
-        // Preload
-        x.get(ServiceGroupName::Types).await?;
 
         Ok(x)
     }
@@ -100,23 +99,23 @@ impl EveDataWrapper {
     ///
     /// Eve´s downtime is at 14:00, so giving them 30 minutes should be ok.
     pub async fn task() {
-        // Current timestamp
-        let timestamp = Utc::now().timestamp();
-        // Create a naive date time and add one day to it
-        let date_time = NaiveDateTime::from_timestamp(timestamp as i64, 0);
-        let date_time = date_time.checked_add_signed(chrono::Duration::days(1)).unwrap();
+        loop {
+            if Path::new(Self::ZIP_PATH).exists() {
+                let _ = fs::remove_file(Self::ZIP_PATH);
+            }
 
-        // Creates a new naive date time based on the date time that is one day
-        // ahead. We take the date and set the hms to 14:30:00.
-        let next = NaiveDateTime::new(
-            date_time.date(),
-            NaiveTime::from_hms(14, 30, 0)
-        )
-        .timestamp();
 
-        // Execute at exactly 14:30
-        let diff = next - timestamp;
-        Duration::from_secs(diff as u64);
+        }
+    }
+
+    async fn download_zip() -> Result<Cursor<Vec<u8>>, EveConnectError> {
+        reqwest::get(Self::ZIP_URL)
+            .await?
+            .bytes()
+            .await
+            .map(|x| x.to_vec())
+            .map(Cursor::new)
+            .map_err(Into::into)
     }
 
     service_loader_gen!(blueprints, Blueprints, BlueprintService);
@@ -149,6 +148,28 @@ impl EveDataWrapper {
 
             Ok(service)
         }
+    }
+
+    /// Generates a duration to the next cycle for downloading and parsing the
+    /// sde zip file
+    fn next_sde_cycle(&self) -> Duration {
+        // Current timestamp
+        let timestamp = Utc::now().timestamp();
+        // Create a naive date time and add one day to it
+        let date_time = NaiveDateTime::from_timestamp(timestamp as i64, 0);
+        let date_time = date_time.checked_add_signed(chrono::Duration::days(1)).unwrap();
+
+        // Creates a new naive date time based on the date time that is one day
+        // ahead. We take the date and set the hms to 14:30:00.
+        let next = NaiveDateTime::new(
+            date_time.date(),
+            NaiveTime::from_hms(14, 30, 0)
+        )
+        .timestamp();
+
+        // Execute at exactly 14:30
+        let diff = next - timestamp;
+        Duration::from_secs(diff as u64)
     }
 }
 

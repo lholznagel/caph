@@ -10,6 +10,5 @@ members = [
   'collector',
   'db',
   'eve_data_wrapper',
-  'eve_missions',
   'server',
 ]

@@ -7,7 +7,7 @@
 
       <v-row dense>
         <v-col cols="3">
-          <v-card elevation="5" style="height: 100%" v-if="$route.params.itemId">
+          <v-card elevation="5" style="height: 100%">
             <v-card-title>Blueprint Info</v-card-title>
             <c-blueprint-info
               :blueprint-id="Number($route.params.id)"
@@ -39,7 +39,7 @@
 import { Component, Vue } from 'vue-property-decorator';
 
 @Component
-export default class BlueprintInfo extends Vue {
+export default class Blueprint extends Vue {
 }
 
 </script>

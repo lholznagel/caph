@@ -8,7 +8,7 @@
 
     <div v-if="!busy">
       <c-item-icon
-        v-if="blueprint.quantity !== -2"
+        v-if="!blueprint.quantity || blueprint.quantity !== -2"
         :id="Number(blueprint.type_id)"
         :type="'bp'"
         :max-height="Number(128)"
@@ -31,15 +31,15 @@
               <th>Type</th>
               <td>{{ blueprint.quantity === -2 ? 'Copy' : 'Original' }}</td>
             </tr>
-            <tr>
+            <tr v-if="blueprint.material_efficiency">
               <th>Material efficiency</th>
               <td>{{ blueprint.material_efficiency }}</td>
             </tr>
-            <tr>
+            <tr v-if="blueprint.time_efficiency">
               <th>Time efficiency</th>
               <td>{{ blueprint.time_efficiency }}</td>
             </tr>
-            <tr>
+            <tr v-if="blueprint.runs">
               <th>Runs</th>
               <td>{{ blueprint.runs === -1 ? '∞' : blueprint.runs }}</td>
             </tr>
@@ -69,9 +69,16 @@ export default class BlueprintItemInfo extends Vue {
   public async created() {
     this.busy = true;
 
-    this.blueprint = (await axios.get(`/api/character/blueprints`))
-      .data
-      .find((x: IBlueprint) => x.item_id === Number(this.$route.params.itemId));
+    if (this.itemId) {
+      this.blueprint = (await axios.get(`/api/character/blueprints`))
+        .data
+        .find((x: IBlueprint) => x.item_id === Number(this.itemId));
+    } else {
+      const item = (await axios.get(`/api/items/${this.blueprintId}`)).data;
+      // FIXME: Fix in server to return type_id
+      this.blueprint = item;
+      this.blueprint.type_id = item.item_id;
+    }
 
     this.busy = false;
   }

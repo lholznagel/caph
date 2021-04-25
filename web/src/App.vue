@@ -27,12 +27,6 @@
             <v-list-item-title>Market</v-list-item-title>
           </v-list-item-content>
         </v-list-item>
-
-        <v-list-item to="/missions">
-          <v-list-item-content>
-            <v-list-item-title>Missions</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
       </v-list>
     </v-navigation-drawer>
 

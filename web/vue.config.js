@@ -5,6 +5,7 @@ module.exports = {
   devServer: {
     hot: false,
     liveReload: false,
+    inline: false,
     port: 1337,
     disableHostCheck: true,
     proxy: {

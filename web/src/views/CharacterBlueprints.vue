@@ -44,7 +44,7 @@
 
         <template v-slot:item.blueprint_info="{ item }">
           <v-btn
-            :to="{ name: 'BlueprintInfo', params: { id: item.type_id, itemId: item.item_id } }"
+            :to="{ name: 'Blueprint', params: { id: item.type_id, itemId: item.item_id } }"
             color="primary"
             icon
           >

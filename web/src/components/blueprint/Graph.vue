@@ -13,7 +13,7 @@
       v-if="!busy"
     >
       <template v-slot:prepend="{ item }">
-        <c-item-icon  :id="Number(item.item_id)" />
+        <c-item-icon :id="Number(item.item_id)" />
       </template>
 
       <template v-slot:label="{ item }">
@@ -36,6 +36,7 @@ export default class BlueprintGraph extends Vue {
   public blueprintId!: number;
 
   public busy            = false;
+  public search: string  = '';
   public graph: IGraph[] = [];
 
   public async created() {

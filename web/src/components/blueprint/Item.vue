@@ -10,7 +10,7 @@
       <template v-slot:default>
         <tbody>
           <tr v-for="item in reqResources" :key="item.itemId">
-            <td style="width: 32px"><c-item-icon  :id="Number(item.itemId)" /></td>
+            <td style="width: 32px"><c-item-icon :id="Number(item.itemId)" /></td>
             <td><c-name-by-id :id="Number(item.itemId)" /></td>
             <td><c-format-number :value="Number(item.quantity)" /></td>
           </tr>
@@ -31,7 +31,7 @@ export default class BlueprintItemInfo extends Vue {
   @Prop(Number)
   public blueprintId!: number;
 
-  public busy: boolean               = false;
+  public busy: boolean                = false;
   public reqResources: IReqResource[] = [];
 
   public async created() {
