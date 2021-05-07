@@ -1,0 +1,11 @@
+[package]
+name = "cargo_market_analyzer"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+cachem = { path = "../../cachem/cachem", features = ["derive"] }
+caph_db = { path = "../db" }
+chrono = "0.4.19"
+metrix_exporter = { path = "../../metrix/exporter" }
+tokio = { version = "1.5.0", features = ["full"] }

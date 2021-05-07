@@ -1,6 +1,6 @@
 use super::MarketOrderCache;
 
-use crate::Actions;
+use crate::{Actions, FetchMarketOrderInfoBulkReq};
 
 use async_trait::async_trait;
 use cachem::{Fetch, Parse, request};
@@ -22,7 +22,7 @@ impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
 
         // Get all item entries that are newer than the given start timestamp
         let historic = self
-            .history
+            .cache
             .read()
             .await;
 
@@ -47,9 +47,17 @@ impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
 
         // Get a list of all order ids and make sure that every id only exist once
         // This is needed to detect missing entries
-        let mut unqiue_order_ids = items.iter().map(|x| x.order_id).collect::<Vec<_>>();
-        unqiue_order_ids.sort();
-        unqiue_order_ids.dedup();
+        let mut unique_order_ids = items.iter().map(|x| x.order_id).collect::<Vec<_>>();
+        unique_order_ids.sort();
+        unique_order_ids.dedup();
+
+        // Collect the expire date for all orders
+        let order_id_expire = self.market_info
+            .fetch(FetchMarketOrderInfoBulkReq(unique_order_ids.clone()))
+            .await.0
+            .iter()
+            .map(|x| (x.order_id, x.expire))
+            .collect::<HashMap<_, _>>();
 
         // Stores all already seen values.
         // Used to fill up missing values
@@ -71,14 +79,14 @@ impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
 
             // If the list of items is smaller than the list of unique order ids
             // we need to search which are missing and fill them in
-            if items_filter.len() < unqiue_order_ids.len() {
+            if items_filter.len() < unique_order_ids.len() {
                 // Filter all order ids that we already have
                 let item_orders = items_filter
                     .iter()
                     .map(|(order, _)| *order)
                     .collect::<Vec<_>>();
                 // Find out what order ids are missing
-                let missing = unqiue_order_ids
+                let missing = unique_order_ids
                     .iter()
                     .filter(|x| !item_orders.contains(x))
                     .collect::<Vec<_>>();
@@ -91,7 +99,7 @@ impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
                     } else {
                         // We don´t have an old value, so we look in the history
                         // if there is an older entry
-                        let items = self.history
+                        let items = self.cache
                             .read()
                             .await;
                         let mut items = items
@@ -100,12 +108,13 @@ impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
                             .get(order_id)
                             .unwrap()
                             .into_iter()
-                            //.filter(|x| x.order_id == *order_id)
                             .filter(|x| x.timestamp < ts_current)
                             .collect::<Vec<_>>();
                         if items.len() > 0 {
                             // Sort the items by timestamp
-                            items.sort_by(|a, b| b.timestamp.partial_cmp(&a.timestamp).unwrap_or(std::cmp::Ordering::Equal));
+                            items.sort_by(|a, b| 
+                                          b.timestamp.partial_cmp(&a.timestamp)
+                                                    .unwrap_or(std::cmp::Ordering::Equal));
                             // Take the first item and return its volume
                             // We check if the result has more than 0 elements
                             // so the unwrap is save
@@ -117,16 +126,24 @@ impl Fetch<FetchMarketOrderReq> for MarketOrderCache {
                         }
                     };
 
-                    // Make sure that we insert the new last value in the map
-                    // for later lookups
-                    last_values.insert(*order_id, volume);
-                    // Push the value into the result
-                    items_filter.push((*order_id, volume));
+                    // Check if the current order is expired, if so, don´t
+                    // add it to the result.
+                    if let Some(x) = order_id_expire.get(order_id) {
+                        if ts_current <= *x {
+                            // Make sure that we insert the new last value in the map
+                            // for later lookups
+                            last_values.insert(*order_id, volume);
+                            // Push the value into the result
+                            items_filter.push((*order_id, volume));
+                        }
+                    }
                 }
             }
+
             // Sort the items by there order id to make sure that those
             // are always in order
-            items_filter.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            items_filter.sort_by(|(a, _), (b, _)| 
+                                 a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
             // Add the items with the current ts into the return map
             ret.insert(ts_current, items_filter);
@@ -186,9 +203,10 @@ pub struct FetchMarketOrderResponseEntries {
 mod tests_fetch_market_orders {
     use super::*;
 
-    use crate::MarketItemOrderId;
+    use crate::{MarketItemOrder, MarketOrderInfoCache, MarketOrderInfoEntry};
 
     use metrix_exporter::MetrixSender;
+    use std::sync::Arc;
     use tokio::sync::RwLock;
 
     // Timeslots that don´t contain a change should be the same as the last known
@@ -198,7 +216,7 @@ mod tests_fetch_market_orders {
         let mut history = HashMap::new();
         let mut orders = HashMap::new();
         orders.insert(0u64, vec![
-            MarketItemOrderId {
+            MarketItemOrder {
                 timestamp: 0 * 1800 * 1000,
                 order_id: 0u64,
                 volume: 100u32,
@@ -206,11 +224,29 @@ mod tests_fetch_market_orders {
         ]);
         history.insert(0u32, orders);
 
+        let order_info = MarketOrderInfoEntry {
+            order_id: 0u64,
+            type_id: 0u32,
+            price: 100f32,
+            issued: 0 * 1800 * 1000,
+            expire: 100 * 1800 * 1000,
+            system_id: 0u32,
+            location_id: 0u64,
+            volume_total: 100,
+            is_buy_order: true
+        };
+        let mut order_map = HashMap::new();
+        order_map.insert(0u64, order_info);
+
         let metrix = MetrixSender::new_test();
+        let market_info = MarketOrderInfoCache {
+            cache:  RwLock::new(order_map),
+            metrix: metrix.clone(),
+        };
         let cache = MarketOrderCache {
-            current: RwLock::new(HashMap::new()),
-            history: RwLock::new(history),
+            cache: RwLock::new(history),
             metrix,
+            market_info: Arc::new(market_info),
         };
 
         let req = FetchMarketOrderReq {
@@ -233,19 +269,19 @@ mod tests_fetch_market_orders {
         let mut history = HashMap::new();
         let mut orders = HashMap::new();
         orders.insert(0u64, vec![
-            MarketItemOrderId {
+            MarketItemOrder {
                 timestamp: 0 * 1800 * 1000,
                 order_id: 0u64,
                 volume: 100u32,
             },
-            MarketItemOrderId {
+            MarketItemOrder {
                 timestamp: 2 * 1800 * 1000,
                 order_id: 0u64,
                 volume: 99u32,
             }
         ]);
         orders.insert(1u64, vec![
-            MarketItemOrderId {
+            MarketItemOrder {
                 timestamp: 0 * 1800 * 1000,
                 order_id: 1u64,
                 volume: 50u32,
@@ -253,11 +289,41 @@ mod tests_fetch_market_orders {
         ]);
         history.insert(0u32, orders);
 
+        let order_info_0 = MarketOrderInfoEntry {
+            order_id: 0u64,
+            type_id: 0u32,
+            price: 100f32,
+            issued: 0 * 1800 * 1000,
+            expire: 100 * 1800 * 1000,
+            system_id: 0u32,
+            location_id: 0u64,
+            volume_total: 100,
+            is_buy_order: true
+        };
+        let order_info_1 = MarketOrderInfoEntry {
+            order_id: 1u64,
+            type_id: 0u32,
+            price: 100f32,
+            issued: 0 * 1800 * 1000,
+            expire: 100 * 1800 * 1000,
+            system_id: 0u32,
+            location_id: 0u64,
+            volume_total: 100,
+            is_buy_order: true
+        };
+        let mut order_map = HashMap::new();
+        order_map.insert(0u64, order_info_0);
+        order_map.insert(1u64, order_info_1);
+
         let metrix = MetrixSender::new_test();
+        let market_info = MarketOrderInfoCache {
+            cache:  RwLock::new(order_map),
+            metrix: metrix.clone(),
+        };
         let cache = MarketOrderCache {
-            current: RwLock::new(HashMap::new()),
-            history: RwLock::new(history),
+            cache: RwLock::new(history),
             metrix,
+            market_info: Arc::new(market_info),
         };
 
         let req = FetchMarketOrderReq {
@@ -271,5 +337,137 @@ mod tests_fetch_market_orders {
         for x in res.iter() {
             assert_eq!(x.entries.len(), 2);
         }
+    }
+
+    // Orders that are expired should not be added
+    #[tokio::test]
+    async fn one_value_expired_after_thee_timeslots() {
+        let mut history = HashMap::new();
+        let mut orders = HashMap::new();
+        orders.insert(0u64, vec![
+            MarketItemOrder {
+                timestamp: 0 * 1800 * 1000,
+                order_id: 0u64,
+                volume: 100u32,
+            }
+        ]);
+        history.insert(0u32, orders);
+
+        let order_info = MarketOrderInfoEntry {
+            order_id: 0u64,
+            type_id: 0u32,
+            price: 100f32,
+            issued: 0 * 1800 * 1000,
+            expire: 3 * 1800 * 1000,
+            system_id: 0u32,
+            location_id: 0u64,
+            volume_total: 100,
+            is_buy_order: true
+        };
+        let mut order_map = HashMap::new();
+        order_map.insert(0u64, order_info);
+
+        let metrix = MetrixSender::new_test();
+        let market_info = MarketOrderInfoCache {
+            cache:  RwLock::new(order_map),
+            metrix: metrix.clone(),
+        };
+        let cache = MarketOrderCache {
+            cache: RwLock::new(history),
+            metrix,
+            market_info: Arc::new(market_info),
+        };
+
+        let req = FetchMarketOrderReq {
+            item_id: 0u32,
+            ts_start: 0u64,
+            ts_stop: 4 * 1800 * 1000,
+        };
+
+        let res = cache.fetch(req).await.0;
+        assert_eq!(res.len(), 5);
+        for x in res.iter().take(4) {
+            assert_eq!(x.entries.len(), 1);
+        }
+        assert_eq!(res.iter().last().unwrap().entries.len(), 0);
+    }
+
+    // Takes the same timestamp for start and stop.
+    // It is expected that all active orders for the given item are returned.
+    #[tokio::test]
+    async fn live_value() {
+        let mut history = HashMap::new();
+        let mut orders = HashMap::new();
+        orders.insert(0u64, vec![
+            MarketItemOrder {
+                timestamp: 0 * 1800 * 1000,
+                order_id: 0u64,
+                volume: 100u32,
+            },
+            MarketItemOrder {
+                timestamp: 2 * 1800 * 1000,
+                order_id: 0u64,
+                volume: 99u32,
+            }
+        ]);
+        orders.insert(1u64, vec![
+            MarketItemOrder {
+                timestamp: 1 * 1800 * 1000,
+                order_id: 1u64,
+                volume: 50u32,
+            }
+        ]);
+        history.insert(0u32, orders);
+
+        let order_info_0 = MarketOrderInfoEntry {
+            order_id: 0u64,
+            type_id: 0u32,
+            price: 100f32,
+            issued: 0 * 1800 * 1000,
+            expire: 100 * 1800 * 1000,
+            system_id: 0u32,
+            location_id: 0u64,
+            volume_total: 100,
+            is_buy_order: true
+        };
+        let order_info_1 = MarketOrderInfoEntry {
+            order_id: 1u64,
+            type_id: 0u32,
+            price: 100f32,
+            issued: 0 * 1800 * 1000,
+            expire: 100 * 1800 * 1000,
+            system_id: 0u32,
+            location_id: 0u64,
+            volume_total: 100,
+            is_buy_order: true
+        };
+        let mut order_map = HashMap::new();
+        order_map.insert(0u64, order_info_0);
+        order_map.insert(1u64, order_info_1);
+
+        let metrix = MetrixSender::new_test();
+        let market_info = MarketOrderInfoCache {
+            cache:  RwLock::new(order_map),
+            metrix: metrix.clone(),
+        };
+        let cache = MarketOrderCache {
+            cache: RwLock::new(history),
+            metrix,
+            market_info: Arc::new(market_info),
+        };
+
+        let req = FetchMarketOrderReq {
+            item_id: 0u32,
+            ts_start: 3 * 1800 * 1000,
+            ts_stop: 3 * 1800 * 1000,
+        };
+
+        let res = cache.fetch(req).await.0;
+        assert_eq!(res.len(), 1);
+        for x in res.iter() {
+            assert_eq!(x.entries.len(), 2);
+        }
+        assert_eq!(res.get(0).unwrap().entries.get(0).unwrap().volume, 99);
+        assert_eq!(res.get(0).unwrap().entries.get(1).unwrap().volume, 50);
     }
 }

@@ -15,3 +15,6 @@ log = "0.4.14"
 metrix_exporter = { path = "../../metrix/exporter" }
 morgan = { git = "https://github.com/lholznagel/morgan.git", rev = "624526038c210b142d2835fa77965064771ac192" }
 tokio = { version = "1.2.0", features = ["full"] }
+
+# remove
+serde_json = "1.0.64"

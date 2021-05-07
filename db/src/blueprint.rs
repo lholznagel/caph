@@ -29,21 +29,27 @@ impl BlueprintCache {
 
 #[derive(Clone, Debug, PartialEq, Parse)]
 pub struct BlueprintEntry {
+    pub activity:  Activity,
     pub item_id:   u32,
     pub time:      u32,
     pub materials: Vec<Material>,
+    pub skills:    Vec<Skill>,
 }
 
 impl BlueprintEntry {
     pub fn new(
-        item_id: u32,
-        time: u32,
+        activity:  Activity,
+        item_id:   u32,
+        time:      u32,
         materials: Vec<Material>,
+        skills:    Vec<Skill>,
     ) -> Self {
         Self {
+            activity,
             item_id,
             time,
             materials,
+            skills,
         }
     }
 }
@@ -67,4 +73,29 @@ impl Material {
             is_product,
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Parse)]
+pub struct Skill {
+    pub level:   u8,
+    pub type_id: u32,
+}
+
+impl Skill {
+    pub fn new(
+        level:   u8,
+        type_id: u32,
+    ) -> Self {
+        Self {
+            level,
+            type_id,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Parse)]
+pub enum Activity {
+    Manufacturing,
+    Reaction,
+    PlanetInteraction,
 }

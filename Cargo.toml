@@ -10,5 +10,6 @@ members = [
   'collector',
   'db',
   'eve_data_wrapper',
+  'market_analyzer',
   'server',
 ]

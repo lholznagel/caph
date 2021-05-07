@@ -1,4 +1,4 @@
-use crate::MarketItemOrderId;
+use crate::MarketItemOrder;
 
 use super::{MarketOrderCache, MarketOrderSaveEntry};
 
@@ -30,13 +30,13 @@ impl Storage for MarketOrderCache {
                 for x in entry.entries {
                     orders
                         .entry(x.order_id)
-                        .and_modify(|y: &mut Vec<MarketItemOrderId>| y.push(x.clone()))
+                        .and_modify(|y: &mut Vec<MarketItemOrder>| y.push(x.clone()))
                         .or_insert(vec![x]);
                 }
                 map.insert(entry.item_id, orders);
             }
 
-            *self.history.write().await = map;
+            *self.cache.write().await = map;
         }
 
         self.metrix.send_time(METRIC_STORAGE_LOAD, timer).await;
@@ -47,10 +47,10 @@ impl Storage for MarketOrderCache {
         where B: AsyncWrite + Send + Unpin {
 
         let timer = Instant::now();
-        let data_copy = self.history.read().await;
+        let data_copy = self.cache.read().await;
 
         let mut save_entries = Vec::with_capacity(data_copy.len());
-        for (item, history) in self.history.read().await.iter() {
+        for (item, history) in self.cache.read().await.iter() {
             let mut values = Vec::new();
             for (_, e) in history {
                 values.extend(e.clone());

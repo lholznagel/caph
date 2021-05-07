@@ -2,7 +2,7 @@ use crate::error::EveServerError;
 use crate::ItemService;
 
 use cachem::{ConnectionPool, Protocol};
-use caph_db::{FetchLatestMarketOrderRes, FetchLatestMarketOrdersReq, FetchMarketOrderInfoBulkReq, FetchMarketOrderInfoResBulk, FetchMarketOrderItemIdsReq, FetchMarketOrderItemIdsRes, FetchMarketOrderReq, FetchMarketOrderRes, FetchSystemRegionReq, FetchSystemRegionRes};
+use caph_db::{FetchMarketOrderInfoBulkReq, FetchMarketOrderInfoResBulk, FetchMarketOrderItemIdsReq, FetchMarketOrderItemIdsRes, FetchMarketOrderReq, FetchMarketOrderRes, FetchSystemRegionReq, FetchSystemRegionRes};
 use chrono::{NaiveDateTime, NaiveTime, Timelike};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -44,14 +44,14 @@ pub enum Sort {
 
 #[derive(Clone)]
 pub struct MarketService {
-    pool:           ConnectionPool,
-    item_service:   ItemService,
+    pool:         ConnectionPool,
+    item_service: ItemService,
 }
 
 impl MarketService {
     pub fn new(
-        pool:            ConnectionPool,
-        item_service:    ItemService,
+        pool:         ConnectionPool,
+        item_service: ItemService,
     ) -> Self {
         Self {
             pool,
@@ -76,24 +76,29 @@ impl MarketService {
 
     pub async fn top_orders(
         &self,
-        item_id:u32,
+        item_id: u32,
         req: TopOrderReq,
     ) -> Result<Vec<TopOrder>, EveServerError> {
         let mut conn = self.pool.acquire().await?;
 
-        let market_data = Protocol::request::<_, FetchLatestMarketOrderRes>(
+        let ts = chrono::Utc::now().timestamp() as u64 * 1_000;
+        let market_data = Protocol::request::<_, FetchMarketOrderRes>(
             &mut conn,
-            FetchLatestMarketOrdersReq(item_id)
-        )
+            FetchMarketOrderReq {
+                item_id,
+                ts_start: ts,
+                ts_stop:  ts,
+            })
         .await
-        .map(|x| {
-            match x {
-                FetchLatestMarketOrderRes::Ok(x) => x,
-                _ => Vec::new()
-            }
-        })?;
+        .map(|x| x.0)?;
 
-        let order_ids = market_data.iter().map(|x| x.order_id).collect::<Vec<_>>();
+        let order_ids = market_data
+            .get(0)
+            .unwrap()
+            .entries
+            .iter()
+            .map(|x| x.order_id)
+            .collect::<Vec<_>>();
         let market_infos = Protocol::request::<_, FetchMarketOrderInfoResBulk>(
             &mut conn,
             FetchMarketOrderInfoBulkReq(order_ids)
@@ -147,15 +152,21 @@ impl MarketService {
                 }
             })?;
 
-            let data = market_data.iter().find(|x| x.order_id == x.order_id).unwrap();
+            let data = market_data
+                .get(0)
+                .unwrap()
+                .entries
+                .iter()
+                .find(|x| x.order_id == x.order_id)
+                .unwrap();
             let order = TopOrder {
                 price: x.price,
                 region_id: system_region.region_id,
                 order_id: x.order_id,
                 security: system_region.security,
                 system_id: x.system_id,
-                timestamp: data.timestamp,
-                volume_remain: data.volume_remain,
+                timestamp: market_data.get(0).unwrap().timestamp,
+                volume_remain: data.volume,
             };
             ret.push(order);
         }
@@ -270,85 +281,6 @@ impl MarketService {
         Ok(ret)
     }
 
-    /*pub async fn all(&self, filter: MarketFilter) -> Result<Vec<Market>, EveServerError> {
-        let mut query = Vec::new();
-        query.push(r#"
-        SELECT DISTINCT market_current.order_id, market_orders.location_id, market_orders.type_id, market_orders.system_id, market_orders.is_buy_order, market_orders.price, market_current.volume_remain, stations.security, stations.region_id
-        FROM market_orders
-        JOIN stations
-        ON market_orders.system_id = stations.system_id
-        JOIN market_current
-        ON market_current.order_id = market_orders.order_id
-        "#);
-
-        let mut filters = Vec::new();
-        if let Some(x) = filter.max_security {
-            filters.push(format!("security >= {}", x));
-        }
-
-        if let Some(true) = filter.only_buy_orders {
-            filters.push("is_buy_order = true".into());
-        } else if let Some(true) = filter.only_sell_orders {
-            filters.push("is_buy_order = false".into());
-        }
-
-        if let Some(x) = filter.ids {
-            filters.push(format!("type_id = ANY(ARRAY{:?})", x));
-        }
-
-        if let Some(x) = filter.location_ids {
-            filters.push(format!("location_id = ANY(ARRAY{:?})", x));
-        }
-
-        if let Some(x) = filter.system_ids {
-            filters.push(format!("location_id = ANY(ARRAY{:?})", x));
-        }
-
-        let combined_filter = filters.join(" AND ");
-        if !filters.is_empty() {
-            query.push("WHERE".into());
-            query.push(&combined_filter);
-        }
-
-        let mut limits = Vec::new();
-        if let Some(x) = filter.sort_price {
-            limits.push(format!("ORDER BY price {:?}", x));
-        }
-
-        if let Some(x) = filter.max_items {
-            limits.push(format!("LIMIT {}", x));
-        }
-
-        let limiter = limits.join(" ");
-        if !limits.is_empty() {
-            query.push(&limiter);
-        }
-
-        let query = query.join(" ");
-        let mut conn = self.db.acquire().await.unwrap();
-        sqlx::query_as::<_, Market>(&query)
-            .fetch_all(&mut conn)
-            .await
-            .map_err(|x| x.into())
-    }*/
-
-    /*pub async fn fetch_by_item_id(&self, item_id: u32) -> Result<Vec<Market>, EveServerError> {
-        let mut conn = self.db.acquire().await.unwrap();
-        sqlx::query_as::<_, Market>(r#"SELECT market_history.volume_remain, market_history.timestamp, market_history.order_id,
-                market_orders.price, market_orders.is_buy_order, stations.region_id, stations.system_id, stations.security
-            FROM market_history
-            JOIN market_orders
-                ON market_history.order_id = market_orders.order_id
-            JOIN stations
-                ON market_orders.system_id = stations.system_id
-            WHERE market_orders.type_id = $1
-            ORDER BY price DESC"#)
-            .bind(item_id as i32)
-            .fetch_all(&mut conn)
-            .await
-            .map_err(|x| x.into())
-    }*/
-
     pub async fn stats(
         &self,
         item_id: u32,
@@ -356,24 +288,24 @@ impl MarketService {
     ) -> Result<MarketStats, EveServerError> {
         let mut conn = self.pool.acquire().await?;
 
-        let market_data = Protocol::request::<_, FetchLatestMarketOrderRes>(
+        let ts = chrono::Utc::now().timestamp() as u64 * 1_000;
+        let market_data = Protocol::request::<_, FetchMarketOrderRes>(
             &mut conn,
-            FetchLatestMarketOrdersReq(item_id)
-        )
-        .await?;
-        let market_data = if let FetchLatestMarketOrderRes::Ok(x) = market_data {
-            x
-        } else {
-            return Ok(MarketStats {
-                average_price: 0f32,
-                highest_price: 0f32,
-                lowest_price: 0f32,
-                order_count: 0u32,
-                total_volume: 0u64,
+            FetchMarketOrderReq {
+                item_id,
+                ts_start: ts,
+                ts_stop:  ts,
             })
-        };
+            .await
+            .map(|x| x.0)?;
 
-        let order_ids = market_data.iter().map(|x| x.order_id).collect::<Vec<_>>();
+        let order_ids = market_data
+            .get(0)
+            .unwrap()
+            .entries
+            .iter()
+            .map(|x| x.order_id)
+            .collect::<Vec<_>>();
         let market_infos = Protocol::request::<_, FetchMarketOrderInfoResBulk>(
             &mut conn,
             FetchMarketOrderInfoBulkReq(order_ids)
@@ -412,15 +344,18 @@ impl MarketService {
         let order_count = market_infos
             .iter()
             .count() as u32;
-        
+
         let order_ids_filtered = market_infos
             .iter()
             .map(|x| x.order_id)
             .collect::<Vec<_>>();
         let total_volume = market_data
+            .get(0)
+            .unwrap()
+            .entries
             .iter()
             .filter(|x| order_ids_filtered.contains(&x.order_id))
-            .map(|x| x.volume_remain as u64)
+            .map(|x| x.volume as u64)
             .sum();
 
         Ok(MarketStats {

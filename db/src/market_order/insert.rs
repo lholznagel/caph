@@ -1,4 +1,4 @@
-use super::{MarketOrderCache, MarketOrderEntry, MarketItemOrderId};
+use super::{MarketOrderCache, MarketOrderEntry, MarketItemOrder};
 
 use crate::Actions;
 
@@ -8,7 +8,6 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 const METRIC_INSERT:         &'static str = "insert::market_order::current::complete";
-const METRIC_INSERT_ENTRIES: &'static str = "insert::market_order::current::entries";
 
 #[async_trait]
 impl Insert<InsertMarketOrderReq> for MarketOrderCache {
@@ -16,19 +15,18 @@ impl Insert<InsertMarketOrderReq> for MarketOrderCache {
 
     async fn insert(&self, input: InsertMarketOrderReq) -> Self::Response {
         let timer = Instant::now();
-        let mut current = HashMap::new();
 
         for entry in input.0 {
             self
-                .history
+                .cache
                 .write()
                 .await
-                .entry(entry.item_id)
+                .entry(entry.type_id)
                 .and_modify(|x| {
                     if let Some(y) = x.get_mut(&entry.order_id) {
                         if y.last().unwrap().volume != entry.volume_remain {
                             y.push(
-                                MarketItemOrderId {
+                                MarketItemOrder {
                                     timestamp: entry.timestamp,
                                     order_id: entry.order_id,
                                     volume: entry.volume_remain,
@@ -39,7 +37,7 @@ impl Insert<InsertMarketOrderReq> for MarketOrderCache {
                         x.insert(
                             entry.order_id,
                             vec![
-                                MarketItemOrderId {
+                                MarketItemOrder {
                                     timestamp: entry.timestamp,
                                     order_id: entry.order_id,
                                     volume: entry.volume_remain,
@@ -53,7 +51,7 @@ impl Insert<InsertMarketOrderReq> for MarketOrderCache {
                     map.insert(
                         entry.order_id,
                         vec![
-                            MarketItemOrderId {
+                            MarketItemOrder {
                                 timestamp: entry.timestamp,
                                 order_id: entry.order_id,
                                 volume: entry.volume_remain,
@@ -62,15 +60,8 @@ impl Insert<InsertMarketOrderReq> for MarketOrderCache {
                     );
                     map
                 });
-
-            current
-                .entry(entry.item_id)
-                .and_modify(|x: &mut Vec<MarketOrderEntry>| x.push(entry))
-                .or_insert(vec![entry]);
         }
 
-        self.metrix.send_len(METRIC_INSERT_ENTRIES, current.len()).await;
-        *self.current.write().await = current;
         self.save_to_file().await.unwrap();
 
         self.metrix

@@ -1,36 +1,39 @@
 mod fetch;
 mod fetch_item_ids;
-mod fetch_latest;
+mod fetch_raw;
 mod insert;
 mod storage;
 
+use crate::MarketOrderInfoCache;
+
 pub use self::fetch::*;
 pub use self::fetch_item_ids::*;
-pub use self::fetch_latest::*;
+pub use self::fetch_raw::*;
 pub use self::insert::*;
 pub use self::storage::*;
 
 use cachem::Parse;
 use metrix_exporter::MetrixSender;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::RwLock;
 
 type ItemId  = u32;
 type OrderId = u64;
 
 pub struct MarketOrderCache {
-    current: RwLock<HashMap<ItemId, Vec<MarketOrderEntry>>>,
-    history: RwLock<HashMap<ItemId, HashMap<OrderId, Vec<MarketItemOrderId>>>>,
+    cache: RwLock<HashMap<ItemId, HashMap<OrderId, Vec<MarketItemOrder>>>>,
+    market_info: Arc<MarketOrderInfoCache>,
     metrix: MetrixSender,
 }
 
 impl MarketOrderCache {
     pub const CAPACITY: usize = 1_000_000;
 
-    pub fn new(metrix: MetrixSender) -> Self {
+    pub fn new(metrix: MetrixSender, market_info: Arc<MarketOrderInfoCache>) -> Self {
         Self {
-            current: RwLock::new(HashMap::new()),
-            history: RwLock::new(HashMap::new()),
+            cache: RwLock::new(HashMap::new()),
+            market_info,
             metrix,
         }
     }
@@ -42,33 +45,17 @@ pub struct MarketOrderEntry {
     pub order_id:      u64,
     pub timestamp:     u64,
     pub volume_remain: u32,
-    pub item_id:       u32,
-}
-
-impl MarketOrderEntry {
-    pub fn new(
-        order_id: u64,
-        timestamp: u64,
-        volume_remain: u32,
-        item_id: u32,
-    ) -> Self {
-        Self {
-            order_id,
-            timestamp,
-            volume_remain,
-            item_id,
-        }
-    }
+    pub type_id:       u32,
 }
 
 #[derive(Debug, Parse)]
 pub struct MarketOrderSaveEntry {
     pub item_id: u32,
-    pub entries: Vec<MarketItemOrderId>,
+    pub entries: Vec<MarketItemOrder>,
 }
 
 #[derive(Clone, Debug, Parse, PartialEq)]
-pub struct MarketItemOrderId {
+pub struct MarketItemOrder {
     pub timestamp: u64,
     pub order_id: u64,
     pub volume: u32,

@@ -34,5 +34,10 @@ deploy:
 	make deploy-server
 	make deploy-web
 
+stop:
+	sudo systemctl stop caph_server
+	sudo systemctl stop caph_collector
+	sudo systemctl stop caph_db
+
 sync-virgo:
 	rsync --recursive --inplace --delete --quiet --exclude={'.git','target','web/node_modules'} . virgo:dev/caph

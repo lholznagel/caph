@@ -2,7 +2,7 @@ use crate::error::CollectorError;
 
 use cachem::{ConnectionPool, EmptyMsg, Protocol};
 use caph_db::*;
-use caph_eve_data_wrapper::{EveDataWrapper, SolarsystemEntry};
+use caph_eve_data_wrapper::{BlueprintAdditional, EveDataWrapper, SolarsystemEntry};
 use metrix_exporter::MetrixSender;
 use std::time::Instant;
 
@@ -215,26 +215,47 @@ impl Sde {
         // Collect all blueprints
         let mut entries = Vec::new();
         for (id, blueprint) in blueprint_service.blueprints() {
+            let mut activity  = Activity::Manufacturing;
+
+            let activity_info = if let Some(x) = blueprint.activities.manufacturing.clone() {
+                x
+            } else if let Some(x) = blueprint.activities.reaction.clone() {
+                activity = Activity::Reaction;
+                x
+            } else {
+                log::error!("Unknown blueprint activity {:?}", blueprint.activities);
+                BlueprintAdditional {
+                    materials: None,
+                    products:  None,
+                    skills:    None,
+                    time:      0,
+                }
+            };
+
+            let time      = activity_info.time;
             let mut materials = Vec::new();
+            let mut skills    = Vec::new();
 
-            let mut time = 0;
-            for x in blueprint.activities.manufacturing.clone() {
-                time = x.time;
-                for material in x.materials.unwrap_or_default() {
-                    let material_id = material.type_id;
-                    let quantity = material.quantity;
-                    let material = Material::new(material_id.0, quantity, false);
-                    materials.push(material);
-                }
-
-                for product in x.products.unwrap_or_default() {
-                    let material_id = product.type_id;
-                    let quantity = product.quantity;
-                    materials.push(Material::new(material_id.0, quantity, true));
-                }
+            for material in activity_info.materials.unwrap_or_default() {
+                let material_id = material.type_id;
+                let quantity = material.quantity;
+                let material = Material::new(material_id.0, quantity, false);
+                materials.push(material);
             }
 
-            entries.push(BlueprintEntry::new(id.0, time, materials));
+            for product in activity_info.products.unwrap_or_default() {
+                let material_id = product.type_id;
+                let quantity = product.quantity;
+                materials.push(Material::new(material_id.0, quantity, true));
+            }
+
+            for skill in activity_info.skills.unwrap_or_default() {
+                let level = skill.level as u8;
+                let type_id = skill.type_id;
+                skills.push(Skill::new(level, *type_id));
+            }
+
+            entries.push(BlueprintEntry::new(activity, id.0, time, materials, skills));
         }
 
         // Collect all schematics
@@ -249,7 +270,15 @@ impl Sde {
                 materials.push(material);
             }
 
-            entries.push(BlueprintEntry::new(id.0, time, materials));
+            entries.push(
+                BlueprintEntry::new(
+                    Activity::PlanetInteraction,
+                    id.0,
+                    time,
+                    materials,
+                    Vec::new()
+                )
+            );
         }
         self.metrix.send_len(Self::METRIC_BLUEPRINT_COUNT, entries.len()).await;
 

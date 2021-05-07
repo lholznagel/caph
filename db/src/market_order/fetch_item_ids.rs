@@ -17,7 +17,7 @@ impl Fetch<FetchMarketOrderItemIdsReq> for MarketOrderCache {
         let timer = Instant::now();
 
         let ids = self
-            .current
+            .cache
             .read()
             .await
             .iter()

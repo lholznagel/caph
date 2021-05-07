@@ -41,12 +41,29 @@ impl MarketService {
         .await
         .map_err(Into::into)
     }
+
+    pub async fn order_page<T: Into<RegionId>>(
+        self,
+        rid: T,
+        page: u32,
+    ) -> Result<Vec<MarketOrder>, EveConnectError> {
+        self.eve_client
+            .fetch(&format!("markets/{}/orders?page={}", *rid.into(), page))
+            .await
+            .unwrap()
+            .json()
+            .await
+            .map_err(Into::into)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MarketOrder {
+    /// Duration in days
     pub duration:      u32,
+    /// true -> buy, false -> sell
     pub is_buy_order:  bool,
+    /// Date this market order was placed
     pub issued:        String,
     pub location_id:   u64,
     pub min_volume:    u32,

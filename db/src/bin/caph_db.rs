@@ -30,14 +30,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     item_material_cache.load_from_file().await?;
     let item_material_cache = Arc::new(item_material_cache);
 
-    let market_order_cache = MarketOrderCache::new(metrix.get_sender());
-    market_order_cache.load_from_file().await?;
-    let market_order_cache = Arc::new(market_order_cache);
-
     let market_order_info_cache = MarketOrderInfoCache::new(metrix.get_sender());
     market_order_info_cache.load_from_file().await?;
     let market_order_info_cache = Arc::new(market_order_info_cache);
 
+    let market_order_cache = MarketOrderCache::new(
+        metrix.get_sender(),
+        market_order_info_cache.clone()
+    );
+    market_order_cache.load_from_file().await?;
+    let market_order_cache = Arc::new(market_order_cache);
+
+    let market_order_v2_cache = MarketOrderCacheV2::new(
+        market_order_info_cache.clone()
+    );
+    let market_order_v2_cache = Arc::new(market_order_v2_cache);
+
+    let market_order_cache = Arc::new(market_order_cache);
     let system_region_cache = SystemRegionCache::new(metrix.get_sender());
     system_region_cache.load_from_file().await?;
     let system_region_cache = Arc::new(system_region_cache);
@@ -58,6 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let item_copy = item_cache.clone();
         let item_material_copy = item_material_cache.clone();
         let market_order_copy = market_order_cache.clone();
+        let market_order_copy_v2 = market_order_v2_cache.clone();
         let market_order_info_copy = market_order_info_cache.clone();
         let system_region_copy = system_region_cache.clone();
         let user_copy = user_cache.clone();
@@ -77,8 +87,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         - Actions::FetchMarketOrder         => (market_order_copy, fetch, FetchMarketOrderReq),
         - Actions::FetchMarketOrderItemIds  => (market_order_copy, fetch, FetchMarketOrderItemIdsReq),
-        - Actions::FetchLatestMarketOrders  => (market_order_copy, fetch, FetchLatestMarketOrdersReq),
+        - Actions::FetchRawMarketOrders     => (market_order_copy, fetch, FetchRawMarketOrderReq),
         - Actions::InsertMarketOrders       => (market_order_copy, insert, InsertMarketOrderReq),
+
+
+        - Actions::FetchMarketOrdersV2     => (market_order_copy_v2, fetch, FetchMarketOrderV2Req),
+        - Actions::InsertMarketOrdersV2     => (market_order_copy_v2, insert, InsertMarketOrderV2Req),
+        - Actions::CommitMarketOrdersV2     => (market_order_copy_v2, commit, CommitMarketOrderV2Req),
 
         - Actions::FetchMarketOrderInfo     => (market_order_info_copy, fetch, FetchMarketOrderInfoReq),
         - Actions::FetchMarketOrderInfoBulk => (market_order_info_copy, fetch, FetchMarketOrderInfoBulkReq),

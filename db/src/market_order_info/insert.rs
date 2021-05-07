@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::time::Instant;
 
 use crate::{Actions, MarketOrderInfoCache, MarketOrderInfoEntry};
@@ -15,17 +14,12 @@ impl Insert<InsertMarketOrderInfoReq> for MarketOrderInfoCache {
 
     async fn insert(&self, input: InsertMarketOrderInfoReq) -> Self::Response {
         let timer = Instant::now();
-        let mut map = HashMap::new();
-        let mut data = input.0;
+        let mut map = self.cache.read().await.clone();
+        let data = input.0;
 
-        while let Some(x) = data.pop() {
+        for x in data {
             map
                 .entry(x.order_id)
-                .and_modify(|entry| {
-                    if *entry != x {
-                        *entry = x.clone();
-                    }
-                })
                 .or_insert(x);
         }
 

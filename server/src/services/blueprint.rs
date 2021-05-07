@@ -1,427 +1,208 @@
-use serde::Serialize;
-use sqlx::{Pool, Postgres};
-use std::collections::{HashMap, VecDeque};
-
 use crate::error::EveServerError;
 
-#[derive(Clone, Debug, Serialize)]
-struct MaterialNeeded {
-    id: u32,
-    quantity: u64,
-    needed: u64,
-}
+use cachem::{ConnectionPool, Protocol};
+use caph_db::{BlueprintEntry, FetchBlueprintReq, FetchBlueprintRes, Material};
+use serde::Serialize;
 
 #[derive(Clone)]
-pub struct BlueprintService {
-    db: Pool<Postgres>,
-}
+pub struct BlueprintService(ConnectionPool);
 
 impl BlueprintService {
-    pub fn new(db: Pool<Postgres>) -> Self {
-        Self { db }
+    pub fn new(pool: ConnectionPool) -> Self {
+        Self(pool)
     }
 
-    pub async fn fetch_blueprints(&self) -> HashMap<u32, Vec<BlueprintResource>> {
-        let mut conn = self.db.acquire().await.unwrap();
-
-        let mut blueprints = HashMap::new();
-        sqlx::query_as::<_, Blueprint>("SELECT blueprint_id FROM blueprints")
-            .fetch_all(&mut conn)
-            .await
-            .unwrap()
-            .into_iter()
-            .for_each(|x| {
-                blueprints.insert(x.blueprint_id as u32, Vec::new());
-            });
-
-        sqlx::query_as::<_, BlueprintResource>(
-            "SELECT blueprint_id, material_id, quantity, is_product FROM blueprint_resources",
-        )
-        .fetch_all(&mut conn)
-        .await
-        .unwrap()
-        .into_iter()
-        .for_each(|x| {
-            blueprints
-                .entry(x.blueprint_id as u32)
-                .and_modify(|y| y.push(x));
-        });
-
-        blueprints
-    }
-
-    pub async fn fetch_schematics(&self) -> HashMap<u32, Vec<SchematicResource>> {
-        let mut conn = self.db.acquire().await.unwrap();
-
-        let mut schematics = HashMap::new();
-        sqlx::query_as::<_, Schematic>("SELECT schematic_id FROM schematics")
-            .fetch_all(&mut conn)
-            .await
-            .unwrap()
-            .into_iter()
-            .for_each(|x| {
-                schematics.insert(x.schematic_id as u32, Vec::new());
-            });
-
-        sqlx::query_as::<_, SchematicResource>(
-            "SELECT schematic_id, material_id, quantity, is_input FROM schematic_resources",
-        )
-        .fetch_all(&mut conn)
-        .await
-        .unwrap()
-        .into_iter()
-        .for_each(|x| {
-            schematics
-                .entry(x.schematic_id as u32)
-                .and_modify(|y| y.push(x));
-        });
-
-        schematics
-    }
-
-    pub async fn calc_bp_cost(&self, id: u32) -> Result<HashMap<u32, u64>, EveServerError> {
-        let bps = self.fetch_blueprints().await;
-        let schematics = self.fetch_schematics().await;
-
-        let mut all_materials = HashMap::new();
-        let mut materials = VecDeque::new();
-        materials.push_front(MaterialNeeded {
-            id,
-            quantity: 1,
-            needed: 1,
-        });
-
-        while !materials.is_empty() {
-            let material = materials.pop_front().unwrap();
-
-            if let Some(x) = self.production_materials(&bps, &schematics, material.clone()) {
-                for x in x {
-                    let mut x = x.clone();
-                    x.needed *= material.needed;
-                    materials.push_back(x.clone());
-                }
-            } else {
-                all_materials
-                    .entry(material.id)
-                    .and_modify(|x| *x += material.quantity * material.needed)
-                    .or_insert(material.quantity * material.needed);
-            }
-        }
-
-        Ok(all_materials)
-    }
-
-    // If there is a blueprint or schematic that produces the given id, the materials needed are returned
-    fn production_materials(
+    pub async fn blueprint(
         &self,
-        bps: &HashMap<u32, Vec<BlueprintResource>>,
-        schematics: &HashMap<u32, Vec<SchematicResource>>,
-        requested_material: MaterialNeeded,
-    ) -> Option<Vec<MaterialNeeded>> {
-        for (id, resources) in schematics {
-            if resources
-                .iter()
-                .find(|x| !x.is_input && x.material_id as u32 == requested_material.id)
-                .is_some()
-            {
-                let mut needed_materials = Vec::new();
-                for r in resources.iter().filter(|x| x.is_input) {
-                    needed_materials.push(MaterialNeeded {
-                        id: *id,
-                        quantity: r.quantity as u64,
-                        needed: requested_material.quantity,
-                    });
-                }
+        bid: u32,
+    ) -> Result<Option<Blueprint>, EveServerError> {
+        let mut conn = self.0.acquire().await?;
 
-                return Some(needed_materials);
-            }
+        let blueprints = Protocol::request::<_, FetchBlueprintRes>(
+            &mut conn,
+            FetchBlueprintReq::default(),
+        )
+        .await
+        .map(|x| x.0)?;
+
+        Ok(
+            blueprints
+                .into_iter()
+                .find(|x| x.item_id == bid)
+                .map(Blueprint::from)
+        )
+    }
+
+    pub async fn blueprint_graph(
+        &self,
+        id: u32,
+    ) -> Result<BlueprintGraph, EveServerError> {
+        let mut conn = self.0.acquire().await?;
+
+        let blueprints = Protocol::request::<_, FetchBlueprintRes>(
+            &mut conn,
+            FetchBlueprintReq::default(),
+        )
+        .await
+        .map(|x| x.0)?;
+
+        let product = blueprints
+            .iter()
+            .find(|x| x.item_id == id)
+            .unwrap();
+
+        let bp_result = product
+            .materials
+            .iter()
+            .find(|x| x.is_product)
+            .unwrap();
+
+        let materials = product
+            .materials
+            .iter()
+            .filter(|x| !x.is_product)
+            .collect::<Vec<_>>();
+
+        let mut graphs = Vec::new();
+        for material in materials {
+            let graph = self
+                .build_graph(
+                                material.material_id,
+                                material.quantity,
+                                &blueprints
+                            );
+            graphs.push(graph);
         }
 
-        for (id, resources) in bps {
-            if resources
-                .iter()
-                .find(|x| x.is_product && x.material_id as u32 == requested_material.id)
-                .is_some()
-            {
-                let mut needed_materials = Vec::new();
-                for r in resources.iter().filter(|x| !x.is_product) {
-                    needed_materials.push(MaterialNeeded {
-                        id: *id,
-                        quantity: r.quantity as u64,
-                        needed: requested_material.quantity,
-                    });
-                }
+        let root = BlueprintGraph {
+            item_id: bp_result.material_id,
+            quantity: bp_result.quantity,
+            children: graphs
+        };
 
-                return Some(needed_materials);
+        Ok(root)
+    }
+
+    fn build_graph(
+        &self,
+        material_id: u32,
+        quantity: u32,
+        blueprints: &Vec<BlueprintEntry>
+    ) -> BlueprintGraph {
+        let find_product = blueprints
+            .iter()
+            .map(|x| x.materials.clone())
+            .flatten()
+            .find(|x| x.is_product && x.material_id == material_id);
+        if let Some(x) = find_product {
+            // There is an blueprint that produces this item
+            let materials = blueprints
+                .iter()
+                .find(|y| {
+                    y.materials
+                        .iter()
+                        .find(|y| y.is_product && y.material_id == x.material_id)
+                        .is_some()
+                })
+                .map(|x| x.materials.clone())
+                .unwrap_or_default();
+            let materials = materials
+                .iter()
+                .filter(|x| !x.is_product)
+                .collect::<Vec<_>>();
+            BlueprintGraph {
+                item_id: material_id,
+                quantity,
+                // iterate over all materials and build there graph
+                children: materials
+                            .iter()
+                            .map(|x| self
+                                        .build_graph(
+                                            x.material_id,
+                                            x.quantity,
+                                            &blueprints
+                                        )
+                            )
+                            .collect::<Vec<_>>()
+            }
+        } else {
+            // Root item, no blueprint found for this item
+            BlueprintGraph {
+                item_id: material_id,
+                quantity,
+                children: Vec::new(),
             }
         }
+    }
 
-        None
+    pub async fn blueprint_product(
+        &self,
+        bid: u32,
+    ) -> Result<u32, EveServerError> {
+        let mut conn = self.0.acquire().await?;
+
+        let blueprints = Protocol::request::<_, FetchBlueprintRes>(
+            &mut conn,
+            FetchBlueprintReq::default(),
+        )
+        .await
+        .map(|x| x.0)?;
+
+        let product = blueprints
+            .iter()
+            .find(|x| x.item_id == bid)
+            .unwrap();
+
+        let bp_result = product
+            .materials
+            .iter()
+            .find(|x| x.is_product)
+            .ok_or(EveServerError::NotFound)?;
+
+        Ok(bp_result.material_id)
     }
 }
 
-#[derive(Clone, Debug, sqlx::FromRow)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Blueprint {
-    pub blueprint_id: i32,
+    pub item_id:   u32,
+    pub time:      u32,
+    pub materials: Vec<BlueprintMaterialResult>,
 }
 
-#[derive(Clone, Debug, sqlx::FromRow)]
-pub struct BlueprintResource {
-    pub blueprint_id: i32,
-    pub material_id: i32,
-    pub quantity: i32,
-    pub is_product: bool,
+impl From<BlueprintEntry> for Blueprint {
+    fn from(x: BlueprintEntry) -> Self {
+        Self {
+            item_id: x.item_id,
+            time: x.time,
+            materials: x.materials
+                        .into_iter()
+                        .map(BlueprintMaterialResult::from)
+                        .collect::<Vec<_>>()
+        }
+    }
 }
 
-#[derive(Clone, Debug, sqlx::FromRow)]
-pub struct Schematic {
-    pub schematic_id: i32,
+#[derive(Clone, Debug, Serialize)]
+pub struct BlueprintGraph {
+    pub item_id:  u32,
+    pub quantity: u32,
+    pub children: Vec<BlueprintGraph>,
 }
 
-#[derive(Clone, Debug, sqlx::FromRow)]
-pub struct SchematicResource {
-    pub schematic_id: i32,
-    pub material_id: i32,
-    pub quantity: i32,
-    pub is_input: bool,
+#[derive(Clone, Debug, Serialize)]
+pub struct BlueprintMaterialResult {
+    pub material_id: u32,
+    pub quantity:    u32,
+    pub is_product:  bool,
 }
 
-// FIXME:
-/*#[cfg(test)]
-mod blueprint_tests {
-    use super::*;
-
-    use caph_eve_sde_parser::{BlueprintAdditional, Material};
-    use async_std::sync::Mutex;
-
-    fn cache_service(blueprints: Vec<BlueprintCacheEntry>) -> Arc<CacheService> {
-        Arc::new(CacheService {
-            blueprints: Mutex::new(blueprints),
-            items: Mutex::new(Vec::new()),
-            markets: Mutex::new(Vec::new()),
-            names: Mutex::new(Vec::new()),
-            regions: Mutex::new(Vec::new()),
-            schematics: Mutex::new(Vec::new()),
-            solarsystems: Mutex::new(Vec::new()),
-            sde_checksum: Mutex::new(Vec::new()),
-        })
+impl From<Material> for BlueprintMaterialResult {
+    fn from(x: Material) -> Self {
+        Self {
+            material_id: x.material_id,
+            quantity: x.quantity,
+            is_product: x.is_product,
+        }
     }
-
-    #[async_std::test]
-    async fn resolve_001() {
-        let blueprint = BlueprintCacheEntry {
-            id: 99,
-            manufacturing: Some(
-                BlueprintAdditional {
-                    materials: Some(vec![
-                        Material {
-                            quantity: 10,
-                            type_id: 1,
-                            probability: None
-                        }
-                    ]),
-                    products: Some(vec![
-                        Material {
-                            quantity: 1,
-                            type_id: 0,
-                            probability: None
-                        }
-                    ]),
-                    time: 1,
-                    skills: None,
-                }
-            ),
-            copying: None,
-            invention: None,
-            reaction: None,
-            research_material: None,
-            research_time: None
-        };
-
-        let blueprints = vec![blueprint];
-        let cache = cache_service(blueprints);
-        let market_service = MarketService::new(cache.clone(), crate::services::ItemService::new(cache.clone()));
-        let instance = BlueprintService { cache, market_service };
-        let result = instance.calc_bp_cost(0).await;
-
-        let mut expected = HashMap::new();
-        expected.insert(1u32, 10u64);
-
-        assert_eq!(result, expected);
-    }
-
-    // The inner needs 10 times the item 1, which in return needs 10 times item 2 -> Item 2 is needed 100 times
-    #[async_std::test]
-    async fn resolve_002() {
-        let blueprint_outer = BlueprintCacheEntry {
-            id: 99,
-            manufacturing: Some(
-                BlueprintAdditional {
-                    materials: Some(vec![
-                        Material {
-                            quantity: 10,
-                            type_id: 2,
-                            probability: None
-                        }
-                    ]),
-                    products: Some(vec![
-                        Material {
-                            quantity: 1,
-                            type_id: 1,
-                            probability: None
-                        }
-                    ]),
-                    time: 1,
-                    skills: None,
-                }
-            ),
-            copying: None,
-            invention: None,
-            reaction: None,
-            research_material: None,
-            research_time: None
-        };
-
-        let blueprint_inner = BlueprintCacheEntry {
-            id: 100,
-            manufacturing: Some(
-                BlueprintAdditional {
-                    materials: Some(vec![
-                        Material {
-                            quantity: 10,
-                            type_id: 1,
-                            probability: None
-                        }
-                    ]),
-                    products: Some(vec![
-                        Material {
-                            quantity: 1,
-                            type_id: 0,
-                            probability: None
-                        }
-                    ]),
-                    time: 1,
-                    skills: None,
-                }
-            ),
-            copying: None,
-            invention: None,
-            reaction: None,
-            research_material: None,
-            research_time: None
-        };
-
-        let blueprints = vec![blueprint_inner, blueprint_outer];
-        let cache = cache_service(blueprints);
-        let market_service = MarketService::new(cache.clone(),  crate::services::ItemService::new(cache.clone()));
-        let instance = BlueprintService { cache,market_service };
-        let result = instance.calc_bp_cost(0).await;
-
-        let mut expected = HashMap::new();
-        expected.insert(2u32, 100u64);
-
-        assert_eq!(result, expected);
-    }
-
-    // Item 1 is needed 1 time, wich needs Item 2 10 times, which needs Item 3 10 times -> Item 3 = 1000 times needed
-    #[async_std::test]
-    async fn resolve_003() {
-        let blueprint_0 = BlueprintCacheEntry {
-            id: 99,
-            manufacturing: Some(
-                BlueprintAdditional {
-                    materials: Some(vec![
-                        Material {
-                            quantity: 10,
-                            type_id: 3,
-                            probability: None
-                        }
-                    ]),
-                    products: Some(vec![
-                        Material {
-                            quantity: 1,
-                            type_id: 2,
-                            probability: None
-                        }
-                    ]),
-                    time: 1,
-                    skills: None,
-                }
-            ),
-            copying: None,
-            invention: None,
-            reaction: None,
-            research_material: None,
-            research_time: None
-        };
-
-        let blueprint_1 = BlueprintCacheEntry {
-            id: 100,
-            manufacturing: Some(
-                BlueprintAdditional {
-                    materials: Some(vec![
-                        Material {
-                            quantity: 10,
-                            type_id: 2,
-                            probability: None
-                        }
-                    ]),
-                    products: Some(vec![
-                        Material {
-                            quantity: 1,
-                            type_id: 1,
-                            probability: None
-                        }
-                    ]),
-                    time: 1,
-                    skills: None,
-                }
-            ),
-            copying: None,
-            invention: None,
-            reaction: None,
-            research_material: None,
-            research_time: None
-        };
-
-        let blueprint_2 = BlueprintCacheEntry {
-            id: 101,
-            manufacturing: Some(
-                BlueprintAdditional {
-                    materials: Some(vec![
-                        Material {
-                            quantity: 10,
-                            type_id: 1,
-                            probability: None
-                        }
-                    ]),
-                    products: Some(vec![
-                        Material {
-                            quantity: 1,
-                            type_id: 0,
-                            probability: None
-                        }
-                    ]),
-                    time: 1,
-                    skills: None,
-                }
-            ),
-            copying: None,
-            invention: None,
-            reaction: None,
-            research_material: None,
-            research_time: None
-        };
-
-        let blueprints = vec![blueprint_0, blueprint_1, blueprint_2];
-        let cache = cache_service(blueprints);
-        let market_service = MarketService::new(cache.clone(), crate::services::ItemService::new(cache.clone()));
-        let instance = BlueprintService { cache, market_service };
-        let result = instance.calc_bp_cost(0).await;
-
-        let mut expected = HashMap::new();
-        expected.insert(3u32, 1000u64);
-
-        assert_eq!(result, expected);
-    }
-}*/
+}

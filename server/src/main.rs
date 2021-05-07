@@ -22,6 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let eve = EveDataWrapper::new().await?;
 
+    let blueprint_service = BlueprintService::new(pool.clone());
     let character_service = CharacterService::new(eve.clone(), pool.clone());
     let item_service = ItemService::new(pool.clone());
     let market_service = MarketService::new(
@@ -32,6 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::info!("Starting server");
 
     ApiServer::new(
+        blueprint_service,
         character_service,
         item_service,
         market_service,
@@ -44,6 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[derive(Clone)]
 pub struct ApiServer{
+    blueprint: BlueprintService,
     character: CharacterService,
     items:     ItemService,
     market:    MarketService,
@@ -51,12 +54,14 @@ pub struct ApiServer{
 
 impl ApiServer {
     pub fn new(
+        blueprint: BlueprintService,
         character: CharacterService,
         items: ItemService,
         market: MarketService,
     ) -> Self {
 
         Self {
+            blueprint,
             character,
             items,
             market,
@@ -151,6 +156,11 @@ impl ApiServer {
             .and(warp::post())
             .and(warp::body::json())
             .and_then(Self::item_resolve_bulk);
+        let item_blueprint = item
+            .clone()
+            .and(warp::path!(u32 / "blueprint"))
+            .and(warp::get())
+            .and_then(Self::item_blueprint);
         let item_blueprint_graph = item
             .clone()
             .and(warp::path!(u32 / "blueprint" / "graph"))
@@ -170,6 +180,7 @@ impl ApiServer {
             .or(item_bulk)
             .or(item_resolve)
             .or(item_resolve_bulk)
+            .or(item_blueprint)
             .or(item_blueprint_graph)
             .or(item_blueprint_product)
             .or(item_reprocessing);
@@ -267,12 +278,24 @@ impl ApiServer {
             .map_err(Into::into)
     }
 
+    async fn item_blueprint(
+        self: Arc<Self>,
+        bid: u32,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .blueprint
+            .blueprint(bid)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
     async fn item_blueprint_graph(
         self: Arc<Self>,
         tid: u32,
     ) -> Result<impl Reply, Rejection> {
         self
-            .items
+            .blueprint
             .blueprint_graph(tid)
             .await
             .map(|x| warp::reply::json(&x))
@@ -284,7 +307,7 @@ impl ApiServer {
         tid: u32,
     ) -> Result<impl Reply, Rejection> {
         self
-            .items
+            .blueprint
             .blueprint_product(tid)
             .await
             .map(|x| warp::reply::json(&x))
@@ -374,7 +397,7 @@ impl ApiServer {
         Ok(Response::builder()
             .status(StatusCode::MOVED_PERMANENTLY)
             .header("location", "https://eve.caph.xyz")
-            .header("Set-Cookie", format!("user={}; Path=/; Secure; HttpOnly; Max-Age={}", user.user_id, 60 * 60 * 24 * 31 * 12 * 100)) // seconds * minutes * hours * days * months * years
+            .header("Set-Cookie", format!("user={}; Path=/; Secure; HttpOnly; Max-Age={}", user.user_id, 31557800)) // 10 years
             .body("")
             .unwrap())
     }

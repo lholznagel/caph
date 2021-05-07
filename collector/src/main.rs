@@ -1,9 +1,11 @@
 mod error;
 mod market;
+mod market_v2;
 mod sde;
 mod time;
 
 use self::market::*;
+use self::market_v2::*;
 use self::sde::*;
 use self::time::*;
 
@@ -61,6 +63,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tokio::time::sleep(next_run).await; // Run on the next 30 minute interval
         }
     });
+
+    /*let eve_copy = eve.clone();
+    let pool_copy = pool.clone();
+    let market_v2 = tokio::task::spawn(async {
+        let mut market = MarketV2::new(eve_copy, pool_copy);
+
+        loop {
+            log::info!("Market v2 start");
+            if let Err(e) = market.task().await {
+                log::error!("Error running market task {:?}", e);
+            }
+            log::info!("Market v2 done");
+
+            let next_run = duration_to_next_30_minute();
+            tokio::time::sleep(std::time::Duration::from_secs(60 * 5)).await; // Run on the next 30 minute interval
+        }
+    });*/
 
     let _ = tokio::join!(
         market,

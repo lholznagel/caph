@@ -11,7 +11,7 @@
         :id="Number(id)"
         :max-height="Number(128)"
         :max-width="Number(128)"
-        type="render"
+        type="bp"
       />
 
       <v-simple-table>

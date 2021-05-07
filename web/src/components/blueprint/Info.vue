@@ -46,6 +46,8 @@
           </tbody>
         </template>
       </v-simple-table>
+
+      {{ blueprint }}
     </div>
   </div>
 </template>
