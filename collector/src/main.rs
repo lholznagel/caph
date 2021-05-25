@@ -1,38 +1,32 @@
 mod error;
 mod market;
-mod market_v2;
 mod sde;
 mod time;
 
 use self::market::*;
-use self::market_v2::*;
 use self::sde::*;
 use self::time::*;
 
 use cachem::ConnectionPool;
 use caph_eve_data_wrapper::EveDataWrapper;
 use metrix_exporter::Metrix;
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     morgan::Morgan::init(vec![]);
 
     let metrix = Metrix::new(env!("CARGO_PKG_NAME").into(), "0.0.0.0:8889").await?;
-    let pool = ConnectionPool::new("0.0.0.0:9999".into(), metrix.get_sender(), 10).await?;
-
-    let metrix_sender = metrix.get_sender();
-
-    let metrix = tokio::task::spawn(async { metrix.listen().await; });
+    let pool = ConnectionPool::new("0.0.0.0:9999", metrix.get_sender(), 10).await?;
 
     log::info!("Preparing SDE");
     let eve = EveDataWrapper::new().await?;
     log::info!("Prepared SDE");
 
     let eve_copy = eve.clone();
-    let metrix_copy = metrix_sender.clone();
     let pool_copy = pool.clone();
     let sde = tokio::task::spawn(async {
-        let mut sde = Sde::new(eve_copy, metrix_copy, pool_copy);
+        let mut sde = Sde::new(eve_copy, pool_copy);
 
         loop {
             log::info!("SDE start");
@@ -41,16 +35,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             log::info!("SDE done");
 
-            let next_run = duration_next_sde_download();
+            let next_run = duration_next_sde_download()
+                .unwrap_or_else(|_| Duration::from_secs(24 * 60 * 60));
             tokio::time::sleep(next_run).await;
         }
     });
 
     let eve_copy = eve.clone();
-    let metrix_copy = metrix_sender.clone();
     let pool_copy = pool.clone();
     let market = tokio::task::spawn(async {
-        let mut market = Market::new(eve_copy, metrix_copy, pool_copy);
+        let mut market = Market::new(eve_copy, pool_copy);
 
         loop {
             log::info!("Market start");
@@ -59,31 +53,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             log::info!("Market done");
 
-            let next_run = duration_to_next_30_minute();
+            let next_run = duration_to_next_30_minute()
+                .unwrap_or_else(|_| Duration::from_secs(30 * 60));
             tokio::time::sleep(next_run).await; // Run on the next 30 minute interval
         }
     });
 
-    /*let eve_copy = eve.clone();
-    let pool_copy = pool.clone();
-    let market_v2 = tokio::task::spawn(async {
-        let mut market = MarketV2::new(eve_copy, pool_copy);
-
-        loop {
-            log::info!("Market v2 start");
-            if let Err(e) = market.task().await {
-                log::error!("Error running market task {:?}", e);
-            }
-            log::info!("Market v2 done");
-
-            let next_run = duration_to_next_30_minute();
-            tokio::time::sleep(std::time::Duration::from_secs(60 * 5)).await; // Run on the next 30 minute interval
-        }
-    });*/
-
     let _ = tokio::join!(
         market,
-        metrix,
         sde,
     );
 

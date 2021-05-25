@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crate::{Actions, BlueprintCache, BlueprintEntry};
+use crate::{Actions, BlueprintCache, BlueprintEntry, PlanetSchematicEntry};
 
 use async_trait::*;
 use cachem::{Fetch, Parse, request};
@@ -13,17 +13,26 @@ impl Fetch<FetchBlueprintReq> for BlueprintCache {
 
     async fn fetch(&self, _: FetchBlueprintReq) -> Self::Response {
         let timer = Instant::now();
-        let res = self
-            .cache
+        let blueprints = self
+            .blueprints
             .read()
             .await
-            .clone()
-            .into_iter()
-            .map(|(_, x)| x)
+            .iter()
+            .map(|(_, x)| x.clone())
+            .collect::<Vec<_>>();
+        let schematics = self
+            .schematics
+            .read()
+            .await
+            .iter()
+            .map(|(_, x)| x.clone())
             .collect::<Vec<_>>();
 
         self.metrix.send_time(METRIC_FETCH, timer).await;
-        FetchBlueprintRes(res)
+        FetchBlueprintRes {
+            blueprints,
+            schematics,
+        }
     }
 }
 
@@ -32,4 +41,7 @@ impl Fetch<FetchBlueprintReq> for BlueprintCache {
 pub struct FetchBlueprintReq;
 
 #[derive(Debug, Parse)]
-pub struct FetchBlueprintRes(pub Vec<BlueprintEntry>);
+pub struct FetchBlueprintRes {
+    pub blueprints: Vec<BlueprintEntry>,
+    pub schematics: Vec<PlanetSchematicEntry>,
+}

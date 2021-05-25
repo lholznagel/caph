@@ -4,15 +4,21 @@
 
 <script lang="ts">
 import { Component, Prop, Vue } from 'vue-property-decorator';
-import { formatNumber } from '../utils/format';
+import { formatNumber, formatTime } from '../utils/format';
 
 @Component
 export default class FormatNumber extends Vue {
   @Prop(Number)
-  public value!: string;
+  public value!: number;
+  @Prop(Boolean)
+  public isTime!: boolean;
 
   public format(): string {
-    return formatNumber(this.value);
+    if (this.isTime) {
+      return formatTime(this.value);
+    } else {
+      return formatNumber(this.value);
+    }
   }
 }
 </script>

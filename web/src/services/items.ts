@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const KV_NAME = 'resolve_ids';
 
-export class IdNameCache {
+export class ItemCache {
   public static async resolve(itemId: number): Promise<IItem> {
     const localItems: IItem[] = this.load();
 

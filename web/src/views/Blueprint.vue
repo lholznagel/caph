@@ -14,7 +14,7 @@
               :item-id="Number($route.params.itemId)" />
           </v-card>
         </v-col>
-        <v-col cols="3">
+        <v-col cols="9">
           <v-card elevation="5" style="height: 100%">
             <v-card-title>Item cost</v-card-title>
             <c-blueprint-item :blueprint-id="Number($route.params.id)" />

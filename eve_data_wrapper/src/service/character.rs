@@ -71,6 +71,20 @@ impl CharacterService {
             .map_err(Into::into)
     }
 
+    pub async fn asset_names(
+        &self,
+        token: &str,
+        character_id: u32,
+        ids: Vec<u64>,
+    ) -> Result<Vec<CharacterAssetName>, EveConnectError> {
+        let path = format!("characters/{}/assets/names", character_id);
+        self
+            .eve_client
+            .post_oauth(&token, &path, &ids)
+            .await
+            .map_err(Into::into)
+    }
+
     pub async fn blueprints(
         &self,
         token: &str,
@@ -99,6 +113,12 @@ pub struct CharacterAsset {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct CharacterAssetName {
+    pub item_id: u64,
+    pub name:    String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CharacterBlueprint {
     pub item_id: u64,
     pub location_flag: String,
@@ -114,3 +134,4 @@ pub struct CharacterBlueprint {
     pub time_efficiency: u32,
     pub type_id: u32,
 }
+

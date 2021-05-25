@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use crate::error::EveServerError;
 
 use cachem::{ConnectionPool, EmptyMsg, Protocol};
 use caph_db::{FetchUserReq, FetchUserRes, InsertUserReq, UserEntry};
-use caph_eve_data_wrapper::{CharacterAsset, CharacterBlueprint, EveClient, EveConnectError, EveDataWrapper, EveOAuthUser};
-
-use crate::error::EveServerError;
+use caph_eve_data_wrapper::{CharacterAssetName, CharacterBlueprint, EveClient, EveConnectError, EveDataWrapper, EveOAuthUser};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct CharacterService {
@@ -85,7 +85,7 @@ impl CharacterService {
             let user = EveClient::retrieve_refresh_token(&oauth.refresh_token)
                 .await
                 .map_err(EveServerError::from)?;
-            
+
             self.save_login(user.clone()).await?;
 
             charater_service.whoami(&user.access_token, character_id)
@@ -151,12 +151,39 @@ impl CharacterService {
             return Err(EveServerError::EveConnectError(EveConnectError::Unauthorized).into());
         };
 
+        let asset_location = |
+            asset: &caph_eve_data_wrapper::CharacterAsset,
+            x:     &mut Vec<AssetLocation>
+        | -> Vec<AssetLocation> {
+            // Try to find an already existing location
+            let location = x
+                .iter_mut()
+                .find(|x| x.item_id == asset.location_id);
+
+            // If it exists, add the quantity
+            if let Some(mut location) = location {
+                location.quantity += asset.quantity;
+            } else {
+                // otherwise add the location
+                x.push(AssetLocation {
+                    item_id:  asset.location_id,
+                    quantity: asset.quantity,
+                    typ:      asset.location_flag.clone(),
+                });
+            }
+            x.to_vec()
+        };
+
         let mut result = HashMap::new();
         for asset in assets {
             result
                 .entry(asset.type_id)
-                .and_modify(|x: &mut CharacterAsset| x.quantity += asset.quantity)
-                .or_insert(asset);
+                .and_modify(|x: &mut CharacterAsset| {
+                    x.item_ids.push(asset.item_id);
+                    x.locations = asset_location(&asset, &mut x.locations);
+                    x.quantity += asset.quantity;
+                })
+                .or_insert(CharacterAsset::from(asset));
         }
 
         let result = result
@@ -164,6 +191,34 @@ impl CharacterService {
             .map(|(_, x)| x)
             .collect::<Vec<_>>();
         Ok(result)
+    }
+
+    pub async fn asset_names(
+        &self,
+        character_id: u32,
+        ids: Vec<u64>
+    ) -> Result<Vec<CharacterAssetName>, EveServerError> {
+        let oauth = self.lookup(character_id).await?.ok_or(EveServerError::UserNotFound)?;
+        let character_service = self.eve.character().await?;
+
+        let names = character_service.asset_names(&oauth.access_token, character_id, ids.clone()).await;
+        let names = if let Err(EveConnectError::Unauthorized) = names {
+            let user = EveClient::retrieve_refresh_token(&oauth.refresh_token)
+                .await
+                .map_err(EveServerError::from)?;
+
+            self.save_login(user.clone()).await?;
+
+            character_service.asset_names(&user.access_token, character_id, ids)
+                .await
+                .map_err(EveServerError::from)?
+        } else if let Ok(x) = names {
+            x
+        } else {
+            return Err(EveServerError::EveConnectError(EveConnectError::Unauthorized).into());
+        };
+
+        Ok(names)
     }
 
     pub async fn blueprints(
@@ -192,4 +247,36 @@ impl CharacterService {
 
         Ok(blueprints)
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct CharacterAsset {
+    pub item_ids:  Vec<u64>,
+    pub quantity:  u32,
+    pub type_id:   u32,
+    pub locations: Vec<AssetLocation>
+}
+
+impl From<caph_eve_data_wrapper::CharacterAsset> for CharacterAsset {
+    fn from(x: caph_eve_data_wrapper::CharacterAsset) -> Self {
+        Self {
+            item_ids:  vec![x.item_id],
+            quantity:  x.quantity,
+            type_id:   x.type_id,
+            locations: vec![
+                AssetLocation {
+                    item_id:  x.location_id,
+                    quantity: x.quantity,
+                    typ:      x.location_flag,
+                }
+            ],
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct AssetLocation {
+    pub item_id:  u64,
+    pub quantity: u32,
+    pub typ:      String,
 }

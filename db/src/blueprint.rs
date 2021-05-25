@@ -12,7 +12,8 @@ use std::collections::HashMap;
 use tokio::sync::RwLock;
 
 pub struct BlueprintCache{
-    cache: RwLock<HashMap<u32, BlueprintEntry>>,
+    blueprints: RwLock<HashMap<u32, BlueprintEntry>>,
+    schematics: RwLock<HashMap<u32, PlanetSchematicEntry>>,
     metrix: MetrixSender,
 }
 
@@ -21,17 +22,22 @@ impl BlueprintCache {
 
     pub fn new(metrix: MetrixSender) -> Self {
         Self {
-            cache: RwLock::new(HashMap::new()),
+            blueprints: RwLock::new(HashMap::new()),
+            schematics: RwLock::new(HashMap::new()),
             metrix,
         }
     }
 }
 
+// TODO: Add copy, research_time, research_material, invention, manufacturing, reaction
+#[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, PartialEq, Parse)]
 pub struct BlueprintEntry {
     pub activity:  Activity,
-    pub item_id:   u32,
+    // blueprint id
+    pub bid:       u32,
     pub time:      u32,
+    pub product:   Material,
     pub materials: Vec<Material>,
     pub skills:    Vec<Skill>,
 }
@@ -39,42 +45,69 @@ pub struct BlueprintEntry {
 impl BlueprintEntry {
     pub fn new(
         activity:  Activity,
-        item_id:   u32,
+        bid:       u32,
         time:      u32,
+        product:   Material,
         materials: Vec<Material>,
         skills:    Vec<Skill>,
     ) -> Self {
         Self {
             activity,
-            item_id,
+            bid,
             time,
+            product,
             materials,
             skills,
         }
     }
 }
 
+#[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, PartialEq, Parse)]
 pub struct Material {
     pub material_id: u32,
     pub quantity:    u32,
-    pub is_product:  bool,
 }
 
 impl Material {
     pub fn new(
         material_id: u32,
         quantity: u32,
-        is_product: bool,
     ) -> Self {
         Self {
             material_id,
             quantity,
-            is_product,
         }
     }
 }
 
+#[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Debug, PartialEq, Parse)]
+pub struct PlanetSchematicEntry {
+    // planet schemtic id
+    pub psid:      u32,
+    pub time:      u32,
+    pub output:    Material,
+    pub inputs:    Vec<Material>,
+}
+
+impl PlanetSchematicEntry {
+    pub fn new(
+        psid:   u32,
+        time:   u32,
+        output: Material,
+        inputs: Vec<Material>,
+    ) -> Self {
+        Self {
+            psid,
+            time,
+            output,
+            inputs,
+        }
+    }
+}
+
+#[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, PartialEq, Parse)]
 pub struct Skill {
     pub level:   u8,
@@ -93,6 +126,7 @@ impl Skill {
     }
 }
 
+#[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, PartialEq, Parse)]
 pub enum Activity {
     Manufacturing,

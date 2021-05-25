@@ -28,6 +28,8 @@ Vue.component('c-market-chart-historic', () => import('@/components/market/Chart
 Vue.component('c-market-orders', () => import('@/components/market/Orders.vue'));
 Vue.component('c-market-stats', () => import('@/components/market/Stats.vue'));
 
+Vue.component('c-character-asset-location', () => import('@/components/character/AssetLocation.vue'));
+
 new Vue({
   router,
   vuetify,

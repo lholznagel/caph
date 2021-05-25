@@ -67,12 +67,6 @@ macro_rules! eve_id {
         #[serde(transparent)]
         pub struct $name(pub $typ);
 
-        impl Into<$typ> for $name {
-            fn into(self) -> $typ {
-                self.0
-            }
-        }
-
         impl From<$typ> for $name {
             fn from(x: $typ) -> Self {
                 Self(x)
@@ -93,7 +87,7 @@ macro_rules! eve_id {
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 s
                     .parse()
-                    .map(|x| Self(x))
+                    .map(Self)
                     .map_err(|_| EveConnectError::CannotParse)
             }
         }

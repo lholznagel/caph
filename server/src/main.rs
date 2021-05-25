@@ -108,6 +108,13 @@ impl ApiServer {
             .and(warp::get())
             .and(warp::cookie("user"))
             .and_then(Self::character_assets);
+        let character_asset_names = character
+            .clone()
+            .and(warp::path!("assets" / "names"))
+            .and(warp::post())
+            .and(warp::cookie("user"))
+            .and(warp::body::json())
+            .and_then(Self::character_asset_names);
         let character_blueprints = character
             .clone()
             .and(warp::path!("blueprints"))
@@ -127,6 +134,7 @@ impl ApiServer {
             .and(warp::cookie("user"))
             .and_then(Self::character_portrait);
         let character = character_assets
+            .or(character_asset_names)
             .or(character_blueprints)
             .or(character_name)
             .or(character_portrait);
@@ -422,16 +430,17 @@ impl ApiServer {
         character_id: u32
     ) -> Result<impl Reply, Rejection> {
         if let None = self.character.lookup(character_id).await? {
-            Ok(Response::builder()
+            return Ok(Response::builder()
                 .status(StatusCode::UNAUTHORIZED)
                 .header("Set-Cookie", "user=; expires=Thu, 01 Jan 1970 00:00:00 GMT")
                 .body("")
-                .unwrap())
+                .unwrap());
         } else {
-            Ok(Response::builder()
+            return Ok(Response::builder()
                 .status(StatusCode::OK)
-                .body("")
-                .unwrap())
+                .header("Content-Type", "application/json")
+                .body("{}")
+                .unwrap());
         }
     }
 
@@ -469,6 +478,19 @@ impl ApiServer {
             .await?;
 
         Ok(warp::reply::json(&assets))
+    }
+
+    async fn character_asset_names(
+        self: Arc<Self>,
+        character_id: u32,
+        ids: Vec<u64>
+    ) -> Result<impl Reply, Rejection> {
+        let asset_names = self
+            .character
+            .asset_names(character_id, ids)
+            .await?;
+
+        Ok(warp::reply::json(&asset_names))
     }
 
     async fn character_blueprints(

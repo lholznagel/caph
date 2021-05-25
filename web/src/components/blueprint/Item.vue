@@ -6,7 +6,9 @@
       v-if="busy"
     ></v-skeleton-loader>
 
-    <v-simple-table v-if="!busy && reqResources.length > 0">
+    <v-simple-table
+      v-if="!busy && reqResources.length > 0"
+      class="overflow-y-auto">
       <template v-slot:default>
         <tbody>
           <tr v-for="item in reqResources" :key="item.itemId">

@@ -1,7 +1,7 @@
 use crate::error::EveServerError;
 
 use cachem::{ConnectionPool, Protocol};
-use caph_db::{BlueprintEntry, FetchBlueprintReq, FetchBlueprintRes, Material};
+use caph_db::{BlueprintEntry, FetchBlueprintReq, FetchBlueprintRes, PlanetSchematicEntry};
 use serde::Serialize;
 
 #[derive(Clone)]
@@ -15,21 +15,20 @@ impl BlueprintService {
     pub async fn blueprint(
         &self,
         bid: u32,
-    ) -> Result<Option<Blueprint>, EveServerError> {
+    ) -> Result<Option<BlueprintEntry>, EveServerError> {
         let mut conn = self.0.acquire().await?;
 
-        let blueprints = Protocol::request::<_, FetchBlueprintRes>(
+        let res = Protocol::request::<_, FetchBlueprintRes>(
             &mut conn,
             FetchBlueprintReq::default(),
         )
-        .await
-        .map(|x| x.0)?;
+        .await?;
 
         Ok(
-            blueprints
+            res
+                .blueprints
                 .into_iter()
-                .find(|x| x.item_id == bid)
-                .map(Blueprint::from)
+                .find(|x| x.bid == bid)
         )
     }
 
@@ -39,44 +38,36 @@ impl BlueprintService {
     ) -> Result<BlueprintGraph, EveServerError> {
         let mut conn = self.0.acquire().await?;
 
-        let blueprints = Protocol::request::<_, FetchBlueprintRes>(
+        let res = Protocol::request::<_, FetchBlueprintRes>(
             &mut conn,
             FetchBlueprintReq::default(),
         )
-        .await
-        .map(|x| x.0)?;
+        .await?;
 
-        let product = blueprints
+        let blueprint = res
+            .blueprints
             .iter()
-            .find(|x| x.item_id == id)
-            .unwrap();
+            .find(|x| x.bid == id)
+            .ok_or(EveServerError::NotFound)?;
 
-        let bp_result = product
-            .materials
-            .iter()
-            .find(|x| x.is_product)
-            .unwrap();
-
-        let materials = product
-            .materials
-            .iter()
-            .filter(|x| !x.is_product)
-            .collect::<Vec<_>>();
-
+        let mut id = 0;
         let mut graphs = Vec::new();
-        for material in materials {
+        for material in blueprint.materials.iter() {
             let graph = self
                 .build_graph(
-                                material.material_id,
-                                material.quantity,
-                                &blueprints
-                            );
+                    &mut id,
+                    material.material_id,
+                    material.quantity,
+                    &res.blueprints,
+                    &res.schematics,
+                );
             graphs.push(graph);
         }
 
         let root = BlueprintGraph {
-            item_id: bp_result.material_id,
-            quantity: bp_result.quantity,
+            id:       0,
+            item_id:  blueprint.product.material_id,
+            quantity: blueprint.product.quantity,
             children: graphs
         };
 
@@ -85,52 +76,70 @@ impl BlueprintService {
 
     fn build_graph(
         &self,
+        id:          &mut u32,
         material_id: u32,
-        quantity: u32,
-        blueprints: &Vec<BlueprintEntry>
+        quantity:    u32,
+        blueprints:  &Vec<BlueprintEntry>,
+        schematics:  &Vec<PlanetSchematicEntry>,
     ) -> BlueprintGraph {
-        let find_product = blueprints
+        *id += 1;
+        // search for a blueprint that produces the given material
+        let bp = blueprints
             .iter()
-            .map(|x| x.materials.clone())
-            .flatten()
-            .find(|x| x.is_product && x.material_id == material_id);
-        if let Some(x) = find_product {
-            // There is an blueprint that produces this item
-            let materials = blueprints
-                .iter()
-                .find(|y| {
-                    y.materials
-                        .iter()
-                        .find(|y| y.is_product && y.material_id == x.material_id)
-                        .is_some()
-                })
-                .map(|x| x.materials.clone())
-                .unwrap_or_default();
-            let materials = materials
-                .iter()
-                .filter(|x| !x.is_product)
-                .collect::<Vec<_>>();
+            .find(|x| x.product.material_id == material_id);
+
+        if let Some(x) = bp {
             BlueprintGraph {
-                item_id: material_id,
+                id:       *id,
+                item_id:  material_id,
                 quantity,
                 // iterate over all materials and build there graph
-                children: materials
+                children: x.materials
                             .iter()
                             .map(|x| self
                                         .build_graph(
+                                            id,
                                             x.material_id,
                                             x.quantity,
-                                            &blueprints
+                                            &blueprints,
+                                            &schematics,
                                         )
                             )
                             .collect::<Vec<_>>()
             }
         } else {
-            // Root item, no blueprint found for this item
-            BlueprintGraph {
-                item_id: material_id,
-                quantity,
-                children: Vec::new(),
+            // search if there is a schematic that produces the material_id
+            let ps = schematics
+                .iter()
+                .find(|x| x.output.material_id == material_id);
+
+            if let Some(x) = ps {
+                BlueprintGraph {
+                    id:       *id,
+                    item_id:  material_id,
+                    quantity,
+                    // iterate over all materials and build there graph
+                    children: x.inputs
+                                .iter()
+                                .map(|x| self
+                                            .build_graph(
+                                                id,
+                                                x.material_id,
+                                                x.quantity,
+                                                &blueprints,
+                                                &schematics,
+                                            )
+                                )
+                                .collect::<Vec<_>>()
+                }
+            } else {
+                // Root item, no blueprint or schematic found for this item
+                BlueprintGraph {
+                    id:       *id,
+                    item_id:  material_id,
+                    quantity,
+                    children: Vec::new(),
+                }
             }
         }
     }
@@ -138,71 +147,32 @@ impl BlueprintService {
     pub async fn blueprint_product(
         &self,
         bid: u32,
-    ) -> Result<u32, EveServerError> {
+    ) -> Result<Option<u32>, EveServerError> {
         let mut conn = self.0.acquire().await?;
 
-        let blueprints = Protocol::request::<_, FetchBlueprintRes>(
+        let res = Protocol::request::<_, FetchBlueprintRes>(
             &mut conn,
             FetchBlueprintReq::default(),
         )
-        .await
-        .map(|x| x.0)?;
+        .await?;
 
-        let product = blueprints
+        let bp = res
+            .blueprints
             .iter()
-            .find(|x| x.item_id == bid)
-            .unwrap();
-
-        let bp_result = product
-            .materials
-            .iter()
-            .find(|x| x.is_product)
-            .ok_or(EveServerError::NotFound)?;
-
-        Ok(bp_result.material_id)
-    }
-}
-
-#[derive(Clone, Debug, Serialize)]
-pub struct Blueprint {
-    pub item_id:   u32,
-    pub time:      u32,
-    pub materials: Vec<BlueprintMaterialResult>,
-}
-
-impl From<BlueprintEntry> for Blueprint {
-    fn from(x: BlueprintEntry) -> Self {
-        Self {
-            item_id: x.item_id,
-            time: x.time,
-            materials: x.materials
-                        .into_iter()
-                        .map(BlueprintMaterialResult::from)
-                        .collect::<Vec<_>>()
+            .find(|x| x.bid == bid);
+        if let Some(x) = bp {
+            Ok(Some(x.product.material_id))
+        } else {
+            Ok(None)
         }
     }
 }
 
 #[derive(Clone, Debug, Serialize)]
 pub struct BlueprintGraph {
+    pub id:       u32,
     pub item_id:  u32,
     pub quantity: u32,
     pub children: Vec<BlueprintGraph>,
 }
 
-#[derive(Clone, Debug, Serialize)]
-pub struct BlueprintMaterialResult {
-    pub material_id: u32,
-    pub quantity:    u32,
-    pub is_product:  bool,
-}
-
-impl From<Material> for BlueprintMaterialResult {
-    fn from(x: Material) -> Self {
-        Self {
-            material_id: x.material_id,
-            quantity: x.quantity,
-            is_product: x.is_product,
-        }
-    }
-}

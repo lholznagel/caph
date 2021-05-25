@@ -12,8 +12,9 @@ export class IdNameCache {
       return item.name;
     }
 
-    // fetch the id
-    const name = (await axios.get(`/api/items/resolve/${id}`)).data.name;
+    // fetch the name
+    const nameReq = (await axios.get(`/api/items/resolve/${id}`)).data || { name: 'Unknown' };
+    const name = nameReq.name;
     localItems.push({ id, name });
 
     this.save(localItems);
@@ -59,6 +60,17 @@ export class IdNameCache {
       });
 
     return names;
+  }
+
+  public static resolve_name_sync(id: number): string {
+    const localItems: IIdName[] = this.load();
+
+    const item = localItems.find(x => x.id === id);
+    if (item) {
+      return item.name;
+    } else {
+      return 'Unknown';
+    }
   }
 
   private static load(): IIdName[] {

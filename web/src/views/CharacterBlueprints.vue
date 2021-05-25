@@ -95,6 +95,7 @@ export default class MyItems extends Vue {
     this.$busy = false;
   }
 
+  // TODO: the server should do this like assets
   private groupItems(items: IItem[]): IItem[] {
     const map = new Map();
     for (const item of items) {

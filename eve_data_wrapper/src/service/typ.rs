@@ -136,7 +136,7 @@ impl TypeIdEntry {
         self
             .description
             .get("en")
-            .map(|x| x.clone())
+            .cloned()
     }
 
     /// Gets the english name for a type.
@@ -149,7 +149,7 @@ impl TypeIdEntry {
         self
             .name
             .get("en")
-            .map(|x| x.clone())
+            .cloned()
     }
 }
 

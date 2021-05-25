@@ -1,25 +1,24 @@
-use std::time::Instant;
+use std::collections::HashMap;
 
-use crate::{Actions, BlueprintCache, BlueprintEntry};
+use crate::{Actions, BlueprintCache, BlueprintEntry, PlanetSchematicEntry};
 
 use async_trait::async_trait;
 use cachem::{EmptyMsg, Insert, Parse, Storage, request};
-
-const METRIC_INSERT:         &'static str = "insert::blueprint::complete";
-const METRIC_INSERT_ENTRIES: &'static str = "insert::blueprint::entries";
 
 #[async_trait]
 impl Insert<InsertBlueprintReq> for BlueprintCache {
     type Response = EmptyMsg;
 
     async fn insert(&self, input: InsertBlueprintReq) -> Self::Response {
-        let timer = Instant::now();
-        let mut map = self.cache.read().await.clone();
-        let mut data = input.0;
+        let mut blueprint_data = input.blueprints;
+        let mut schematic_data = input.schematics;
 
-        while let Some(x) = data.pop() {
-            map
-                .entry(x.item_id)
+        let mut blueprints = HashMap::new();
+        let mut schematics = HashMap::new();
+
+        while let Some(x) = blueprint_data.pop() {
+            blueprints
+                .entry(x.bid)
                 .and_modify(|entry| {
                     if *entry != x {
                         *entry = x.clone();
@@ -28,15 +27,28 @@ impl Insert<InsertBlueprintReq> for BlueprintCache {
                 .or_insert(x);
         }
 
-        self.metrix.send_len(METRIC_INSERT_ENTRIES, map.len()).await;
-        *self.cache.write().await = map;
+        while let Some(x) = schematic_data.pop() {
+            schematics
+                .entry(x.psid)
+                .and_modify(|entry| {
+                    if *entry != x {
+                        *entry = x.clone();
+                    }
+                })
+                .or_insert(x);
+        }
+
+        *self.blueprints.write().await = blueprints;
+        *self.schematics.write().await = schematics;
         self.save_to_file().await.unwrap();
 
-        self.metrix.send_time(METRIC_INSERT, timer).await;
         EmptyMsg::default()
     }
 }
 
 #[request(Actions::InsertBlueprints)]
 #[derive(Debug, Parse)]
-pub struct InsertBlueprintReq(pub Vec<BlueprintEntry>);
+pub struct InsertBlueprintReq {
+    pub blueprints: Vec<BlueprintEntry>,
+    pub schematics: Vec<PlanetSchematicEntry>,
+}

@@ -21,12 +21,11 @@ pub use self::eve_client::*;
 pub use self::error::*;
 pub use self::service::*;
 
-use chrono::{NaiveDateTime, NaiveTime, Utc};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::path::Path;
 use std::sync::Arc;
 use std::{collections::HashMap, io::Read};
-use std::{fs, io::Cursor, time::Duration};
+use std::{fs, io::Cursor};
 use tokio::sync::RwLock;
 use zip::ZipArchive;
 
@@ -94,20 +93,6 @@ impl EveDataWrapper {
         Ok(x)
     }
 
-
-    /// Creates a new duration to the next 14:30:00 time.
-    ///
-    /// Eve´s downtime is at 14:00, so giving them 30 minutes should be ok.
-    pub async fn task() {
-        loop {
-            if Path::new(Self::ZIP_PATH).exists() {
-                let _ = fs::remove_file(Self::ZIP_PATH);
-            }
-
-
-        }
-    }
-
     async fn download_zip() -> Result<Cursor<Vec<u8>>, EveConnectError> {
         reqwest::get(Self::ZIP_URL)
             .await?
@@ -148,28 +133,6 @@ impl EveDataWrapper {
 
             Ok(service)
         }
-    }
-
-    /// Generates a duration to the next cycle for downloading and parsing the
-    /// sde zip file
-    fn next_sde_cycle(&self) -> Duration {
-        // Current timestamp
-        let timestamp = Utc::now().timestamp();
-        // Create a naive date time and add one day to it
-        let date_time = NaiveDateTime::from_timestamp(timestamp as i64, 0);
-        let date_time = date_time.checked_add_signed(chrono::Duration::days(1)).unwrap();
-
-        // Creates a new naive date time based on the date time that is one day
-        // ahead. We take the date and set the hms to 14:30:00.
-        let next = NaiveDateTime::new(
-            date_time.date(),
-            NaiveTime::from_hms(14, 30, 0)
-        )
-        .timestamp();
-
-        // Execute at exactly 14:30
-        let diff = next - timestamp;
-        Duration::from_secs(diff as u64)
     }
 }
 

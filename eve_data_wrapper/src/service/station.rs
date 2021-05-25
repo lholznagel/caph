@@ -47,7 +47,7 @@ impl StationService {
             .stations
             .iter()
             .find(|x| x.solar_system_id == sid)
-            .map(|x| x.clone())
+            .cloned()
     }
 }
 

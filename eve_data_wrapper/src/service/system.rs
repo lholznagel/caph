@@ -53,21 +53,21 @@ impl SystemService {
         let mut penalty_entries  = Vec::with_capacity(penalty.len());
         let mut wormhole_entries = Vec::with_capacity(wormhole.len());
 
-        /*for path in abyssal {
+        for path in abyssal {
             abyssal_entries.push(crate::parse_zip_file(&path, &mut zip)?);
-        }*/
+        }
 
         for path in eve {
             eve_entries.push(crate::parse_zip_file(&path, &mut zip)?);
         }
 
-        /*for path in penalty {
+        for path in penalty {
             penalty_entries.push(crate::parse_zip_file(&path, &mut zip)?);
         }
 
         for path in wormhole {
             wormhole_entries.push(crate::parse_zip_file(&path, &mut zip)?);
-        }*/
+        }
 
         let constellations = Self::fetch_constellations(eve_client.clone()).await?;
         let regions = Self::fetch_regions(eve_client).await?;
@@ -128,7 +128,6 @@ impl SystemService {
         }
         Ok(constellations)
     }
-
 
     async fn fetch_regions(
         eve_client: EveClient

@@ -230,6 +230,53 @@ impl EveClient {
         Ok(fetched_data)
     }
 
+    pub(crate) async fn post_oauth<T, R>(
+        &self,
+        token: &str,
+        path: &str,
+        body: &T
+    ) -> Result<R, EveConnectError>
+    where
+        T: serde::Serialize,
+        R: serde::de::DeserializeOwned {
+
+        let mut retry_counter = 0usize;
+
+        loop {
+            let url = format!("{}/{}", Self::EVE_API_URL, path);
+            if retry_counter == 3 {
+                log::error!("Too many retries requesting {}.", url);
+                return Err(EveConnectError::TooManyRetries(url));
+            }
+
+            let response = self.0
+                .post(&url)
+                .json(body)
+                .bearer_auth(token)
+                .send()
+                .await;
+            let response = response.map_err(EveConnectError::ReqwestError)?;
+
+            if response.status() == StatusCode::UNAUTHORIZED ||
+               response.status() == StatusCode::FORBIDDEN {
+                return Err(EveConnectError::Unauthorized);
+            }
+
+            // status 200 and 404 are ok
+            if response.status() != StatusCode::OK &&
+               response.status() != StatusCode::NOT_FOUND {
+                retry_counter += 1;
+                log::error!(
+                    "Fetch resulted in non 200 or 404 status code. Statuscode was {}. Retrying.",
+                    response.status()
+                );
+                continue;
+           } else {
+               return response.json().await.map_err(Into::into);
+           }
+        }
+    }
+
     fn page_count(&self, response: &Response) -> u8 {
         let headers = response.headers();
         if let Some(x) = headers.get("x-pages") {
@@ -286,7 +333,7 @@ impl EveOAuthToken {
     pub fn payload(&self) -> Result<EveOAuthPayload, EveConnectError> {
         let payload = self.access_token.to_string();
         let payload = payload.split('.').collect::<Vec<_>>();
-        let payload = payload.get(1).map(|x| *x).unwrap_or_default();
+        let payload = payload.get(1).copied().unwrap_or_default();
         let decoded = base64::decode(payload)
             .map_err(|_| EveConnectError::OAuthPayload("Failed to decode base64".into()))?;
         serde_json::from_slice(&decoded).map_err(Into::into)

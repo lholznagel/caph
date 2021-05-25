@@ -3,45 +3,24 @@ use crate::error::CollectorError;
 use cachem::{ConnectionPool, EmptyMsg, Protocol};
 use caph_db::*;
 use caph_eve_data_wrapper::{BlueprintAdditional, EveDataWrapper, SolarsystemEntry};
-use metrix_exporter::MetrixSender;
-use std::time::Instant;
 
 pub struct Sde {
     eve:    EveDataWrapper,
-    metrix: MetrixSender,
     pool:   ConnectionPool,
 }
 
 impl Sde {
-    const METRIC_SDE:                  &'static str = "sde::time::complete";
-    const METRIC_FETCH_SDE:            &'static str = "sde::time::fetch";
-    const METRIC_PROCESSING_ITEM:      &'static str = "sde::time::processing::item";
-    const METRIC_PROCESSING_MATERIAL:  &'static str = "sde::time::processing::material";
-    const METRIC_PROCESSING_STATION:   &'static str = "sde::time::processing::station";
-    const METRIC_PROCESSING_BLUEPRINT: &'static str = "sde::time::processing::blueprint";
-    const METRIC_ITEM_VOLUME_COUNT:    &'static str = "sde::count::item_volume";
-    const METRIC_MATERIAL_COUNT:       &'static str = "sde::count::material";
-    const METRIC_SYSTEM_REGION_COUNT:  &'static str = "sde::count::system_region";
-    const METRIC_BLUEPRINT_COUNT:      &'static str = "sde::count::blueprint";
-
-    pub fn new(eve: EveDataWrapper, metrix: MetrixSender, pool: ConnectionPool) -> Self {
-        Self { eve, metrix, pool }
+    pub fn new(eve: EveDataWrapper, pool: ConnectionPool) -> Self {
+        Self { eve, pool }
     }
 
     pub async fn run(&mut self) -> Result<(), CollectorError> {
-        let start = Instant::now();
-        let timer = Instant::now();
-
         // Download the current zip
-        self.metrix.send_time(Self::METRIC_FETCH_SDE, timer).await;
-
         self.save_blueprints(&self.eve).await?;
         self.save_item_materials(&self.eve).await?;
         self.save_items(&self.eve).await?;
         self.save_names(&self.eve).await?;
         self.save_system_region(&self.eve).await?;
-
-        self.metrix.send_time(Self::METRIC_SDE, start).await;
 
         Ok(())
     }
@@ -105,21 +84,13 @@ impl Sde {
                 )
             );
         }
-        self.metrix
-            .send_len(
-                Self::METRIC_ITEM_VOLUME_COUNT,
-                entries.len()
-            )
-            .await;
 
         // Save all entries in the database
-        let timer = Instant::now();
         Protocol::request::<_, EmptyMsg>(
             &mut conn,
             InsertItemReq(entries)
         )
         .await?;
-        self.metrix.send_time(Self::METRIC_PROCESSING_ITEM, timer).await;
 
         Ok(())
     }
@@ -146,18 +117,13 @@ impl Sde {
                 );
             }
         }
-        self.metrix
-            .send_len(Self::METRIC_MATERIAL_COUNT, entries.len())
-            .await;
 
         // Save all materials in the database
-        let timer = Instant::now();
         Protocol::request::<_, EmptyMsg>(
             &mut conn,
             InsertItemMaterialReq(entries)
         )
         .await?;
-        self.metrix.send_time(Self::METRIC_PROCESSING_MATERIAL, timer).await;
 
         Ok(())
     }
@@ -192,16 +158,13 @@ impl Sde {
                 }
             }
         }
-        self.metrix.send_len(Self::METRIC_SYSTEM_REGION_COUNT, entries.len()).await;
 
         // Save all entries
-        let timer = Instant::now();
         Protocol::request::<_, EmptyMsg>(
             &mut conn,
             InsertSystemRegionReq(entries)
         )
         .await?;
-        self.metrix.send_time(Self::METRIC_PROCESSING_STATION, timer).await;
 
         Ok(())
     }
@@ -213,7 +176,7 @@ impl Sde {
         let mut conn = self.pool.acquire().await?;
 
         // Collect all blueprints
-        let mut entries = Vec::new();
+        let mut blueprints = Vec::new();
         for (id, blueprint) in blueprint_service.blueprints() {
             let mut activity  = Activity::Manufacturing;
 
@@ -223,7 +186,6 @@ impl Sde {
                 activity = Activity::Reaction;
                 x
             } else {
-                log::error!("Unknown blueprint activity {:?}", blueprint.activities);
                 BlueprintAdditional {
                     materials: None,
                     products:  None,
@@ -232,22 +194,21 @@ impl Sde {
                 }
             };
 
-            let time      = activity_info.time;
+            let time          = activity_info.time;
             let mut materials = Vec::new();
             let mut skills    = Vec::new();
 
             for material in activity_info.materials.unwrap_or_default() {
                 let material_id = material.type_id;
                 let quantity = material.quantity;
-                let material = Material::new(material_id.0, quantity, false);
+                let material = Material::new(material_id.0, quantity);
                 materials.push(material);
             }
 
-            for product in activity_info.products.unwrap_or_default() {
-                let material_id = product.type_id;
-                let quantity = product.quantity;
-                materials.push(Material::new(material_id.0, quantity, true));
-            }
+            let product = if let Some(x) = activity_info.products {
+                let x = x.get(0).unwrap();
+                Material::new(*x.type_id, x.quantity)
+            } else { Material::new(0, 0) };
 
             for skill in activity_info.skills.unwrap_or_default() {
                 let level = skill.level as u8;
@@ -255,41 +216,54 @@ impl Sde {
                 skills.push(Skill::new(level, *type_id));
             }
 
-            entries.push(BlueprintEntry::new(activity, id.0, time, materials, skills));
-        }
-
-        // Collect all schematics
-        for (id, schematic) in schematic_service.schematics() {
-            let time = schematic.cycle_time;
-            let mut materials = Vec::new();
-
-            for (material_id, schematic) in schematic.types.clone() {
-                let quantity = schematic.quantity;
-                let is_product = !schematic.is_input;
-                let material = Material::new(material_id.0, quantity, is_product);
-                materials.push(material);
-            }
-
-            entries.push(
+            blueprints.push(
                 BlueprintEntry::new(
-                    Activity::PlanetInteraction,
+                    activity,
                     id.0,
                     time,
+                    product,
                     materials,
-                    Vec::new()
+                    skills
                 )
             );
         }
-        self.metrix.send_len(Self::METRIC_BLUEPRINT_COUNT, entries.len()).await;
+
+        // Collect all schematics
+        let mut schematics = Vec::new();
+        for (id, schematic) in schematic_service.schematics() {
+            let time = schematic.cycle_time;
+
+            let mut inputs = Vec::new();
+            let mut output = Material::new(0, 0);
+            for (material_id, schematic) in schematic.types.clone() {
+                let material = Material::new(material_id.0, schematic.quantity);
+
+                if schematic.is_input {
+                    inputs.push(material);
+                } else {
+                    output = material;
+                }
+            }
+
+            schematics.push(
+                PlanetSchematicEntry::new(
+                    id.0,
+                    time,
+                    output,
+                    inputs,
+                )
+            );
+        }
 
         // Save all entries
-        let timer = Instant::now();
         Protocol::request::<_, EmptyMsg>(
             &mut conn,
-            InsertBlueprintReq(entries)
+            InsertBlueprintReq {
+                blueprints,
+                schematics,
+            }
         )
         .await?;
-        self.metrix.send_time(Self::METRIC_PROCESSING_BLUEPRINT, timer).await;
 
         Ok(())
     }

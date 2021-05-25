@@ -18,15 +18,17 @@
     <v-card-text>
       <v-data-table
         :headers="headers"
-        :items="items"
+        :items="assets"
+        :loading="busy"
         :search="search"
-        :loading="$busy"
+        :single-expand="true"
         item-key="type_id"
         sort-by="name"
+        show-expand
       >
 
         <template v-slot:item.type_id="{ item }">
-          <c-item-icon :id="item.type_id" type="icon" />
+          <c-item-icon :id="item.type_id" :type="item.icon" />
         </template>
 
         <template v-slot:item.quantity="{ item }">
@@ -43,23 +45,30 @@
           </v-btn>
         </template>
 
-
+        <template v-slot:expanded-item="{ headers, item }">
+          <td :colspan="headers.length">
+            <c-character-asset-location
+              :asset="item"
+              :assets="assets"
+              :names="names" />
+          </td>
+        </template>
       </v-data-table>
     </v-card-text>
   </v-card>
 </template>
 
 <script lang="ts">
-import axios from 'axios';
-
 import { Component, Vue } from 'vue-property-decorator';
-import { IdNameCache } from '../services/resolve_names';
+import { CharacterService, IAsset, IAssetName } from '@/services/character';
 
 @Component
-export default class MyItems extends Vue {
-  public $busy = false;
+export default class CharacterAssets extends Vue {
+  public busy = false;
 
-  public items: IItem[] = [];
+  public assets: IAsset[]    = [];
+  public names: IAssetName[] = [];
+
   public search: string = '';
   public headers        = [
     { text: '', value: 'type_id', sortable: false, filterable: false, width: 32 },
@@ -69,27 +78,12 @@ export default class MyItems extends Vue {
   ];
 
   public async created() {
-    this.$busy = true;
-    const assets: IAsset[] = (await axios.get(`/api/character/assets`)).data;
-    for (const asset of assets) {
-      this.items.push({
-        name: (await IdNameCache.resolve(asset.type_id)),
-        ...asset
-      });
-    }
+    this.busy = true;
 
-    this.$busy = false;
+    this.assets = await CharacterService.assets();
+    this.names  = await CharacterService.asset_names(this.assets);
+
+    this.busy = false;
   }
-}
-
-interface IAsset {
-  type_id: number;
-  quantity: number;
-}
-
-interface IItem {
-  quantity: number;
-  type_id: number;
-  name: string;
 }
 </script>
