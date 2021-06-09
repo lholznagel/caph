@@ -1,11 +1,12 @@
 use crate::error::CollectorError;
 use crate::time::previous_30_minute;
 
-use cachem::{ConnectionPool, EmptyMsg, Protocol};
-use caph_db::*;
+use cachem::v2::ConnectionPool;
+use caph_db_v2::*;
 use caph_eve_data_wrapper::{EveDataWrapper, MarketOrder};
 use chrono::{DateTime, Utc};
 use futures::stream::{FuturesUnordered, StreamExt};
+use std::collections::HashMap;
 
 pub struct Market {
     eve:    EveDataWrapper,
@@ -54,50 +55,45 @@ impl Market {
         entries: Vec<MarketOrder>,
         timestamp: u64
     ) -> Result<(), CollectorError> {
-        let mut conn = self.pool.acquire().await?;
+        let mut con = self.pool.acquire().await?;
 
-        let mut market_order_infos = Vec::with_capacity(MarketOrderCache::CAPACITY);
+        let mut market_infos = HashMap::new();
+        let mut market_orders = HashMap::new();
+
         for entry in entries.iter() {
             let issued = entry.issued.parse::<DateTime<Utc>>()?;
             let expire = issued.checked_add_signed(chrono::Duration::days(entry.duration as i64)).ok_or(CollectorError::ChronoError)?;
 
-            let market_order_info = MarketOrderInfoEntry {
+            let market_info = MarketInfoEntry {
                 issued:       issued.timestamp() as u64 * 1000,
                 expire:       expire.timestamp() as u64 * 100,
-                order_id:     entry.order_id,
-                location_id:  entry.location_id,
-                system_id:    entry.system_id,
-                type_id:      entry.type_id,
+                order_id:     entry.order_id.into(),
+                location_id:  entry.location_id.into(),
+                system_id:    entry.system_id.into(),
+                type_id:      entry.type_id.into(),
                 volume_total: entry.volume_total,
                 price:        entry.price,
                 is_buy_order: entry.is_buy_order,
             };
-            market_order_infos.push(market_order_info);
+            market_infos.insert(entry.order_id, market_info);
         }
 
-        let mut market_orders = Vec::with_capacity(MarketOrderCache::CAPACITY);
         for entry in entries {
             let market_order = MarketOrderEntry {
-                order_id:      entry.order_id,
+                order_id:      entry.order_id.into(),
                 timestamp,
                 volume_remain: entry.volume_remain,
-                type_id:       entry.type_id,
+                type_id:       entry.type_id.into(),
             };
-            market_orders.push(market_order);
+            market_orders
+                .entry(entry.type_id)
+                .and_modify(|x: &mut Vec<MarketOrderEntry>| { x.push(market_order.clone()) })
+                .or_insert(vec![market_order]);
         }
 
-        if !market_order_infos.is_empty() {
-            Protocol::request::<_, EmptyMsg>(
-                &mut conn,
-                InsertMarketOrderInfoReq(market_order_infos)
-            )
-            .await?;
-
-            Protocol::request::<_, EmptyMsg>(
-                &mut conn,
-                InsertMarketOrderReq(market_orders)
-            )
-            .await?;
+        if !market_infos.is_empty() {
+            con.mset(CacheName::MarketInfo, market_infos).await.unwrap();
+            con.mset(CacheName::MarketOrder, market_orders).await.unwrap();
         }
 
         Ok(())

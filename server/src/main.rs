@@ -4,9 +4,8 @@ mod services;
 
 use self::services::*;
 
-use cachem::ConnectionPool;
-use caph_eve_data_wrapper::{EveClient, EveDataWrapper};
-use metrix_exporter::Metrix;
+use cachem::v2::ConnectionPool;
+use caph_eve_data_wrapper::{EveClient, EveDataWrapper, TypeId};
 use serde::Deserialize;
 use std::sync::Arc;
 use warp::http::Response;
@@ -17,18 +16,14 @@ use warp::{Filter, Rejection, Reply};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     morgan::Morgan::init(vec!["tracing".into()]);
 
-    let metrix = Metrix::new(env!("CARGO_PKG_NAME").into(), "0.0.0.0:8889").await?;
-    let pool = ConnectionPool::new("0.0.0.0:9999", metrix.get_sender(), 10).await?;
+    let pool = ConnectionPool::new("0.0.0.0:55555", 10).await?;
 
     let eve = EveDataWrapper::new().await?;
 
     let blueprint_service = BlueprintService::new(pool.clone());
     let character_service = CharacterService::new(eve.clone(), pool.clone());
     let item_service = ItemService::new(pool.clone());
-    let market_service = MarketService::new(
-        pool,
-        item_service.clone(),
-    );
+    let market_service = MarketService::new(pool, item_service.clone());
 
     log::info!("Starting server");
 
@@ -133,18 +128,39 @@ impl ApiServer {
             .and(warp::get())
             .and(warp::cookie("user"))
             .and_then(Self::character_portrait);
+        let character_skills = character
+            .clone()
+            .and(warp::path!("skills"))
+            .and(warp::get())
+            .and(warp::cookie("user"))
+            .and_then(Self::character_skills);
+        let character_skillqueue = character
+            .clone()
+            .and(warp::path!("skillqueue"))
+            .and(warp::get())
+            .and(warp::cookie("user"))
+            .and_then(Self::character_skillqueue);
+        let character_corp_skillplans = character
+            .clone()
+            .and(warp::path!("corp" / "skillplans"))
+            .and(warp::get())
+            .and(warp::cookie("user"))
+            .and_then(Self::character_corp_skillplans);
         let character = character_assets
             .or(character_asset_names)
             .or(character_blueprints)
             .or(character_name)
-            .or(character_portrait);
+            .or(character_portrait)
+            .or(character_skills)
+            .or(character_skillqueue)
+            .or(character_corp_skillplans);
 
         let item = root
             .clone()
             .and(warp::path!("items" / ..));
         let item_by_id = item
             .clone()
-            .and(warp::path!(u32))
+            .and(warp::path!(TypeId))
             .and(warp::get())
             .and_then(Self::item_by_id);
         let item_bulk = item
@@ -155,7 +171,7 @@ impl ApiServer {
             .and_then(Self::item_bulk);
         let item_resolve = item
             .clone()
-            .and(warp::path!("resolve" / u32))
+            .and(warp::path!("resolve" / TypeId))
             .and(warp::get())
             .and_then(Self::item_resolve);
         let item_resolve_bulk = item
@@ -166,22 +182,12 @@ impl ApiServer {
             .and_then(Self::item_resolve_bulk);
         let item_blueprint = item
             .clone()
-            .and(warp::path!(u32 / "blueprint"))
+            .and(warp::path!(TypeId / "blueprint"))
             .and(warp::get())
             .and_then(Self::item_blueprint);
-        let item_blueprint_graph = item
-            .clone()
-            .and(warp::path!(u32 / "blueprint" / "graph"))
-            .and(warp::get())
-            .and_then(Self::item_blueprint_graph);
-        let item_blueprint_product = item
-            .clone()
-            .and(warp::path!(u32 / "blueprint" / "product"))
-            .and(warp::get())
-            .and_then(Self::item_blueprint_product);
         let item_reprocessing = item
             .clone()
-            .and(warp::path!(u32 / "reprocessing"))
+            .and(warp::path!(TypeId / "reprocessing"))
             .and(warp::get())
             .and_then(Self::item_reprocessing);
         let item = item_by_id
@@ -189,8 +195,6 @@ impl ApiServer {
             .or(item_resolve)
             .or(item_resolve_bulk)
             .or(item_blueprint)
-            .or(item_blueprint_graph)
-            .or(item_blueprint_product)
             .or(item_reprocessing);
 
         let market = root
@@ -240,7 +244,7 @@ impl ApiServer {
 
     async fn item_by_id(
         self: Arc<Self>,
-        item_id: u32,
+        item_id: TypeId,
     ) -> Result<impl Reply, Rejection> {
         self
             .items
@@ -252,7 +256,7 @@ impl ApiServer {
 
     async fn item_bulk(
         self: Arc<Self>,
-        item_ids: Vec<u32>,
+        item_ids: Vec<TypeId>,
     ) -> Result<impl Reply, Rejection> {
         self
             .items
@@ -263,8 +267,8 @@ impl ApiServer {
     }
 
     async fn item_resolve(
-        self: Arc<Self>,
-        item_id: u32,
+        self:    Arc<Self>,
+        item_id: TypeId,
     ) -> Result<impl Reply, Rejection> {
         self
             .items
@@ -276,7 +280,7 @@ impl ApiServer {
 
     async fn item_resolve_bulk(
         self: Arc<Self>,
-        ids: Vec<u32>
+        ids:  Vec<TypeId>
     ) -> Result<impl Reply, Rejection> {
         self
             .items
@@ -288,7 +292,7 @@ impl ApiServer {
 
     async fn item_blueprint(
         self: Arc<Self>,
-        bid: u32,
+        bid:  TypeId,
     ) -> Result<impl Reply, Rejection> {
         self
             .blueprint
@@ -298,33 +302,9 @@ impl ApiServer {
             .map_err(Into::into)
     }
 
-    async fn item_blueprint_graph(
-        self: Arc<Self>,
-        tid: u32,
-    ) -> Result<impl Reply, Rejection> {
-        self
-            .blueprint
-            .blueprint_graph(tid)
-            .await
-            .map(|x| warp::reply::json(&x))
-            .map_err(Into::into)
-    }
-
-    async fn item_blueprint_product(
-        self: Arc<Self>,
-        tid: u32,
-    ) -> Result<impl Reply, Rejection> {
-        self
-            .blueprint
-            .blueprint_product(tid)
-            .await
-            .map(|x| warp::reply::json(&x))
-            .map_err(Into::into)
-    }
-
     async fn item_reprocessing(
-        self: Arc<Self>,
-        item_id: u32,
+        self:    Arc<Self>,
+        item_id: TypeId,
     ) -> Result<impl Reply, Rejection> {
         self
             .items
@@ -413,7 +393,7 @@ impl ApiServer {
     async fn eve_login(
         self: Arc<Self>,
     ) -> Result<impl Reply, Rejection> {
-        let auth_uri = EveClient::eve_auth_uri().unwrap();
+        let auth_uri = EveClient::eve_auth_uri("login").unwrap();
 
         let uri = warp::http::uri::Builder::new()
             .scheme(auth_uri.scheme())
@@ -505,6 +485,36 @@ impl ApiServer {
         Ok(warp::reply::json(&assets))
     }
 
+    async fn character_skills(
+        self: Arc<Self>,
+        character_id: u32
+    ) -> Result<impl Reply, Rejection> {
+        let assets = self
+            .character
+            .skills(character_id)
+            .await?;
+
+        Ok(warp::reply::json(&assets))
+    }
+
+    async fn character_skillqueue(
+        self: Arc<Self>,
+        character_id: u32
+    ) -> Result<impl Reply, Rejection> {
+        let assets = self
+            .character
+            .skillqueue(character_id)
+            .await?;
+
+        Ok(warp::reply::json(&assets))
+    }
+
+    async fn character_corp_skillplans(
+        self: Arc<Self>,
+        _: u32
+    ) -> Result<impl Reply, Rejection> {
+        Ok(warp::reply::json(&include_str!("../skillplans.out.json")))
+    }
 }
 
 

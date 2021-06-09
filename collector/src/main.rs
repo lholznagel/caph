@@ -7,17 +7,15 @@ use self::market::*;
 use self::sde::*;
 use self::time::*;
 
-use cachem::ConnectionPool;
+use cachem::v2::ConnectionPool;
 use caph_eve_data_wrapper::EveDataWrapper;
-use metrix_exporter::Metrix;
 use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     morgan::Morgan::init(vec![]);
 
-    let metrix = Metrix::new(env!("CARGO_PKG_NAME").into(), "0.0.0.0:8889").await?;
-    let pool = ConnectionPool::new("0.0.0.0:9999", metrix.get_sender(), 10).await?;
+    let pool = ConnectionPool::new("0.0.0.0:55555", 10).await?;
 
     log::info!("Preparing SDE");
     let eve = EveDataWrapper::new().await?;

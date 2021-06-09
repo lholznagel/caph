@@ -27,7 +27,7 @@ impl EveClient {
         Ok(Self(client))
     }
 
-    pub fn eve_auth_uri() -> Result<Url, EveConnectError> {
+    pub fn eve_auth_uri(state: &str) -> Result<Url, EveConnectError> {
         let mut url = Url::parse(Self::EVE_LOGIN_URL).unwrap();
 
         let client_id    = std::env::var(Self::ENV_CLIENT_ID)
@@ -40,7 +40,7 @@ impl EveClient {
             .append_pair("redirect_uri", &redirect_uri)
             .append_pair("client_id", &client_id)
             .append_pair("scope", &scope())
-            .append_pair("state", "TODO:secure");
+            .append_pair("state", state);
         Ok(url)
     }
 
@@ -240,6 +240,7 @@ impl EveClient {
         T: serde::Serialize,
         R: serde::de::DeserializeOwned {
 
+        dbg!(&serde_json::to_string(&body));
         let mut retry_counter = 0usize;
 
         loop {
@@ -297,12 +298,10 @@ fn scope() -> String {
         "esi-characters.read_agents_research.v1",
         "esi-characters.read_blueprints.v1",
         "esi-characterstats.read.v1",
-        "esi-corporations.read_structures.v1",
         "esi-fittings.read_fittings.v1",
         "esi-fittings.write_fittings.v1",
         "esi-industry.read_character_jobs.v1",
         "esi-industry.read_character_mining.v1",
-        "esi-location.read_location.v1",
         "esi-markets.read_character_orders.v1",
         "esi-markets.structure_markets.v1",
         "esi-planets.manage_planets.v1",

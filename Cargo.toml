@@ -9,7 +9,9 @@ panic = 'abort'
 members = [
   'collector',
   'db',
+  'db_v2',
   'eve_data_wrapper',
+  'evemon_to_json',
   'market_analyzer',
   'server',
 ]

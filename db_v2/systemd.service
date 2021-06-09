@@ -1,0 +1,13 @@
+[Unit]
+Description=Caph database
+
+[Service]
+Type=simple
+Environment=MORGAN_COLOR=false
+Environment=RUST_BACKTRACE=1
+ExecStart=/opt/caph/caph_db
+WorkingDirectory=/var/caph
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

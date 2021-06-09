@@ -13,8 +13,7 @@ export class IdNameCache {
     }
 
     // fetch the name
-    const nameReq = (await axios.get(`/api/items/resolve/${id}`)).data || { name: 'Unknown' };
-    const name = nameReq.name;
+    const name = (await axios.get(`/api/items/resolve/${id}`)).data || { name: 'Unknown' };
     localItems.push({ id, name });
 
     this.save(localItems);
@@ -40,9 +39,10 @@ export class IdNameCache {
     if (unknown.length > 0) {
       // fetch all unknown ids
       const items = (await axios.post(`/api/items/resolve/bulk`, unknown)).data;
-      for (const item of items) {
-        names.push({ id: item.item_id, name: item.name });
-        localItems.push({ id: item.item_id, name: item.name });
+      for (let i = 0; i < unknown.length; i++) {
+        const obj = { id: unknown[i], name: items[i] };
+        names.push(obj);
+        localItems.push(obj);
       }
 
       this.save(localItems);

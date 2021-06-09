@@ -310,7 +310,7 @@ pub struct Moon {
     #[serde(rename = "position")]
     pub position:          Vec<f32>,
     #[serde(rename = "radius")]
-    pub radius:            u32,
+    pub radius:            f32,
     #[serde(rename = "typeID")]
     pub type_id:           TypeId,
 
@@ -362,7 +362,7 @@ pub struct Star {
     #[serde(rename = "id")]
     pub id:         StarId,
     #[serde(rename = "radius")]
-    pub radius:     u32,
+    pub radius:     f32,
     #[serde(rename = "statistics")]
     pub statistics: StarStatistics,
     #[serde(rename = "typeID")]

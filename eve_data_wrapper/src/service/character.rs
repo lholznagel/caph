@@ -97,6 +97,36 @@ impl CharacterService {
             .await
             .map_err(Into::into)
     }
+
+    pub async fn skills(
+        &self,
+        token: &str,
+        character_id: u32,
+    ) -> Result<CharacterSkillRes, EveConnectError> {
+        let path = format!("characters/{}/skills", character_id);
+        self
+            .eve_client
+            .fetch_oauth(&token, &path)
+            .await?
+            .json()
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn skillqueue(
+        &self,
+        token: &str,
+        character_id: u32,
+    ) -> Result<Vec<CharacterSkillQueue>, EveConnectError> {
+        let path = format!("characters/{}/skillqueue", character_id);
+        self
+            .eve_client
+            .fetch_oauth(&token, &path)
+            .await?
+            .json()
+            .await
+            .map_err(Into::into)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -135,3 +165,30 @@ pub struct CharacterBlueprint {
     pub type_id: u32,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CharacterSkillRes {
+    pub skills:         Vec<CharacterSkill>,
+    pub total_sp:       u64,
+    pub unallocated_sp: Option<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CharacterSkill {
+    pub active_skill_level:   u32,
+    pub skill_id:             u32,
+    pub skillpoints_in_skill: u64,
+    pub trained_skill_level:  u32,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct CharacterSkillQueue {
+    pub finished_level:    u32,
+    pub queue_position:    u32,
+    pub skill_id:          u32,
+
+    pub finish_date:       Option<String>,
+    pub level_end_sp:      Option<u32>,
+    pub level_start_sp:    Option<u32>,
+    pub start_date:        Option<String>,
+    pub training_start_sp: Option<u32>,
+}

@@ -6,7 +6,7 @@ Vue.use(VueRouter);
 const routes: RouteConfig[] = [
   {
     path: '/',
-    redirect: 'Market'
+    redirect: 'market'
   },
   {
     path: '/market',
@@ -32,6 +32,11 @@ const routes: RouteConfig[] = [
     path: '/my/blueprints',
     name: 'CharacterBlueprints',
     component: () => import(/* webpackChunkName: "character_blueprints" */ '../views/CharacterBlueprints.vue')
+  },
+  {
+    path: '/my/skills',
+    name: 'CharacterSkills',
+    component: () => import(/* webpackChunkName: "character_skills" */ '../views/CharacterSkills.vue')
   }
 ];
 

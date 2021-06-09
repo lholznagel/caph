@@ -91,5 +91,28 @@ macro_rules! eve_id {
                     .map_err(|_| EveConnectError::CannotParse)
             }
         }
+
+        #[async_trait::async_trait]
+        impl cachem::Parse for $name {
+            async fn read<B>(
+                buf: &mut B
+            ) -> Result<Self, cachem::CachemError>
+            where
+                B: tokio::io::AsyncBufRead + tokio::io::AsyncRead + Send + Unpin {
+
+                Ok(Self(<$typ>::read(buf).await?))
+            }
+
+            async fn write<B>(
+                &self,
+                buf: &mut B
+            ) -> Result<(), cachem::CachemError>
+            where
+                B: tokio::io::AsyncWrite + Send + Unpin {
+
+                self.0.write(buf).await?;
+                Ok(())
+            }
+        }
     };
 }

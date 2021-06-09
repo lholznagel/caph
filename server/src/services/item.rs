@@ -1,8 +1,11 @@
 use crate::error::EveServerError;
 use crate::reprocessing::calc_reprocessing;
 
-use cachem::{ConnectionPool, Protocol};
-use caph_db::{FetchItemMaterialReq, FetchItemMaterialRes, FetchItemReq, FetchItemRes, ItemEntry, IdNameEntry, FetchIdNameRes, FetchIdNameReq, FetchIdNameBulkRes, FetchIdNameBulkReq};
+use cachem::v2::ConnectionPool;
+use caph_db_v2::CacheName;
+use caph_db_v2::ItemEntry;
+use caph_db_v2::ReprocessEntry;
+use caph_eve_data_wrapper::TypeId;
 use serde::Serialize;
 
 #[derive(Clone)]
@@ -13,102 +16,77 @@ impl ItemService {
         Self(pool)
     }
 
-    pub async fn by_id(&self, id: u32) -> Result<Option<ItemEntry>, EveServerError> {
-        let mut conn = self.0.acquire().await?;
-
-        Protocol::request::<_, FetchItemRes>(
-            &mut conn,
-            FetchItemReq(id)
-        )
-        .await
-        .map(|x| {
-            match x {
-                FetchItemRes::Ok(x) => Some(x),
-                _ => None
-            }
-        })
-        .map_err(Into::into)
+    pub async fn by_id(&self, iid: TypeId) -> Result<Option<ItemEntry>, EveServerError> {
+        self.0
+            .acquire()
+            .await?
+            .get::<_, _, ItemEntry>(CacheName::Item, *iid)
+            .await
+            .map_err(Into::into)
     }
 
-    pub async fn bulk(&self, ids: Vec<u32>) -> Result<Vec<ItemEntry>, EveServerError> {
-        let mut result = Vec::with_capacity(ids.len());
-
-        for id in ids {
-            let item = self.by_id(id).await?;
-            if let Some(x) = item {
-                result.push(x);
-            }
-        }
-
-        Ok(result)
+    pub async fn bulk(&self, ids: Vec<TypeId>) -> Result<Vec<ItemEntry>, EveServerError> {
+        let res = self.0
+            .acquire()
+            .await?
+            .mget::<_, _, ItemEntry>(CacheName::Item, ids)
+            .await?
+            .into_iter()
+            .filter(|x| x.is_some())
+            .map(|x| x.unwrap())
+            .collect::<Vec<_>>();
+        Ok(res)
     }
 
-    pub async fn resolve_id(&self, id: u32) -> Result<Option<IdNameEntry>, EveServerError> {
-        let mut conn = self.0.acquire().await?;
-
-        Protocol::request::<_, FetchIdNameRes>(
-            &mut conn,
-            FetchIdNameReq(id)
-        )
-        .await
-        .map(|x| {
-            match x {
-                FetchIdNameRes::Ok(x) => Some(x),
-                _ => None,
-            }
-        })
-        .map_err(Into::into)
+    pub async fn resolve_id(&self, tid: TypeId) -> Result<Option<String>, EveServerError> {
+        self.0
+            .acquire()
+            .await?
+            .get::<_, _, String>(CacheName::Name, tid)
+            .await
+            .map_err(Into::into)
     }
 
-    pub async fn resolve_bulk(&self, ids: Vec<u32>) -> Result<Vec<IdNameEntry>, EveServerError> {
-        let mut conn = self.0.acquire().await?;
-
-        Protocol::request::<_, FetchIdNameBulkRes>(
-            &mut conn,
-            FetchIdNameBulkReq(ids)
-        )
-        .await
-        .map(|x| x.0)
-        .map_err(Into::into)
+    pub async fn resolve_bulk(&self, ids: Vec<TypeId>) -> Result<Vec<String>, EveServerError> {
+        let res = self.0
+            .acquire()
+            .await?
+            .mget::<_, _, String>(CacheName::Name, ids)
+            .await?
+            .into_iter()
+            .filter(|x| x.is_some())
+            .map(|x| x.unwrap())
+            .collect::<Vec<_>>();
+        Ok(res)
     }
 
     pub async fn reprocessing(
         &self,
-        id: u32,
+        tid: TypeId,
     ) -> Result<Vec<ItemReprocessingResult>, EveServerError> {
-        let mut conn = self.0.acquire().await?;
-
-        let ret = Protocol::request::<_, FetchItemMaterialRes>(
-            &mut conn,
-            FetchItemMaterialReq(id)
-        )
-        .await
-        .map(|x| {
-            if let FetchItemMaterialRes::Ok(x) = x {
-                x
-            } else {
-                Vec::new()
-            }
-        })?
-        .iter()
-        .map(|x| {
-            let modifier = calc_reprocessing(50, 0, 0, 0);
-            ItemReprocessingResult {
-                id: x.item_id,
-                material_id: x.material_id,
-                quantity: x.quantity,
-                reprocessed: x.quantity as f32 * (modifier / 100f32),
-            }
-        })
-        .collect::<Vec<_>>();
+        let ret = self.0
+            .acquire()
+            .await?
+            .get::<_, _, Vec<ReprocessEntry>>(CacheName::Reprocess, tid)
+            .await?
+            .unwrap_or_default()
+            .iter()
+            .map(|x| {
+                let modifier = calc_reprocessing(50, 0, 0, 0);
+                ItemReprocessingResult {
+                    material_id: x.material_id,
+                    quantity: x.quantity,
+                    reprocessed: x.quantity as f32 * (modifier / 100f32),
+                }
+            })
+            .collect::<Vec<_>>();
         Ok(ret)
     }
 }
 
 #[derive(Clone, Debug, Serialize)]
 pub struct ItemReprocessingResult {
-    pub id:          u32,
-    pub material_id: u32,
+    pub material_id: TypeId,
     pub quantity:    u32,
     pub reprocessed: f32,
 }

@@ -1,8 +1,8 @@
 use crate::error::EveServerError;
 
-use cachem::{ConnectionPool, EmptyMsg, Protocol};
-use caph_db::{FetchUserReq, FetchUserRes, InsertUserReq, UserEntry};
-use caph_eve_data_wrapper::{CharacterAssetName, CharacterBlueprint, EveClient, EveConnectError, EveDataWrapper, EveOAuthUser};
+use cachem::v2::ConnectionPool;
+use caph_db_v2::{CacheName, UserEntry};
+use caph_eve_data_wrapper::{CharacterAssetName, CharacterBlueprint, CharacterSkill, CharacterSkillQueue, EveClient, EveConnectError, EveDataWrapper, EveOAuthUser};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -24,30 +24,35 @@ impl CharacterService {
         &self,
         character: EveOAuthUser,
     ) -> Result<(), EveServerError> {
-        let mut conn = self.pool.acquire().await?;
-
         if let Some(x) = self.lookup(character.user_id).await? {
-            Protocol::request::<_, EmptyMsg>(
-                &mut conn,
-                InsertUserReq(UserEntry {
-                    access_token: character.access_token,
-                    refresh_token: character.refresh_token,
-                    ..x
-                })
-            )
-            .await?;
+            let entry = UserEntry {
+                access_token: character.access_token,
+                refresh_token: character.refresh_token,
+                ..x
+            };
+
+            self
+                .pool
+                .acquire()
+                .await?
+                .set(CacheName::User, x.user_id, entry)
+                .await?;
         } else {
-            Protocol::request::<_, EmptyMsg>(
-                &mut conn,
-                InsertUserReq(UserEntry {
-                    access_token: character.access_token,
-                    refresh_token: character.refresh_token,
-                    user_id: character.user_id,
-                    name: String::new(),
-                    aliase: Vec::new(),
-                })
-            )
-            .await?;
+            let entry = UserEntry {
+                access_token: character.access_token,
+                refresh_token: character.refresh_token,
+                user_id: character.user_id,
+                name: String::new(),
+                aliase: Vec::new(),
+                token: String::new()
+            };
+
+            self
+                .pool
+                .acquire()
+                .await?
+                .set(CacheName::User, character.user_id, entry)
+                .await?;
         }
 
         Ok(())
@@ -55,22 +60,15 @@ impl CharacterService {
 
     pub async fn lookup(
         &self,
-        character_id: u32,
+        cid: u32,
     ) -> Result<Option<UserEntry>, EveServerError> {
-        let mut conn = self.pool.acquire().await?;
-
-        Protocol::request::<_, FetchUserRes>(
-            &mut conn,
-            FetchUserReq(character_id)
-        )
-        .await
-        .map(|x| {
-            match x {
-                FetchUserRes::Ok(x) => Some(x),
-                _ => None
-            }
-        })
-        .map_err(Into::into)
+        self
+            .pool
+            .acquire()
+            .await?
+            .get::<_, _, UserEntry>(CacheName::User, cid)
+            .await
+            .map_err(Into::into)
     }
 
     pub async fn name(
@@ -246,6 +244,61 @@ impl CharacterService {
         };
 
         Ok(blueprints)
+    }
+
+    pub async fn skills(
+        &self,
+        character_id: u32,
+    ) -> Result<Vec<CharacterSkill>, EveServerError> {
+        let oauth = self.lookup(character_id).await?.ok_or(EveServerError::UserNotFound)?;
+        let character_service = self.eve.character().await?;
+
+        let skills = character_service.skills(&oauth.access_token, character_id).await;
+        let skills = if let Err(EveConnectError::Unauthorized) = skills {
+            let user = EveClient::retrieve_refresh_token(&oauth.refresh_token)
+                .await
+                .map_err(EveServerError::from)?;
+
+            self.save_login(user.clone()).await?;
+
+            character_service.skills(&user.access_token, character_id)
+                .await
+                .map(|x| x.skills)
+                .map_err(EveServerError::from)?
+        } else if let Ok(x) = skills {
+            x.skills
+        } else {
+            return Err(EveServerError::EveConnectError(EveConnectError::Unauthorized).into());
+        };
+
+        Ok(skills)
+    }
+
+    pub async fn skillqueue(
+        &self,
+        character_id: u32,
+    ) -> Result<Vec<CharacterSkillQueue>, EveServerError> {
+        let oauth = self.lookup(character_id).await?.ok_or(EveServerError::UserNotFound)?;
+        let character_service = self.eve.character().await?;
+
+        let skills = character_service.skillqueue(&oauth.access_token, character_id).await;
+        let skills = if let Err(EveConnectError::Unauthorized) = skills {
+            let user = EveClient::retrieve_refresh_token(&oauth.refresh_token)
+                .await
+                .map_err(EveServerError::from)?;
+
+            self.save_login(user.clone()).await?;
+
+            character_service.skillqueue(&user.access_token, character_id)
+                .await
+                .map_err(EveServerError::from)?
+        } else if let Ok(x) = skills {
+            x
+        } else {
+            return Err(EveServerError::EveConnectError(EveConnectError::Unauthorized).into());
+        };
+
+        Ok(skills)
     }
 }
 

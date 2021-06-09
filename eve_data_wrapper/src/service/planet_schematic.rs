@@ -30,7 +30,7 @@ pub struct PlanetSchematicEntry {
     #[serde(rename = "nameID")]
     pub name:       HashMap<String, String>,
     #[serde(rename = "pins")]
-    pub skills:     Vec<TypeId>,
+    pub pins:       Vec<TypeId>,
     #[serde(rename = "types")]
     pub types:      HashMap<TypeId, SchematicType>,
 }

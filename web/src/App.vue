@@ -20,6 +20,12 @@
               <v-list-item-title>Blueprints</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
+
+          <v-list-item to="/my/skills">
+            <v-list-item-content>
+              <v-list-item-title>Skills</v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
         </v-list-group>
 
         <v-list-item to="/market">

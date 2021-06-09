@@ -1,8 +1,16 @@
 use crate::error::EveServerError;
 use crate::ItemService;
 
-use cachem::{ConnectionPool, Protocol};
-use caph_db::{FetchMarketOrderInfoBulkReq, FetchMarketOrderInfoResBulk, FetchMarketOrderItemIdsReq, FetchMarketOrderItemIdsRes, FetchMarketOrderReq, FetchMarketOrderRes, FetchSystemRegionReq, FetchSystemRegionRes};
+use cachem::v2::ConnectionPool;
+use caph_db_v2::CacheName;
+use caph_db_v2::MarketInfoEntry;
+use caph_db_v2::MarketOrderRequest;
+use caph_db_v2::MarketOrderResponse;
+use caph_db_v2::SystemRegionEntry;
+use caph_eve_data_wrapper::OrderId;
+use caph_eve_data_wrapper::RegionId;
+use caph_eve_data_wrapper::SolarSystemId;
+use caph_eve_data_wrapper::TypeId;
 use chrono::{NaiveDateTime, NaiveTime, Timelike};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -61,17 +69,14 @@ impl MarketService {
 
     pub async fn items(
         &self,
-    ) -> Result<Vec<u32>, EveServerError> {
-        let mut conn = self.pool.acquire().await?;
-
-        let ids = Protocol::request::<_, FetchMarketOrderItemIdsRes>(
-            &mut conn,
-            FetchMarketOrderItemIdsReq { }
-        )
-        .await
-        .map(|x| x.0)?;
-
-        Ok(ids)
+    ) -> Result<Vec<TypeId>, EveServerError> {
+        self
+            .pool
+            .acquire()
+            .await?
+            .keys(CacheName::MarketOrder)
+            .await
+            .map_err(Into::into)
     }
 
     pub async fn top_orders(
@@ -79,18 +84,18 @@ impl MarketService {
         item_id: u32,
         req: TopOrderReq,
     ) -> Result<Vec<TopOrder>, EveServerError> {
-        let mut conn = self.pool.acquire().await?;
-
         let ts = chrono::Utc::now().timestamp() as u64 * 1_000;
-        let market_data = Protocol::request::<_, FetchMarketOrderRes>(
-            &mut conn,
-            FetchMarketOrderReq {
-                item_id,
-                ts_start: ts,
-                ts_stop:  ts,
-            })
-        .await
-        .map(|x| x.0)?;
+        let filter = MarketOrderRequest {
+            start: ts,
+            end:   ts,
+        };
+        let market_data = self
+            .pool
+            .acquire()
+            .await?
+            .fget::<_, _, _, Vec<MarketOrderResponse>>(CacheName::MarketOrder, item_id, Some(filter))
+            .await?
+            .unwrap_or_default();
 
         let order_ids = market_data
             .get(0)
@@ -99,12 +104,16 @@ impl MarketService {
             .iter()
             .map(|x| x.order_id)
             .collect::<Vec<_>>();
-        let market_infos = Protocol::request::<_, FetchMarketOrderInfoResBulk>(
-            &mut conn,
-            FetchMarketOrderInfoBulkReq(order_ids)
-        )
-        .await
-        .map(|x| x.0)?;
+        let market_infos = self
+            .pool
+            .acquire()
+            .await?
+            .mget::<_, _, MarketInfoEntry>(CacheName::MarketInfo, order_ids)
+            .await?
+            .into_iter()
+            .filter(|x| x.is_some())
+            .map(|x| x.unwrap())
+            .collect::<Vec<_>>();
 
         let mut market_infos = market_infos
             .iter()
@@ -140,17 +149,13 @@ impl MarketService {
 
         let mut ret = Vec::with_capacity(subset.len());
         for x in subset {
-            let system_region = Protocol::request::<_, FetchSystemRegionRes>(
-                &mut conn,
-                FetchSystemRegionReq(x.system_id)
-            )
-            .await
-            .map(|x| {
-                match x {
-                    FetchSystemRegionRes::Ok(x) => x,
-                    _ => panic!("unknown system id")
-                }
-            })?;
+            let system_region = self
+                .pool
+                .acquire()
+                .await?
+                .get::<_, _, SystemRegionEntry>(CacheName::SystemRegion, x.system_id)
+                .await?
+                .unwrap();
 
             let data = market_data
                 .get(0)
@@ -189,21 +194,21 @@ impl MarketService {
     }
 
     pub async fn historic(&self, item_id: u32, is_buy_order: bool) -> Result<Vec<Historic>, EveServerError> {
-        let mut conn = self.pool.acquire().await?;
         let ts = chrono::Utc::now().timestamp() as u64;
         let ts = Self::previous_30_minute(ts);
         let start_ts = ts - (7 * 48 * 1800 * 1000);
 
-        let market_data = Protocol::request::<_, FetchMarketOrderRes>(
-            &mut conn,
-            FetchMarketOrderReq {
-                item_id,
-                ts_start: start_ts,
-                ts_stop: ts
-            }
-        )
-        .await
-        .map(|x| x.0)?;
+        let filter = MarketOrderRequest {
+            start: start_ts,
+            end:   ts,
+        };
+        let market_data = self
+            .pool
+            .acquire()
+            .await?
+            .fget::<_, _, _, Vec<MarketOrderResponse>>(CacheName::MarketOrder, item_id, Some(filter))
+            .await?
+            .unwrap_or_default();
 
         // Get the order ids from the first layer
         let order_ids = market_data
@@ -213,12 +218,13 @@ impl MarketService {
             .iter()
             .map(|x| x.order_id)
             .collect::<Vec<_>>();
-        let market_infos = Protocol::request::<_, FetchMarketOrderInfoResBulk>(
-            &mut conn,
-            FetchMarketOrderInfoBulkReq(order_ids)
-        )
-        .await
-        .map(|x| x.0)?;
+        let market_infos = self
+            .pool
+            .acquire()
+            .await?
+            .get::<_, _, Vec<MarketInfoEntry>>(CacheName::MarketInfo, order_ids)
+            .await?
+            .unwrap_or_default();
         let market_infos = market_infos
             .iter()
             .filter(|x| x.is_buy_order == is_buy_order)
@@ -286,18 +292,18 @@ impl MarketService {
         item_id: u32,
         is_buy_order: bool,
     ) -> Result<MarketStats, EveServerError> {
-        let mut conn = self.pool.acquire().await?;
-
         let ts = chrono::Utc::now().timestamp() as u64 * 1_000;
-        let market_data = Protocol::request::<_, FetchMarketOrderRes>(
-            &mut conn,
-            FetchMarketOrderReq {
-                item_id,
-                ts_start: ts,
-                ts_stop:  ts,
-            })
-            .await
-            .map(|x| x.0)?;
+        let filter = MarketOrderRequest {
+            start: ts,
+            end:   ts,
+        };
+        let market_data = self
+            .pool
+            .acquire()
+            .await?
+            .fget::<_, _, _, Vec<MarketOrderResponse>>(CacheName::MarketOrder, item_id, Some(filter))
+            .await?
+            .unwrap_or_default();
 
         let order_ids = market_data
             .get(0)
@@ -306,12 +312,16 @@ impl MarketService {
             .iter()
             .map(|x| x.order_id)
             .collect::<Vec<_>>();
-        let market_infos = Protocol::request::<_, FetchMarketOrderInfoResBulk>(
-            &mut conn,
-            FetchMarketOrderInfoBulkReq(order_ids)
-        )
-        .await
-        .map(|x| x.0)?;
+        let market_infos = self
+            .pool
+            .acquire()
+            .await?
+            .mget::<_, _, MarketInfoEntry>(CacheName::MarketInfo, order_ids)
+            .await?
+            .into_iter()
+            .filter(|x| x.is_some())
+            .map(|x| x.unwrap())
+            .collect::<Vec<_>>();
 
         let market_infos = market_infos
             .iter()
@@ -380,10 +390,10 @@ pub struct MarketStats {
 #[derive(Clone, Debug, Serialize)]
 pub struct TopOrder {
     pub price: f32,
-    pub region_id: u32,
-    pub order_id: u64,
+    pub region_id: RegionId,
+    pub order_id: OrderId,
     pub security: f32,
-    pub system_id: u32,
+    pub system_id: SolarSystemId,
     pub timestamp: u64,
     pub volume_remain: u32,
 }
