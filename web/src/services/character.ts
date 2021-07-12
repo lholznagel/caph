@@ -1,77 +1,63 @@
 import axios from 'axios';
-import {IdNameCache} from './resolve_names';
+
+const KV_NAME = 'resolve_locations';
 
 export class CharacterService {
-  public static async assets(): Promise<IAsset[]> {
-    const assets: IAsset[] = [];
-
-    const serverAssets: IServerAsset[] = (await axios.get(`/api/character/assets`)).data;
-    for (const asset of serverAssets) {
-      const name = (await IdNameCache.resolve(asset.type_id));
-
-      let icon = 'icon';
-      if (name.indexOf('Blueprint') >= 0) {
-        icon = 'bp';
-      }
-
-      assets.push({
-        name,
-        icon,
-        ...asset
-      });
-    }
-
-    return assets;
+  public static async assets(): Promise<any[]> {
+    return (await axios.get('/api/assets')).data;
   }
 
-  public static async asset_names(items: IAsset[]): Promise<IAssetName[]> {
-    const names: IAssetName[] = [];
+  public static async blueprints(): Promise<ICharacterBlueprint[]> {
+    return (await axios.get('/api/character/blueprints')).data;
+  }
 
-    const locationIds: number[] = [];
-    for (const item of items) {
-      for (const location of item.locations) {
-        if (location.item_id > 1000000000000 && locationIds.indexOf(location.item_id) === -1) {
-          locationIds.push(location.item_id);
-        } else if (location.item_id < 1000000000000) {
-          const name = (await IdNameCache.resolve(location.item_id));
-          names.push({ item_id: location.item_id, name });
-        }
-      }
+  public static async itemLocation(id: number): Promise<IItemLocation> {
+    const localItems: IItemLocation[] = this.load();
+
+    // check if the id is stored
+    const item = localItems.find((x: IItemLocation) => x.id === id);
+    if (item) {
+      return item;
     }
 
-    const assetNames = (
-      await axios
-        .post(`/api/character/assets/names`, locationIds)
-      )
-      .data;
+    let location = (await axios.get(`/api/character/location/${id}`)).data;
+    localItems.push({ id, ...location });
+    this.save(localItems);
+    return { id, ...location };
+  }
 
-    return names.concat(assetNames);
+  public static itemLocationByName(name: string): IItemLocation | undefined {
+    const localItems: IItemLocation[] = this.load();
+    return localItems.find((x: IItemLocation) => x.name === name);
+  }
+
+  private static load(): IItemLocation[] {
+    const localItems = localStorage.getItem(KV_NAME) || '[]';
+    return JSON.parse(localItems);
+  }
+
+  private static save(kv: IItemLocation[]) {
+    localStorage.setItem(KV_NAME, JSON.stringify(kv));
   }
 }
 
-interface IServerAsset {
-  item_ids:      number[];
-  type_id:       number;
-  quantity:      number;
-  locations:     ILocation[];
+export interface ICharacterBlueprint {
+  item_id:             number;
+  location_flag:       string;
+  location_id:         number;
+  material_efficiency: number;
+  quantity:            number;
+  runs:                number;
+  time_efficiency:     number;
+  type_id:             number;
+  user_id:             number;
 }
 
-export interface IAssetName {
-  item_id: number;
-  name:    string;
-}
-
-export interface IAsset {
-  quantity:      number;
-  item_ids:      number[];
-  type_id:       number;
-  name:          string;
-  icon:          string;
-  locations:     ILocation[];
-}
-
-export interface ILocation {
-  item_id:  number;
-  quantity: number;
-  typ:      string;
+export interface IItemLocation {
+  // Added by us
+  id?:       number;
+  name:      string;
+  owner_id:  number;
+  system_id: number;
+  type_id:   number;
 }

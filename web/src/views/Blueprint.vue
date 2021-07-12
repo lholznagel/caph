@@ -1,45 +1,75 @@
 <template>
-  <div>
-    <v-card>
-      <v-card-title>
-        Blueprint info for "<c-name-by-id :id="Number($route.params.id)"/>"
-      </v-card-title>
+  <n-card>
+    <template #header>
+      <name-by-id :id="Number($route.params.bid)" />
+    </template>
 
-      <v-row dense>
-        <v-col cols="3">
-          <v-card elevation="5" style="height: 100%">
-            <v-card-title>Blueprint Info</v-card-title>
-            <c-blueprint-info
-              :blueprint-id="Number($route.params.id)"
-              :item-id="Number($route.params.itemId)" />
-          </v-card>
-        </v-col>
-        <v-col cols="9">
-          <v-card elevation="5" style="height: 100%">
-            <v-card-title>Item cost</v-card-title>
-            <c-blueprint-item :blueprint-id="Number($route.params.id)" />
-          </v-card>
-        </v-col>
-      </v-row>
-    </v-card>
-
-    <v-card class="mt-5">
-      <v-card-title>
-        Item graph
-      </v-card-title>
-
-      <v-card-text>
-        <c-blueprint-graph :blueprint-id="Number($route.params.id)" />
-      </v-card-text>
-    </v-card>
-  </div>
+    <n-tabs type="line">
+      <n-tab-pane name="Item info" :disabled="!cbp.item_id">
+        <blueprint-info :bp="bp" :cbp="cbp" v-if="cbp.item_id" />
+      </n-tab-pane>
+      <n-tab-pane name="Copy" :disabled="!bp.copy">
+        <blueprint-action :action="bp.copy" v-if="bp.copy" />
+      </n-tab-pane>
+      <n-tab-pane name="Invention" :disabled="!bp.invention">
+        <blueprint-action :action="bp.invention" />
+      </n-tab-pane>
+      <n-tab-pane name="Manufacture" :disabled="!bp.manufacture">
+        <blueprint-action :action="bp.manufacture" />
+      </n-tab-pane>
+      <n-tab-pane name="Reaction" :disabled="!bp.reaction">
+        <blueprint-action :action="bp.reaction" />
+      </n-tab-pane>
+      <n-tab-pane name="Research Material" :disabled="!bp.research_mat">
+        <blueprint-action :action="bp.research_mat" />
+      </n-tab-pane>
+      <n-tab-pane name="Research Time" :disabled="!bp.research_time">
+        <blueprint-action :action="bp.research_time" />
+      </n-tab-pane>
+    </n-tabs>
+  </n-card>
 </template>
 
 <script lang="ts">
-import { Component, Vue } from 'vue-property-decorator';
+import { Options, Vue } from 'vue-class-component';
+import { NCard, NTabs, NTabPane } from 'naive-ui';
+import { BlueprintService, IBlueprint } from '@/services/blueprint';
+import { CharacterService, ICharacterBlueprint } from '@/services/character';
 
-@Component
+import BlueprintAction from '@/components/blueprint/Action.vue';
+import BlueprintInfo from '@/components/blueprint/Info.vue';
+import NameById from '@/components/NameById.vue';
+
+@Options({
+  components: {
+    NCard,
+    NTabs,
+    NTabPane,
+
+    BlueprintAction,
+    BlueprintInfo,
+    NameById,
+  }
+})
 export default class Blueprint extends Vue {
-}
+  public bid: any = undefined;
+  public iid: any = undefined;
 
+  public bp:  {} | IBlueprint          = {};
+  public cbp: {} | ICharacterBlueprint = {};
+
+  // Requires a bid -> BlueprintId
+  // Optional a iid -> ItemId
+  public async created() {
+    this.bid = Number(this.$route.params.bid);
+    this.iid = Number(this.$route.params.iid);
+
+    this.bp = await BlueprintService.blueprint(this.bid);
+    if (this.iid) {
+      this.cbp = (await CharacterService.blueprints())
+        .find((x: ICharacterBlueprint) => x.item_id === Number(this.iid)) || {};
+    }
+  }
+}
 </script>
+

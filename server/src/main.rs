@@ -1,13 +1,34 @@
-mod error;
-mod reprocessing;
-mod services;
+#![deny(missing_docs)]
 
-use self::services::*;
+//! API-Server for the frontend
+
+mod blueprint;
+mod character;
+mod corporation;
+mod error;
+mod eve;
+mod industry;
+mod item;
+mod name;
+mod project;
+
+use crate::blueprint::BlueprintService;
+use crate::character::CharacterService;
+use crate::corporation::CorporationService;
+use crate::industry::IndustryService;
+use crate::item::ItemService;
+use crate::name::NameService;
+use crate::project::ProjectService;
+
+use self::eve::*;
 
 use cachem::v2::ConnectionPool;
-use caph_eve_data_wrapper::{EveClient, EveDataWrapper, TypeId};
-use serde::Deserialize;
+use caph_db_v2::CorporationBlueprintEntry;
+use caph_eve_data_wrapper::{CorporationId, EveDataWrapper, TypeId};
+use project::ProjectNew;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use uuid::Uuid;
 use warp::http::Response;
 use warp::hyper::StatusCode;
 use warp::{Filter, Rejection, Reply};
@@ -16,22 +37,31 @@ use warp::{Filter, Rejection, Reply};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     morgan::Morgan::init(vec!["tracing".into()]);
 
-    let pool = ConnectionPool::new("0.0.0.0:55555", 10).await?;
+    let pool     = ConnectionPool::new("0.0.0.0:55555", 100).await?;
+    let eve_data = EveDataWrapper::new().await?;
 
-    let eve = EveDataWrapper::new().await?;
+    let eve_auth  = EveAuthService::new(pool.clone());
+    let industry  = IndustryService::new(eve_auth.clone(), eve_data.clone());
 
-    let blueprint_service = BlueprintService::new(pool.clone());
-    let character_service = CharacterService::new(eve.clone(), pool.clone());
-    let item_service = ItemService::new(pool.clone());
-    let market_service = MarketService::new(pool, item_service.clone());
+    let blueprint   = BlueprintService::new(pool.clone(), eve_auth.clone(), industry.clone());
+    let character   = CharacterService::new(pool.clone(), eve_auth.clone(), eve_data.clone());
+    let corporation = CorporationService::new(pool.clone(), eve_auth.clone());
+    let item        = ItemService::new(pool.clone());
+    let name        = NameService::new(pool.clone());
+    let project     = ProjectService::new(pool.clone(), blueprint.clone(), character.clone(), eve_auth.clone());
 
     log::info!("Starting server");
 
     ApiServer::new(
-        blueprint_service,
-        character_service,
-        item_service,
-        market_service,
+        eve_auth,
+
+        blueprint,
+        character,
+        corporation,
+        industry,
+        item,
+        name,
+        project,
     )
     .serve()
     .await;
@@ -39,36 +69,138 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Contains all services and handles routing
 #[derive(Clone)]
-pub struct ApiServer{
-    blueprint: BlueprintService,
-    character: CharacterService,
-    items:     ItemService,
-    market:    MarketService,
+pub struct ApiServer {
+    eve_auth:  EveAuthService,
+
+    blueprint:   BlueprintService,
+    character:   CharacterService,
+    corporation: CorporationService,
+    industry:    IndustryService,
+    item:        ItemService,
+    name:        NameService,
+    project:     ProjectService,
 }
 
 impl ApiServer {
+    /// Creates a new api server instance
     pub fn new(
-        blueprint: BlueprintService,
-        character: CharacterService,
-        items: ItemService,
-        market: MarketService,
-    ) -> Self {
+        eve_auth:  EveAuthService,
 
+        blueprint:   BlueprintService,
+        character:   CharacterService,
+        corporation: CorporationService,
+        industry:    IndustryService,
+        item:        ItemService,
+        name:        NameService,
+        project:     ProjectService,
+    ) -> Self {
         Self {
+            eve_auth,
+
             blueprint,
             character,
-            items,
-            market,
+            corporation,
+            industry,
+            item,
+            name,
+            project,
         }
     }
 
+    /// Exposes all routes
+    ///
+    /// This function is blocking
     pub async fn serve(&self) {
         let _self = Arc::new(self.clone());
+        let log = warp::log::custom(|info| {
+            log::info!(
+                "{} {} {} {}ms",
+                info.method(),
+                info.path(),
+                info.status(),
+                info.elapsed().as_millis()
+            );
+        });
 
         let root = warp::any()
             .map(move || _self.clone())
             .and(warp::path!("api" / ..));
+
+        let blueprint = root
+            .clone()
+            .and(warp::path!("blueprint" / ..));
+        let blueprint_all = blueprint
+            .clone()
+            .and(warp::path::end())
+            .and(warp::get())
+            .and_then(Self::blueprint_all);
+        let blueprint_by_id = blueprint
+            .clone()
+            .and(warp::path!(TypeId))
+            .and(warp::get())
+            .and_then(Self::blueprint_get);
+        let blueprint = blueprint_all
+            .or(blueprint_by_id);
+
+        let character = root
+            .clone()
+            .and(warp::path!("character" / ..));
+        let character_assets = character
+            .clone()
+            .and(warp::path!("assets"))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::character_assets);
+        let character_blueprints = character
+            .clone()
+            .and(warp::path!("blueprints"))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::character_blueprints);
+        let character_info = character
+            .clone()
+            .and(warp::path!("info"))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::character_info);
+        let character_item_location = character
+            .clone()
+            .and(warp::path!("location" / u64))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::character_item_location);
+        let character = character_assets
+            .or(character_blueprints)
+            .or(character_info)
+            .or(character_item_location);
+
+        let corporation = root
+            .clone()
+            .and(warp::path!("corporation" / ..));
+        let corporation_blueprints = corporation
+            .clone()
+            .and(warp::path!(CorporationId / "blueprints"))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::corporation_blueprints);
+        let corporation_set_blueprints = corporation
+            .clone()
+            .and(warp::path!(CorporationId / "blueprints"))
+            .and(warp::post())
+            .and(warp::body::json())
+            .and(warp::cookie("token"))
+            .and_then(Self::corporation_set_blueprints);
+        let corporation_del_blueprints = corporation
+            .clone()
+            .and(warp::path!(CorporationId / "blueprints"))
+            .and(warp::delete())
+            .and(warp::cookie("token"))
+            .and_then(Self::corporation_delete_blueprints);
+        let corporation = corporation_blueprints
+            .or(corporation_set_blueprints)
+            .or(corporation_del_blueprints);
 
         let eve = root
             .clone()
@@ -84,447 +216,618 @@ impl ApiServer {
             .and(warp::path!("login"))
             .and(warp::get())
             .and_then(Self::eve_login);
+        let eve_login_alt = eve
+            .clone()
+            .and(warp::path!("login" / "alt"))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::eve_login_alt);
         let eve_whoami = eve
             .clone()
             .and(warp::path!("whoami"))
             .and(warp::get())
-            .and(warp::cookie("user"))
+            .and(warp::cookie("token"))
             .and_then(Self::eve_whoami);
         let eve = eve_auth
             .or(eve_login)
+            .or(eve_login_alt)
             .or(eve_whoami);
-
-        let character = root
-            .clone()
-            .and(warp::path!("character" / ..));
-        let character_assets = character
-            .clone()
-            .and(warp::path!("assets"))
-            .and(warp::get())
-            .and(warp::cookie("user"))
-            .and_then(Self::character_assets);
-        let character_asset_names = character
-            .clone()
-            .and(warp::path!("assets" / "names"))
-            .and(warp::post())
-            .and(warp::cookie("user"))
-            .and(warp::body::json())
-            .and_then(Self::character_asset_names);
-        let character_blueprints = character
-            .clone()
-            .and(warp::path!("blueprints"))
-            .and(warp::get())
-            .and(warp::cookie("user"))
-            .and_then(Self::character_blueprints);
-        let character_name = character
-            .clone()
-            .and(warp::path!("name"))
-            .and(warp::get())
-            .and(warp::cookie("user"))
-            .and_then(Self::character_name);
-        let character_portrait = character
-            .clone()
-            .and(warp::path!("portrait"))
-            .and(warp::get())
-            .and(warp::cookie("user"))
-            .and_then(Self::character_portrait);
-        let character_skills = character
-            .clone()
-            .and(warp::path!("skills"))
-            .and(warp::get())
-            .and(warp::cookie("user"))
-            .and_then(Self::character_skills);
-        let character_skillqueue = character
-            .clone()
-            .and(warp::path!("skillqueue"))
-            .and(warp::get())
-            .and(warp::cookie("user"))
-            .and_then(Self::character_skillqueue);
-        let character_corp_skillplans = character
-            .clone()
-            .and(warp::path!("corp" / "skillplans"))
-            .and(warp::get())
-            .and(warp::cookie("user"))
-            .and_then(Self::character_corp_skillplans);
-        let character = character_assets
-            .or(character_asset_names)
-            .or(character_blueprints)
-            .or(character_name)
-            .or(character_portrait)
-            .or(character_skills)
-            .or(character_skillqueue)
-            .or(character_corp_skillplans);
 
         let item = root
             .clone()
-            .and(warp::path!("items" / ..));
-        let item_by_id = item
+            .and(warp::path!("items" / ..))
+            .and(warp::get());
+        let item_all = item
             .clone()
-            .and(warp::path!(TypeId))
+            .and(warp::path::end())
             .and(warp::get())
-            .and_then(Self::item_by_id);
-        let item_bulk = item
+            .and_then(Self::item_all);
+        let item_keys = item
             .clone()
-            .and(warp::path!("bulk"))
-            .and(warp::post())
-            .and(warp::body::json())
-            .and_then(Self::item_bulk);
-        let item_resolve = item
+            .and(warp::path!("keys"))
+            .and(warp::get())
+            .and_then(Self::item_keys);
+        let item_meta = item
+            .clone()
+            .and(warp::path!(TypeId / "meta"))
+            .and(warp::get())
+            .and_then(Self::item_meta);
+        let item = item_all
+            .or(item_keys)
+            .or(item_meta);
+
+        let industry = root
+            .clone()
+            .and(warp::path!("industry" / ..));
+        let industry_jobs = industry
+            .clone()
+            .and(warp::path!("jobs"))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::industry_jobs);
+        let industry_stations = industry
+            .clone()
+            .and(warp::path!("stations"))
+            .and(warp::get())
+            .and_then(Self::industry_stations);
+        let industry = industry_jobs
+            .or(industry_stations);
+
+        let name = root
+            .clone()
+            .and(warp::path("name"));
+        let name_resolve = name
             .clone()
             .and(warp::path!("resolve" / TypeId))
             .and(warp::get())
-            .and_then(Self::item_resolve);
-        let item_resolve_bulk = item
+            .and_then(Self::name_resolve);
+        let name_resolve_bulk = name
             .clone()
             .and(warp::path!("resolve" / "bulk"))
             .and(warp::post())
             .and(warp::body::json())
-            .and_then(Self::item_resolve_bulk);
-        let item_blueprint = item
+            .and_then(Self::name_resolve_bulk);
+        let name_resolve_name_to_id_bulk = name
             .clone()
-            .and(warp::path!(TypeId / "blueprint"))
-            .and(warp::get())
-            .and_then(Self::item_blueprint);
-        let item_reprocessing = item
-            .clone()
-            .and(warp::path!(TypeId / "reprocessing"))
-            .and(warp::get())
-            .and_then(Self::item_reprocessing);
-        let item = item_by_id
-            .or(item_bulk)
-            .or(item_resolve)
-            .or(item_resolve_bulk)
-            .or(item_blueprint)
-            .or(item_reprocessing);
-
-        let market = root
-            .clone()
-            .and(warp::path!("market" / ..));
-        let market_items = market
-            .clone()
-            .and(warp::path!("items"))
-            .and(warp::get())
-            .and_then(Self::market_items);
-        let market_stats_buy = market
-            .clone()
-            .and(warp::path!(u32 / "stats" / "buy"))
-            .and(warp::get())
-            .and_then(Self::market_stats_buy);
-        let market_stats_sell = market
-            .clone()
-            .and(warp::path!(u32 / "stats" / "sell"))
-            .and(warp::get())
-            .and_then(Self::market_stats_sell);
-        let market_top_order = market
-            .clone()
-            .and(warp::path!(u32 / "orders"))
+            .and(warp::path!("resolve" / "bulk" / "id"))
             .and(warp::post())
             .and(warp::body::json())
-            .and_then(Self::market_top_order);
-        let market_history = market
-            .clone()
-            .and(warp::path!(u32 / "historic"))
-            .and(warp::query())
-            .and(warp::get())
-            .and_then(Self::market_historic);
-        let market = market_items
-            .or(market_stats_buy)
-            .or(market_stats_sell)
-            .or(market_top_order)
-            .or(market_history);
+            .and_then(Self::name_resolve_name_to_id_bulk);
+        let name = name_resolve
+            .or(name_resolve_bulk)
+            .or(name_resolve_name_to_id_bulk);
 
-        let api = character
+        let project = root
+            .clone()
+            .and(warp::path!("projects" / ..));
+        let projects = project
+            .clone()
+            .and(warp::path::end())
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::projects);
+        let project_id = project
+            .clone()
+            .and(warp::path!(Uuid))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::project_id);
+        let project_delete = project
+            .clone()
+            .and(warp::path!(Uuid))
+            .and(warp::delete())
+            .and(warp::cookie("token"))
+            .and_then(Self::project_delete);
+        let project_new = project
+            .clone()
+            .and(warp::path::end())
+            .and(warp::post())
+            .and(warp::body::json())
+            .and(warp::cookie("token"))
+            .and_then(Self::project_new);
+        let project_cost = project
+            .clone()
+            .and(warp::path!(Uuid / "cost"))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::project_cost);
+        let project_materials = project
+            .clone()
+            .and(warp::path!(Uuid / "materials"))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::project_materials);
+        let project_materials_raw = project
+            .clone()
+            .and(warp::path!(Uuid / "materials" / "raw"))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::project_materials_raw);
+        let project_materials_stored = project
+            .clone()
+            .and(warp::path!(Uuid / "materials" / "stored"))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::project_materials_stored);
+        let project_blueprints = project
+            .clone()
+            .and(warp::path!(Uuid / "blueprints"))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::project_blueprints);
+        let project_tree = project
+            .clone()
+            .and(warp::path!(Uuid / "tree"))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::project_tree);
+        let project_required_products = project
+            .clone()
+            .and(warp::path!(Uuid / "products"))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::project_required_products);
+        let project = projects
+            .or(project_id)
+            .or(project_delete)
+            .or(project_new)
+            .or(project_cost)
+            .or(project_materials)
+            .or(project_materials_raw)
+            .or(project_materials_stored)
+            .or(project_blueprints)
+            .or(project_tree)
+            .or(project_required_products);
+
+        let api = blueprint
+            .or(character)
+            .or(corporation)
             .or(eve)
+            .or(industry)
             .or(item)
-            .or(market);
+            .or(name)
+            .or(project)
+            .with(log);
+
         warp::serve(api)
             .run(([0, 0, 0, 0], 10101))
             .await;
     }
 
-    async fn item_by_id(
+    async fn blueprint_all(
         self: Arc<Self>,
-        item_id: TypeId,
     ) -> Result<impl Reply, Rejection> {
         self
-            .items
-            .by_id(item_id)
+            .blueprint
+            .all()
             .await
             .map(|x| warp::reply::json(&x))
             .map_err(Into::into)
     }
 
-    async fn item_bulk(
-        self: Arc<Self>,
-        item_ids: Vec<TypeId>,
-    ) -> Result<impl Reply, Rejection> {
-        self
-            .items
-            .bulk(item_ids)
-            .await
-            .map(|x| warp::reply::json(&x))
-            .map_err(Into::into)
-    }
-
-    async fn item_resolve(
-        self:    Arc<Self>,
-        item_id: TypeId,
-    ) -> Result<impl Reply, Rejection> {
-        self
-            .items
-            .resolve_id(item_id)
-            .await
-            .map(|x| warp::reply::json(&x))
-            .map_err(Into::into)
-    }
-
-    async fn item_resolve_bulk(
-        self: Arc<Self>,
-        ids:  Vec<TypeId>
-    ) -> Result<impl Reply, Rejection> {
-        self
-            .items
-            .resolve_bulk(ids)
-            .await
-            .map(|x| warp::reply::json(&x))
-            .map_err(Into::into)
-    }
-
-    async fn item_blueprint(
+    async fn blueprint_get(
         self: Arc<Self>,
         bid:  TypeId,
     ) -> Result<impl Reply, Rejection> {
         self
             .blueprint
-            .blueprint(bid)
+            .by_id(bid)
             .await
             .map(|x| warp::reply::json(&x))
             .map_err(Into::into)
     }
 
-    async fn item_reprocessing(
-        self:    Arc<Self>,
-        item_id: TypeId,
+    async fn character_assets(
+        self:  Arc<Self>,
+        token: String
     ) -> Result<impl Reply, Rejection> {
         self
-            .items
-            .reprocessing(item_id)
+            .character
+            .assets(&token)
             .await
             .map(|x| warp::reply::json(&x))
             .map_err(Into::into)
     }
 
-    async fn market_items(
-        self: Arc<Self>,
+    async fn character_blueprints(
+        self:  Arc<Self>,
+        token: String,
     ) -> Result<impl Reply, Rejection> {
         self
-            .market
-            .items()
+            .character
+            .blueprints(token)
             .await
             .map(|x| warp::reply::json(&x))
             .map_err(Into::into)
     }
 
-    async fn market_stats_buy(
-        self: Arc<Self>,
-        item_id: u32,
+    async fn character_info(
+        self:  Arc<Self>,
+        token: String,
     ) -> Result<impl Reply, Rejection> {
         self
-            .market
-            .stats(item_id, true)
+            .character
+            .info(token)
             .await
             .map(|x| warp::reply::json(&x))
             .map_err(Into::into)
     }
 
-    async fn market_stats_sell(
-        self: Arc<Self>,
-        item_id: u32,
+    async fn character_item_location(
+        self:  Arc<Self>,
+        id:    u64,
+        token: String,
     ) -> Result<impl Reply, Rejection> {
         self
-            .market
-            .stats(item_id, false)
+            .character
+            .item_location(token, id)
             .await
             .map(|x| warp::reply::json(&x))
             .map_err(Into::into)
     }
 
-    async fn market_top_order(
-        self: Arc<Self>,
-        item_id: u32,
-        body: TopOrderReq,
+    async fn corporation_blueprints(
+        self:  Arc<Self>,
+        cid:   CorporationId,
+        token: String,
     ) -> Result<impl Reply, Rejection> {
         self
-            .market
-            .top_orders(item_id, body)
+            .corporation
+            .blueprints(cid, token)
             .await
             .map(|x| warp::reply::json(&x))
             .map_err(Into::into)
     }
 
-    async fn market_historic(
-        self: Arc<Self>,
-        item_id: u32,
-        query: MarketQuery,
+    async fn corporation_set_blueprints(
+        self:  Arc<Self>,
+        cid:   CorporationId,
+        body:  Vec<CorporationBlueprintEntry>,
+        token: String,
     ) -> Result<impl Reply, Rejection> {
         self
-            .market
-            .historic(item_id, query.buy)
+            .corporation
+            .set_blueprints(cid, body, token)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn corporation_delete_blueprints(
+        self:  Arc<Self>,
+        cid:   CorporationId,
+        token: String,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .corporation
+            .delete_blueprints(cid, token)
             .await
             .map(|x| warp::reply::json(&x))
             .map_err(Into::into)
     }
 
     async fn eve_auth(
-        self: Arc<Self>,
-        query: EveQuery,
+        self:  Arc<Self>,
+        query: EveAuthQuery,
     ) -> Result<impl Reply, Rejection> {
-        let user = EveClient::retrieve_authorization_token(&query.code).await.unwrap();
-        self.character.save_login(user.clone()).await?;
+        let token = self.eve_auth.auth(query.code, query.state).await?;
 
-        Ok(Response::builder()
-            .status(StatusCode::MOVED_PERMANENTLY)
-            .header("location", "https://eve.caph.xyz")
-            .header("Set-Cookie", format!("user={}; Path=/; Secure; HttpOnly; Max-Age={}", user.user_id, 31557800)) // 10 years
-            .body("")
-            .unwrap())
+        if let Some(token) = token {
+            let cookie = format!(
+                "token={}; Path=/; Secure; HttpOnly; Max-Age={}",
+                token, 31557800 // 10 years
+            );
+
+            Ok(Response::builder()
+                .status(StatusCode::MOVED_PERMANENTLY)
+                .header("location", "https://eve.caph.xyz")
+                .header("Set-Cookie", cookie)
+                .body("")
+                .unwrap_or_default())
+        } else {
+            Ok(Response::builder()
+                .status(StatusCode::MOVED_PERMANENTLY)
+                .header("location", "https://eve.caph.xyz")
+                .body("")
+                .unwrap_or_default())
+        }
     }
 
     async fn eve_login(
         self: Arc<Self>,
     ) -> Result<impl Reply, Rejection> {
-        let auth_uri = EveClient::eve_auth_uri("login").unwrap();
-
+        let uri = self.eve_auth.login().await?;
         let uri = warp::http::uri::Builder::new()
-            .scheme(auth_uri.scheme())
-            .authority(auth_uri.host_str().unwrap_or_default())
-            .path_and_query(&format!("{}?{}", auth_uri.path(), auth_uri.query().unwrap_or_default()))
+            .scheme(uri.scheme())
+            .authority(uri.host_str().unwrap_or_default())
+            .path_and_query(&format!("{}?{}", uri.path(), uri.query().unwrap_or_default()))
             .build()
-            .unwrap();
+            .unwrap_or_default();
+        Ok(warp::redirect::temporary(uri))
+    }
 
-        Ok(warp::redirect::redirect(uri))
+    async fn eve_login_alt(
+        self:  Arc<Self>,
+        token: String,
+    ) -> Result<impl Reply, Rejection> {
+        let uri = self.eve_auth.login_alt(&token).await?;
+        let uri = warp::http::uri::Builder::new()
+            .scheme(uri.scheme())
+            .authority(uri.host_str().unwrap_or_default())
+            .path_and_query(&format!("{}?{}", uri.path(), uri.query().unwrap_or_default()))
+            .build()
+            .unwrap_or_default();
+        Ok(warp::redirect::temporary(uri))
     }
 
     async fn eve_whoami(
-        self: Arc<Self>,
-        character_id: u32
+        self:  Arc<Self>,
+        token: String,
     ) -> Result<impl Reply, Rejection> {
-        if let None = self.character.lookup(character_id).await? {
-            return Ok(Response::builder()
-                .status(StatusCode::UNAUTHORIZED)
-                .header("Set-Cookie", "user=; expires=Thu, 01 Jan 1970 00:00:00 GMT")
-                .body("")
-                .unwrap());
-        } else {
-            return Ok(Response::builder()
-                .status(StatusCode::OK)
-                .header("Content-Type", "application/json")
-                .body("{}")
-                .unwrap());
-        }
-    }
-
-    async fn character_name(
-        self: Arc<Self>,
-        character_id: u32,
-    ) -> Result<impl Reply, Rejection> {
-        let name = self
+        self
             .character
-            .name(character_id)
-            .await?;
-
-        Ok(warp::reply::json(&name))
+            .whoami(token)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
     }
 
-    async fn character_portrait(
-        self: Arc<Self>,
-        character_id: u32
+    async fn name_resolve(
+        self:    Arc<Self>,
+        item_id: TypeId,
     ) -> Result<impl Reply, Rejection> {
-        let image = self
-            .character
-            .portrait(character_id)
-            .await?;
-
-        Ok(warp::reply::json(&image))
+        self
+            .name
+            .resolve_id(item_id)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
     }
 
-    async fn character_assets(
+    async fn name_resolve_bulk(
         self: Arc<Self>,
-        character_id: u32
+        ids:  Vec<TypeId>
     ) -> Result<impl Reply, Rejection> {
-        let assets = self
-            .character
-            .assets(character_id)
-            .await?;
-
-        Ok(warp::reply::json(&assets))
+        self
+            .name
+            .resolve_bulk(ids)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
     }
 
-    async fn character_asset_names(
+    async fn name_resolve_name_to_id_bulk(
+        self:  Arc<Self>,
+        names: Vec<String>
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .name
+            .resolve_names_to_id_bulk(names)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn projects(
+        self:  Arc<Self>,
+        token: String,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .project
+            .all(token)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn project_id(
+        self:  Arc<Self>,
+        id:    Uuid,
+        token: String,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .project
+            .by_id(id, token)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn project_delete(
+        self:  Arc<Self>,
+        id:    Uuid,
+        token: String,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .project
+            .delete(id, &token)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn project_new(
+        self:  Arc<Self>,
+        body:  ProjectNew,
+        token: String,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .project
+            .create(body, token)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn project_cost(
+        self:  Arc<Self>,
+        id:    Uuid,
+        token: String,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .project
+            .cost(id, token)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn project_materials(
+        self:  Arc<Self>,
+        id:    Uuid,
+        token: String,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .project
+            .materials(id, token)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn project_materials_raw(
+        self:  Arc<Self>,
+        id:    Uuid,
+        token: String,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .project
+            .raw_materials(id, token)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn project_materials_stored(
+        self:  Arc<Self>,
+        id:    Uuid,
+        token: String
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .project
+            .stored_materials(id, token)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn project_blueprints(
+        self:  Arc<Self>,
+        id:    Uuid,
+        token: String
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .project
+            .blueprints(id, token)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn project_tree(
+        self:  Arc<Self>,
+        id:    Uuid,
+        token: String
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .project
+            .trees(id, token)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn project_required_products(
+        self:  Arc<Self>,
+        id:    Uuid,
+        token: String
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .project
+            .manufacture(id, token)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn industry_jobs(
+        self:  Arc<Self>,
+        token: String,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .industry
+            .jobs(token)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn industry_stations(
         self: Arc<Self>,
-        character_id: u32,
-        ids: Vec<u64>
     ) -> Result<impl Reply, Rejection> {
-        let asset_names = self
-            .character
-            .asset_names(character_id, ids)
-            .await?;
-
-        Ok(warp::reply::json(&asset_names))
+        let stations = self
+            .industry
+            .stations()?
+            .iter()
+            .map(|x| x.id)
+            .collect::<Vec<_>>();
+        Ok(warp::reply::json(&stations))
     }
 
-    async fn character_blueprints(
+    async fn item_all(
+        self: Arc<Self>
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .item
+            .all()
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn item_keys(
+        self: Arc<Self>
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .item
+            .keys()
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn item_meta(
         self: Arc<Self>,
-        character_id: u32
+        tid:  TypeId
     ) -> Result<impl Reply, Rejection> {
-        let assets = self
-            .character
-            .blueprints(character_id)
-            .await?;
-
-        Ok(warp::reply::json(&assets))
+        self
+            .item
+            .meta(tid)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
     }
-
-    async fn character_skills(
-        self: Arc<Self>,
-        character_id: u32
-    ) -> Result<impl Reply, Rejection> {
-        let assets = self
-            .character
-            .skills(character_id)
-            .await?;
-
-        Ok(warp::reply::json(&assets))
-    }
-
-    async fn character_skillqueue(
-        self: Arc<Self>,
-        character_id: u32
-    ) -> Result<impl Reply, Rejection> {
-        let assets = self
-            .character
-            .skillqueue(character_id)
-            .await?;
-
-        Ok(warp::reply::json(&assets))
-    }
-
-    async fn character_corp_skillplans(
-        self: Arc<Self>,
-        _: u32
-    ) -> Result<impl Reply, Rejection> {
-        Ok(warp::reply::json(&include_str!("../skillplans.out.json")))
-    }
-}
-
-
-#[derive(Deserialize)]
-struct MarketQuery {
-    buy: bool,
 }
 
 #[derive(Debug, Deserialize)]
-struct EveQuery {
+struct EveAuthQuery {
     code: String,
     state: String,
+}
+
+#[derive(Debug, Serialize)]
+struct RequiredProducts {
+    pub pid:       TypeId,
+    pub bpid:      TypeId,
+    pub quantity:  u32,
+    pub stored:    u32,
+    pub materials: Vec<RequiredProductsMaterial>,
+    pub depth:     u8,
+}
+
+#[derive(Debug, Serialize)]
+struct RequiredProductsMaterial {
+    pub mid:      TypeId,
+    pub quantity: u32,
+    pub stored:   u32,
 }

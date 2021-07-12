@@ -1,26 +1,20 @@
 use std::error::Error;
 use std::fmt;
-
 use warp::reject::Reject;
 
 #[derive(Debug)]
 pub enum EveServerError {
     EveConnectError(caph_eve_data_wrapper::EveConnectError),
-    IoError(std::io::Error),
     CachemError(cachem::CachemError),
-    UserNotFound,
-    NotFound,
+    SerdeJsonError(serde_json::Error),
+    InvalidUser,
+    BlueprintNotFound,
+    TypeNotFound,
 }
 
 impl Error for EveServerError {}
 
 impl Reject for EveServerError {}
-
-impl From<std::io::Error> for EveServerError {
-    fn from(e: std::io::Error) -> Self {
-        Self::IoError(e)
-    }
-}
 
 impl From<cachem::CachemError> for EveServerError {
     fn from(e: cachem::CachemError) -> Self {
@@ -31,6 +25,12 @@ impl From<cachem::CachemError> for EveServerError {
 impl From<caph_eve_data_wrapper::EveConnectError> for EveServerError {
     fn from(e: caph_eve_data_wrapper::EveConnectError) -> Self {
         Self::EveConnectError(e)
+    }
+}
+
+impl From<serde_json::Error> for EveServerError {
+    fn from(e: serde_json::Error) -> Self {
+        Self::SerdeJsonError(e)
     }
 }
 

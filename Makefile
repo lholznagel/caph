@@ -17,7 +17,7 @@ deploy-collector: musl
 
 deploy-db: musl
 	sudo rsync target/x86_64-unknown-linux-musl/release/caph_db /opt/caph/caph_db
-	sudo mkdir -p /var/caph/db/storage
+	sudo mkdir -p /var/caph/db
 	sudo systemctl restart caph_db
 
 deploy-server: musl
@@ -39,5 +39,3 @@ stop:
 	sudo systemctl stop caph_collector
 	sudo systemctl stop caph_db
 
-sync-virgo:
-	rsync --recursive --inplace --delete --quiet --exclude={'.git','target','web/node_modules'} . virgo:dev/caph

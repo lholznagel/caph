@@ -1,7 +1,4 @@
 module.exports = {
-  "transpileDependencies": [
-    "vuetify"
-  ],
   devServer: {
     hot: false,
     liveReload: false,
@@ -11,6 +8,10 @@ module.exports = {
     proxy: {
       '/api': {
         target: 'http://0.0.0.0:10101'
+      },
+      '/img': {
+        target: 'https://images.evetech.net/types',
+        pathRewrite: { '^/img': '' }
       }
     }
   }

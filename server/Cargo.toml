@@ -1,5 +1,5 @@
 [package]
-name = "caph_server"
+name = "caph_server_v2"
 version = "0.1.0"
 authors = ["lholznagel <contact@lholznagel.info>"]
 edition = "2018"
@@ -10,9 +10,11 @@ caph_db_v2 = { path = "../db_v2", features = ["with_serde"] }
 caph_eve_data_wrapper = { path = "../eve_data_wrapper" }
 chrono = "0.4.19"
 log = "0.4.14"
-metrix_exporter = { path = "../../metrix/exporter" }
 morgan = { git = "https://github.com/lholznagel/morgan.git", rev = "624526038c210b142d2835fa77965064771ac192" }
-serde = { version = "1.0.123", features = ["derive"] }
-serde_json = "1.0.61"
-tokio = { version = "1.5.0", features = ["full"] }
-warp = "0.3.0"
+rand = "0.8.3"
+rand_chacha = "0.3.1"
+serde = { version = "1.0.126", features = ["derive"] }
+serde_json = "1.0.64"
+tokio = { version = "1.6.1", features = ["full"] }
+uuid = { version = "0.8.2", features = ["serde", "v4"] }
+warp = "0.3.1"

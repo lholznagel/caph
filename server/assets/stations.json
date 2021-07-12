@@ -1,0 +1,64 @@
+[
+  {
+    "id": 30003978,
+    "name": "P-ZMZV",
+    "engineering": {
+      "manufacturing": 3.0,
+      "time_efficiency": 1.0,
+      "material_efficiency": 1.0,
+      "copy": 1.0,
+      "invention": 1.0,
+      "type_id": 35827
+    },
+    "refinery": {
+      "composit": 10.0,
+      "biochemical": 10.0,
+      "hybrid": 10.0,
+      "type_id": 35836
+    }
+  }, {
+    "id": 30003988,
+    "name": "UVHO-F",
+    "engineering": {
+      "manufacturing": 10.0,
+      "type_id": 35825
+    },
+    "refinery": {
+      "composit": 10.0,
+      "hybrid": 10.0,
+      "type_id": 35836
+    }
+  }, {
+    "id": 30003968,
+    "name": "W-IX39",
+    "engineering": {
+      "manufacturing": 3.0,
+      "time_efficiency": 1.0,
+      "material_efficiency": 1.0,
+      "copy": 1.0,
+      "invention": 1.0,
+      "type_id": 35826
+    },
+    "refinery": {
+      "composit": 10.0,
+      "biochemical": 10.0,
+      "hybrid": 10.0,
+      "type_id": 35836
+    }
+  }, {
+    "id": 30003977,
+    "name": "A-5F4A",
+    "engineering": {
+        "manufacturing": 1.0,
+        "time_efficiency": 1.0,
+        "material_efficiency": 1.0,
+        "copy": 1.0,
+        "invention": 1.0,
+        "type_id": 35825
+    },
+    "refinery": {
+      "composit": 10.0,
+      "type_id": 35836
+    }
+  }
+]

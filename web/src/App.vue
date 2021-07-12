@@ -1,100 +1,201 @@
 <template>
-  <v-app id="app">
-    <v-navigation-drawer clipped fixed app>
-      <v-list>
-        <v-list-group no-action v-if="loggedIn" :value="true">
-          <template v-slot:activator>
-            <v-list-item-content>
-              <v-list-item-title>My shit n stuff</v-list-item-title>
-            </v-list-item-content>
-          </template>
+  <n-config-provider :theme="dark">
+    <n-global-style />
 
-          <v-list-item to="/my/assets">
-            <v-list-item-content>
-              <v-list-item-title>Assets</v-list-item-title>
-            </v-list-item-content>
-          </v-list-item>
+    <n-layout position="absolute">
+      <n-layout-header class="header" bordered>
+        <div class="nav-header-text">
+          Caph
+        </div>
 
-          <v-list-item to="/my/blueprints">
-            <v-list-item-content>
-              <v-list-item-title>Blueprints</v-list-item-title>
-            </v-list-item-content>
-          </v-list-item>
+        <n-button
+          text
+          @click="redirectLogin"
+          v-if="!isLoggedIn()"
+        >Login with Eve</n-button>
+        <div v-if="isLoggedIn()" class="nav-header-character">
+          <span class="nav-header-character-text">{{ whoami.name }}</span>
 
-          <v-list-item to="/my/skills">
-            <v-list-item-content>
-              <v-list-item-title>Skills</v-list-item-title>
-            </v-list-item-content>
-          </v-list-item>
-        </v-list-group>
+          <n-avatar size="medium" :src="whoami.portrait" />
+        </div>
+      </n-layout-header>
 
-        <v-list-item to="/market">
-          <v-list-item-content>
-            <v-list-item-title>Market</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-      </v-list>
-    </v-navigation-drawer>
+      <n-layout position="absolute" style="top: 64px;" :has-sider="isLoggedIn()">
+        <n-layout-sider
+          :native-scrollbar="false"
+          bordered
+          v-if="isLoggedIn()"
+        >
+          <n-menu
+            @update:value="handleUpdateValue"
+            :options="options"
+            default-expand-all
+          />
+        </n-layout-sider>
 
-    <v-app-bar app fixed dense clipped-left>
-      <v-toolbar-title>Caph</v-toolbar-title>
+        <n-layout content-style="padding: 24px;" :native-scrollbar="false">
+          <router-view v-if="isLoggedIn()" />
 
-      <v-spacer></v-spacer>
-
-      <v-btn v-if="!loggedIn" href="/api/eve/login">Eve login</v-btn>
-
-      <div v-if="loggedIn">
-          {{ characterName }}
-
-        <v-list-item-avatar>
-          <v-img :src="characterPortrait"></v-img>
-        </v-list-item-avatar>
-      </div>
-    </v-app-bar>
-
-    <v-main>
-      <v-container fluid fill-height>
-        <v-layout justify-center align-center>
-          <v-flex text-xs-center fill-height>
-            <router-view></router-view>
-          </v-flex>
-        </v-layout>
-      </v-container>
-    </v-main>
-  </v-app>
+          <n-result
+            status="403"
+            title="403 Forbidden"
+            description="Some of the doors are always close to you."
+            v-if="!isLoggedIn()"
+          >
+            <template #footer>
+              <n-button @click="redirectLogin">Login with eve</n-button>
+            </template>
+          </n-result>
+        </n-layout>
+      </n-layout>
+    </n-layout>
+  </n-config-provider>
 </template>
 
 <script lang="ts">
 import axios from 'axios';
+import {
+  darkTheme, NAvatar, NButton, NConfigProvider, NGlobalStyle,
+  NLayout, NLayoutHeader, NLayoutSider, NMenu, NResult
+} from 'naive-ui';
+import { Options, Vue } from 'vue-class-component';
 
-import { Component, Vue } from 'vue-property-decorator';
-
-@Component
+@Options({
+  components: {
+    NAvatar,
+    NButton,
+    NConfigProvider,
+    NGlobalStyle,
+    NLayout,
+    NLayoutHeader,
+    NLayoutSider,
+    NMenu,
+    NResult,
+  }
+})
 export default class App extends Vue {
-  public loggedIn: boolean = false;
+  public dark = darkTheme;
+  public menuValue = '';
 
-  public characterName: string = '';
-  public characterPortrait: string = '';
+  public whoami: WhoAmI = DEFAULT_WHOAMI;
+
+  public options = [
+  {
+    label: 'Assets',
+    key:   'assets',
+    type:  'group',
+    children: [
+      {
+        label: 'All',
+        key:   'character_assets',
+      },
+      {
+        label: 'Blueprints',
+        key:   'blueprint_overview',
+      }
+    ]
+  }, {
+    label: 'Industry',
+    key:   'industry',
+    type:  'group',
+    children: [
+      {
+        label: 'Jobs',
+        key:   'industry_jobs'
+      },
+      {
+        label: 'Projects',
+        key:   'projects'
+      }
+    ]
+  }, {
+    label: 'Accounts',
+    key:   'accounts',
+    type:  'group',
+    children: [
+      {
+        label: 'Settings',
+        key:   'settings'
+      }
+    ]
+  }, {
+    label: 'Admin stuff',
+    key:   'admin_stuff',
+    type:  'group',
+    children: [
+      {
+        label: 'Metadata',
+        key:   'meta'
+      },
+      {
+        label: 'Network',
+        key:   'network'
+      },
+      {
+        label: 'Corp Blueprints',
+        key:   'corp_blueprints'
+      }
+    ]
+  }];
 
   public async created() {
-    await this.character();
+    const res = await (axios.get<WhoAmI>('/api/eve/whoami'));
+    if (res.status === 200) {
+      this.whoami = res.data;
+      window.whoami = res.data;
+    }
   }
 
-  private async character() {
-    axios
-      .get(`/api/eve/whoami`)
-      .then(_ => {
-        return axios.get(`/api/character/name`);
-      })
-      .then(x => {
-        this.characterName = x.data;
-        return axios.get(`/api/character/portrait`);
-      })
-      .then(x => {
-        this.characterPortrait = x.data;
-        this.loggedIn = true;
-      })
-      .catch(_ => this.loggedIn = false);
+  public handleUpdateValue(key: string, _: string) {
+    this.$router.push({ name: key });
+  }
+
+  public redirectLogin() {
+    window.location.href = `/api/eve/login`;
+  }
+
+  public isLoggedIn() {
+    // TODO: not very secure
+    return this.whoami.name !== '';
   }
 }
+
+interface WhoAmI {
+  alliance_icon?:   string;
+  corporation_icon: string;
+  portrait:         string;
+  name:             string;
+}
+const DEFAULT_WHOAMI: WhoAmI ={
+  corporation_icon: '',
+  portrait:         '',
+  name:             '',
+};
 </script>
+
+<style scoped>
+.header {
+  cursor: pointer;
+
+  height: 64px;
+  padding: 24px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-header-text {
+  font-size: 28px;
+}
+
+.nav-header-character {
+  display: flex;
+  align-items: center;
+}
+
+.nav-header-character-text {
+  margin-right: 10px;
+  font-size: 16px;
+}
+</style>

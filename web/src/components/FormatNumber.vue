@@ -1,18 +1,30 @@
 <template>
-  <label>{{ format() }}</label>
+  <n-text>{{ format() }}</n-text>
 </template>
 
 <script lang="ts">
-import { Component, Prop, Vue } from 'vue-property-decorator';
-import { formatNumber, formatTime } from '../utils/format';
+import { Options, Vue, prop } from 'vue-class-component';
+import { formatNumber, formatTime } from '../services/formatNumber';
+import { NText } from 'naive-ui';
 
-@Component
-export default class FormatNumber extends Vue {
-  @Prop(Number)
-  public value!: number;
-  @Prop(Boolean)
-  public isTime!: boolean;
+class Props {
+  value = prop({
+    type: Number,
+    required: true
+  });
 
+  isTime = prop({
+    type: Boolean,
+    required: false,
+  });
+}
+
+@Options({
+  components: {
+    NText
+  }
+})
+export default class FormatNumber extends Vue.with(Props) {
   public format(): string {
     if (this.isTime) {
       return formatTime(this.value);
