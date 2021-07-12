@@ -3,13 +3,13 @@ use crate::time::previous_30_minute;
 
 use cachem::v2::ConnectionPool;
 use caph_db_v2::*;
-use caph_eve_data_wrapper::{EveDataWrapper, MarketOrder};
+use caph_eve_data_wrapper::{EveDataWrapper, IndustryService, MarketService, SolarSystemId, SystemService, TypeId};
 use chrono::{DateTime, Utc};
 use futures::stream::{FuturesUnordered, StreamExt};
 use std::collections::HashMap;
 
 pub struct Market {
-    eve:    EveDataWrapper,
+    eve:  EveDataWrapper,
     pool: ConnectionPool,
 }
 
@@ -25,9 +25,25 @@ impl Market {
     /// entries from all markets and writes them into the database.
     pub async fn task(&mut self) -> Result<(), CollectorError> {
         log::info!("Loading eve services");
-        let market_service = self.eve.market().await?;
-        let system_service = self.eve.systems().await?;
+        let market_service  = self.eve.market().await?;
+        let system_service  = self.eve.systems().await?;
+        let indutry_service = self.eve.industry().await?;
         log::info!("Services loaded");
+
+        let _ = tokio::join! {
+            self.market_data(market_service.clone(), system_service),
+            self.market_price(market_service.clone()),
+            self.industry_cost(indutry_service)
+        };
+
+        Ok(())
+    }
+
+    async fn market_data(
+        &self,
+        market_service: MarketService,
+        system_service: SystemService,
+    ) -> Result<(), CollectorError> {
 
         let timestamp = previous_30_minute(Utc::now().timestamp() as u64)? * 1_000;
 
@@ -38,23 +54,13 @@ impl Market {
             requests.push(market_service.orders(*region));
         }
 
-        let mut results = Vec::new();
+        let mut entries = Vec::new();
         while let Some(return_val) = requests.next().await {
             if let Ok(r) = return_val {
-                results.extend(r);
+                entries.extend(r);
             }
         }
 
-        self.market_info(results, timestamp).await?;
-
-        Ok(())
-    }
-
-    async fn market_info(
-        &mut self,
-        entries: Vec<MarketOrder>,
-        timestamp: u64
-    ) -> Result<(), CollectorError> {
         let mut con = self.pool.acquire().await?;
 
         let mut market_infos = HashMap::new();
@@ -62,7 +68,9 @@ impl Market {
 
         for entry in entries.iter() {
             let issued = entry.issued.parse::<DateTime<Utc>>()?;
-            let expire = issued.checked_add_signed(chrono::Duration::days(entry.duration as i64)).ok_or(CollectorError::ChronoError)?;
+            let expire = issued.checked_add_signed(
+                chrono::Duration::days(entry.duration as i64)
+            ).ok_or(CollectorError::ChronoError)?;
 
             let market_info = MarketInfoEntry {
                 issued:       issued.timestamp() as u64 * 1000,
@@ -96,6 +104,35 @@ impl Market {
             con.mset(CacheName::MarketOrder, market_orders).await.unwrap();
         }
 
+        Ok(())
+    }
+
+    async fn market_price(&self, market_service: MarketService) -> Result<(), CollectorError> {
+        let mut con = self.pool.acquire().await?;
+
+        let prices = market_service
+            .prices()
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(MarketPriceEntry::from)
+            .map(|x| (x.type_id, x))
+            .collect::<HashMap<TypeId, MarketPriceEntry>>();
+        con.mset(CacheName::MarketPrice, prices).await.unwrap();
+        Ok(())
+    }
+
+    async fn industry_cost(&self, industry_service: IndustryService) -> Result<(), CollectorError> {
+        let mut con = self.pool.acquire().await?;
+        let cost = industry_service
+            .systems()
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(IndustryCostEntry::from)
+            .map(|x| (x.solar_system_id, x))
+            .collect::<HashMap<SolarSystemId, IndustryCostEntry>>();
+        con.mset(CacheName::IndustryCost, cost).await.unwrap();
         Ok(())
     }
 }

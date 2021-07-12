@@ -29,6 +29,8 @@ use std::{fs, io::Cursor};
 use tokio::sync::RwLock;
 use zip::ZipArchive;
 
+pub use url::Url;
+
 /// Type alias for `ZipArchive<Cursor<Vec<u8>>>`
 pub(crate) type SdeZipArchive = ZipArchive<Cursor<Vec<u8>>>;
 
@@ -109,8 +111,9 @@ impl EveDataWrapper {
     service_loader_gen!(corporations, Corporations, CorporationService);
     service_loader_gen!(dogma, Dogmas, DogmaService);
     service_loader_gen!(groups, Groups, GroupService);
-    service_loader_gen!(meta_groups, MetaGroups, MetaGroupService);
+    service_loader_gen!(industry, Industry, IndustryService);
     service_loader_gen!(market, Market, MarketService);
+    service_loader_gen!(meta_groups, MetaGroups, MetaGroupService);
     service_loader_gen!(names, Names, NameService);
     service_loader_gen!(planet_schematics, PlanetSchematics, PlanceSchematicService);
     service_loader_gen!(races, Races, RaceService);
@@ -141,6 +144,7 @@ eve_id!(ActivityId, u32);
 eve_id!(AgentId, u32);
 eve_id!(AttributeId, u32);
 eve_id!(CategoryId, u32);
+eve_id!(CharacterId, u32);
 eve_id!(ConstellationId, u32);
 eve_id!(CorporationId, u32);
 eve_id!(DisplayNameId, u32);
@@ -148,9 +152,11 @@ eve_id!(DivisionId, u32);
 eve_id!(DogmaCategoryId, u32);
 eve_id!(EffectId, u32);
 eve_id!(FactionId, u32);
+eve_id!(FittingId, u32);
 eve_id!(GraphicId, u32);
 eve_id!(GroupId, u32);
 eve_id!(IconId, u32);
+eve_id!(ItemId, u64);
 eve_id!(LocationId, u64);
 eve_id!(MarketGroupId, u32);
 eve_id!(MaterialSetId, u32);

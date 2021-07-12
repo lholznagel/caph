@@ -1,4 +1,4 @@
-use crate::EveConnectError;
+use crate::{Character, CharacterId, CorporationId, EveConnectError};
 
 use reqwest::{Client, Response, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -51,7 +51,7 @@ impl EveClient {
         map.insert("code", code);
 
         let result = Self::send(map).await?;
-        Ok(EveOAuthUser::from(result))
+        EveOAuthUser::from(result).await
     }
 
     // https://docs.esi.evetech.net/docs/sso/refreshing_access_tokens.htmlEveOAuthUser
@@ -61,7 +61,7 @@ impl EveClient {
         map.insert("refresh_token", refresh_token);
 
         let result = Self::send(map).await?;
-        Ok(EveOAuthUser::from(result))
+        EveOAuthUser::from(result).await
     }
 
     async fn send<T: Serialize>(form: T) -> Result<EveOAuthToken, EveConnectError> {
@@ -301,6 +301,7 @@ fn scope() -> String {
         "esi-fittings.read_fittings.v1",
         "esi-fittings.write_fittings.v1",
         "esi-industry.read_character_jobs.v1",
+        "esi-industry.read_corporation_jobs.v1",
         "esi-industry.read_character_mining.v1",
         "esi-markets.read_character_orders.v1",
         "esi-markets.structure_markets.v1",
@@ -341,18 +342,36 @@ impl EveOAuthToken {
 
 #[derive(Clone, Debug)]
 pub struct EveOAuthUser {
-    pub access_token: String,
+    pub access_token:  String,
     pub refresh_token: String,
-    pub user_id: u32,
+    pub user_id:       CharacterId,
+    pub corp_id:       CorporationId,
 }
 
-impl From<EveOAuthToken> for EveOAuthUser {
-    fn from(x: EveOAuthToken) -> Self {
-        Self {
+impl EveOAuthUser {
+    pub async fn from(x: EveOAuthToken) -> Result<Self, EveConnectError> {
+        let user_id = CharacterId(x
+            .payload()
+            .unwrap()
+            .sub
+            .replace("CHARACTER:EVE:", "")
+            .parse()
+            .unwrap_or_default());
+        let path = format!("characters/{}/", user_id);
+        let res: Character = EveClient::new()?
+            .fetch_oauth(&x.access_token, &path)
+            .await?
+            .json()
+            .await
+            .map_err(EveConnectError::ReqwestError)?;
+
+        let res = Self {
             access_token: x.access_token.clone(),
             refresh_token: x.refresh_token.clone(),
-            user_id: x.payload().unwrap().sub.replace("CHARACTER:EVE:", "").parse().unwrap_or_default(),
-        }
+            corp_id: res.corporation_id.into(),
+            user_id,
+        };
+        Ok(res)
     }
 }
 

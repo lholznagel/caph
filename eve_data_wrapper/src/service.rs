@@ -4,6 +4,7 @@ mod character;
 mod corporation;
 mod dogma;
 mod group_ids;
+mod industry;
 mod market;
 mod meta_group;
 mod name;
@@ -23,6 +24,7 @@ pub use self::character::*;
 pub use self::corporation::*;
 pub use self::dogma::*;
 pub use self::group_ids::*;
+pub use self::industry::*;
 pub use self::market::*;
 pub use self::meta_group::*;
 pub use self::name::*;
@@ -42,6 +44,7 @@ pub enum ServiceGroupName {
     Corporations,
     Dogmas,
     Groups,
+    Industry,
     Market,
     MetaGroups,
     Names,
@@ -67,6 +70,7 @@ impl ServiceGroupName {
             Self::Corporations => ServiceGroup::Corporations(CorporationService::new(zip)?),
             Self::Dogmas => ServiceGroup::Dogmas(DogmaService::new(zip)?),
             Self::Groups => ServiceGroup::Groups(GroupService::new(zip)?),
+            Self::Industry => ServiceGroup::Industry(IndustryService::new(eve_client, zip)?),
             Self::Market => ServiceGroup::Market(MarketService::new(eve_client, zip)?),
             Self::MetaGroups => ServiceGroup::MetaGroups(MetaGroupService::new(zip)?),
             Self::Names => ServiceGroup::Names(NameService::new(zip)?),
@@ -90,6 +94,7 @@ pub enum ServiceGroup {
     Corporations(CorporationService),
     Dogmas(DogmaService),
     Groups(GroupService),
+    Industry(IndustryService),
     Market(MarketService),
     MetaGroups(MetaGroupService),
     Names(NameService),

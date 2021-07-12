@@ -1,12 +1,13 @@
 use async_trait::*;
 use cachem::{Parse, v2::{Cache, Command, Get, Key, Set, Save}};
+use caph_eve_data_wrapper::{CharacterId, CorporationId};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::BufStream;
 use tokio::net::TcpStream;
 use tokio::sync::{RwLock, watch::Receiver};
 
-type Idx = u32;
+type Idx = CharacterId;
 type Val = UserEntry;
 type Typ = HashMap<Idx, Val>;
 
@@ -144,29 +145,26 @@ impl Save for UserCache {
 #[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, PartialEq, Parse)]
 pub struct UserEntry {
-    pub user_id:       u32,
-    pub name:          String,
+    pub user_id:       CharacterId,
+    pub corp_id:       CorporationId,
     pub aliase:        Vec<UserEntry>,
     pub access_token:  String,
     pub refresh_token: String,
-    pub token:         String,
 }
 
 impl UserEntry {
     pub fn new(
-        user_id:       u32,
-        name:          String,
+        user_id:       CharacterId,
+        corp_id:       CorporationId,
         access_token:  String,
         refresh_token: String,
-        token:         String,
     ) -> Self {
         Self {
             user_id,
-            name,
+            corp_id,
             aliase: Vec::new(),
             access_token,
             refresh_token,
-            token,
         }
     }
 }

@@ -42,9 +42,7 @@ impl CharacterService {
                 access_token: character.access_token,
                 refresh_token: character.refresh_token,
                 user_id: character.user_id,
-                name: String::new(),
                 aliase: Vec::new(),
-                token: String::new()
             };
 
             self

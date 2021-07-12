@@ -105,6 +105,7 @@ dependencies = [
  "log",
  "metrix_exporter",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -158,6 +159,7 @@ dependencies = [
  "morgan",
  "serde",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -196,11 +198,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "caph_server_v2"
+version = "0.1.0"
+dependencies = [
+ "cachem",
+ "caph_db_v2",
+ "caph_eve_data_wrapper",
+ "chrono",
+ "log",
+ "morgan",
+ "rand 0.8.3",
+ "rand_chacha 0.3.1",
+ "serde",
+ "serde_json",
+ "tokio",
+ "uuid",
+ "warp",
+]
+
+[[package]]
 name = "cargo_market_analyzer"
 version = "0.1.0"
 dependencies = [
  "cachem",
  "caph_db",
+ "caph_eve_data_wrapper",
  "chrono",
  "metrix_exporter",
  "tokio",
@@ -951,7 +973,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ef9e7e66b4468674bfcb0c81af8b7fa0bb154fa9f28eb840da5c447baeb8d7e"
 dependencies = [
  "libc",
- "rand_chacha 0.3.0",
+ "rand_chacha 0.3.1",
  "rand_core 0.6.2",
  "rand_hc 0.3.0",
 ]
@@ -968,9 +990,9 @@ dependencies = [
 
 [[package]]
 name = "rand_chacha"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e12735cf05c9e10bf21534da50a147b924d555dc7a547c42e6bb2d5b6017ae0d"
+checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
 dependencies = [
  "ppv-lite86",
  "rand_core 0.6.2",
@@ -1307,9 +1329,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.6.0"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd3076b5c8cc18138b8f8814895c11eb4de37114a5d127bafdc5e55798ceef37"
+checksum = "0a38d31d7831c6ed7aad00aa4c12d9375fd225a6dd77da1d25b707346319a975"
 dependencies = [
  "autocfg",
  "bytes",
@@ -1515,6 +1537,7 @@ version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
+ "getrandom 0.2.3",
  "serde",
 ]
 

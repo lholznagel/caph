@@ -108,7 +108,8 @@ impl Get for MarketOrderCache {
             .await;
 
         let mut items = Vec::new();
-        for (_, entries) in historic.get(&idx).unwrap().iter() {
+        let entries = if let Some(e) = historic.get(&idx) { e.clone() } else { HashMap::new() };
+        for (_, entries) in entries.iter() {
             let mut index = 0;
             loop {
                 if let Some(x) = entries.get(index) {

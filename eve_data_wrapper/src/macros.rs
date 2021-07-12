@@ -92,6 +92,15 @@ macro_rules! eve_id {
             }
         }
 
+        impl std::fmt::Display for $name {
+            fn fmt(
+                &self,
+                f: &mut std::fmt::Formatter<'_>
+            ) -> std::fmt::Result {
+                write!(f, "{}", self.0)
+            }
+        }
+
         #[async_trait::async_trait]
         impl cachem::Parse for $name {
             async fn read<B>(

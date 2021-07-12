@@ -1,169 +1,111 @@
-use cachem::{ConnectionPool, Protocol};
-use caph_db::{FetchMarketOrderInfoBulkReq, FetchMarketOrderInfoResBulk, FetchRawMarketOrderReq, FetchRawMarketOrderRes, MarketItemOrder, MarketOrderInfoEntry};
-use chrono::Utc;
-use metrix_exporter::Metrix;
-use std::fmt;
+use caph_eve_data_wrapper::{EveDataWrapper, TypeId};
+use std::collections::HashMap;
 
-type Result<T> = std::result::Result<T, AnalyzerError>;
+const THE_FORGE: u32 = 10000002;
+const ROLLING_AVERAGE: u8 = 14;
 
-#[derive(Debug)]
-enum AnalyzerError {
-    Cachem(cachem::CachemError),
-    Metrix(Box<dyn std::error::Error>),
-}
+// const MOON_ORE: u32 = 45511; // Monazite
+// const QUANTITY: u32 = 6396;
 
-impl std::error::Error for AnalyzerError {  }
+// const MOON_ORE: u32 = 45500; // Vanadinite
+// const QUANTITY: u32 = 3034;
 
-impl From<cachem::CachemError> for AnalyzerError {
-    fn from(x: cachem::CachemError) -> Self {
-        Self::Cachem(x)
-    }
-}
+// const MOON_ORE: u32 = 46300; // Lavish Vanadinite
+// const QUANTITY: u32 = 7041;
 
-impl fmt::Display for AnalyzerError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
+const MOON_ORE: u32 = 45510;
+const QUANTITY: u32 = 6853;
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+enum Rarity {
+    R4,
+    R8,
+    R16,
+    R32,
+    R64
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    let metrix = Metrix::new(env!("CARGO_PKG_NAME").into(), "0.0.0.0:8889").await.map_err(AnalyzerError::Metrix)?;
-    let pool = ConnectionPool::new("0.0.0.0:9999", metrix.get_sender(), 10).await?;
-    let mut conn = pool.acquire().await?;
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let eve_client = EveDataWrapper::new().await?;
+    let market_service = eve_client.market().await?;
+    let type_service = eve_client.types().await?;
 
-    let type_id = 28606u32;
+    let mut rarity = HashMap::new();
+    rarity.insert(TypeId(16633), Rarity::R4);
+    rarity.insert(TypeId(16634), Rarity::R4);
+    rarity.insert(TypeId(16635), Rarity::R4);
+    rarity.insert(TypeId(16636), Rarity::R4);
 
-    // Fetches all market data for the given typeid
-    let market_data = Protocol::request::<_, FetchRawMarketOrderRes>(
-        &mut conn,
-        FetchRawMarketOrderReq(type_id)
-    )
-    .await
-    .map(|x| x.0)?;
+    rarity.insert(TypeId(16637), Rarity::R8);
+    rarity.insert(TypeId(16638), Rarity::R8);
+    rarity.insert(TypeId(16639), Rarity::R8);
+    rarity.insert(TypeId(16640), Rarity::R8);
 
-    // Generates a list of order ids
-    let mut order_ids = market_data
-        .iter()
-        .map(|x| x.order_id)
-        .collect::<Vec<_>>();
-    order_ids.sort();
-    order_ids.dedup();
+    rarity.insert(TypeId(16641), Rarity::R16);
+    rarity.insert(TypeId(16642), Rarity::R16);
+    rarity.insert(TypeId(16643), Rarity::R16);
+    rarity.insert(TypeId(16644), Rarity::R16);
 
-    // Fetches all order id informations
-    let market_infos = Protocol::request::<_, FetchMarketOrderInfoResBulk>(
-        &mut conn,
-        FetchMarketOrderInfoBulkReq(order_ids)
-    )
-    .await
-    .map(|x| x.0)?;
+    rarity.insert(TypeId(16646), Rarity::R32);
+    rarity.insert(TypeId(16647), Rarity::R32);
+    rarity.insert(TypeId(16648), Rarity::R32);
+    rarity.insert(TypeId(16649), Rarity::R32);
 
-    let buy_info  = info_type(market_infos.iter(), true);
-    let sell_info = info_type(market_infos.iter(), false);
+    rarity.insert(TypeId(16650), Rarity::R64);
+    rarity.insert(TypeId(16651), Rarity::R64);
+    rarity.insert(TypeId(16652), Rarity::R64);
+    rarity.insert(TypeId(16653), Rarity::R64);
 
-    let buy_market = market_data
-        .iter()
-        .filter(|x| buy_info.iter().find(|y| x.order_id == y.order_id).is_some())
-        .collect::<Vec<_>>();
-    let sell_market = market_data
-        .iter()
-        .filter(|x| sell_info.iter().find(|y| x.order_id == y.order_id).is_some())
-        .collect::<Vec<_>>();
+    let mut taxes = HashMap::new();
+    taxes.insert(Rarity::R4, 0u32);
+    taxes.insert(Rarity::R8, 5u32);
+    taxes.insert(Rarity::R16, 10u32);
+    taxes.insert(Rarity::R32, 15u32);
+    taxes.insert(Rarity::R64, 20u32);
 
-    let (buy_max, buy_min) = min_max_price(buy_info.iter());
-    let (sell_max, sell_min) = min_max_price(sell_info.iter());
+    let reprocess = type_service.materials();
 
-    println!("===== Stats =====");
-    println!("Count data:  \t\t{}", market_data.len());
-    println!("Count orders:\t\t{}", market_infos.len());
-    println!("Expired:     \t\t{}", expired(market_data.iter(), market_infos.iter()).len());
-    println!("\tVolume:      \t{}", expired_volume(market_data.iter()).len());
-    println!("\tTime:        \t{}", expired_time(market_infos.iter()).len());
-    println!();
+    let mut market_historic_vals = HashMap::new();
 
-    println!("===== Buy =====");
-    println!("Orders:    \t\t{:?}", buy_info.len());
-    println!("Data:        \t\t{}", buy_market.len());
-    println!("Max price:   \t\t{}", buy_max);
-    println!("Min price:   \t\t{}", buy_min);
-    println!("Total Volume:\t\t{}", volume_total(buy_info.iter()));
-    println!();
+    for material in reprocess.get(&MOON_ORE.into()).unwrap().materials.clone() {
+        let mut historic = market_service
+            .history(THE_FORGE.into(), material.material_type_id)
+            .await?;
+        historic.reverse();
 
-    println!("===== Sell =====");
-    println!("Orders:    \t\t{:?}", sell_info.len());
-    println!("Data:        \t\t{}", sell_market.len());
-    println!("Max price:   \t\t{}", sell_max);
-    println!("Min price:   \t\t{}", sell_min);
-    println!("Total Volume:\t\t{}", volume_total(sell_info.iter()));
-    Ok(())
-}
+        let mut weight = ROLLING_AVERAGE;
+        let mut weighted_avg = 0f32;
+        let mut weighted_total = 0;
+        for val in historic {
+            if weight > 0 {
+                weighted_avg += val.average * weight as f32;
+                weighted_total += weight;
+                weight -= 1;
+            } else {
+                break;
+            }
+        }
 
-fn expired<'a, D, I>(x: D, y: I) -> Vec<u64>
-where
-    D: Iterator<Item = &'a MarketItemOrder>,
-    I: Iterator<Item = &'a MarketOrderInfoEntry>
-{
-    let mut volume = expired_volume(x);
-    let time = expired_time(y);
-
-    volume.extend(time);
-    volume
-}
-
-fn expired_volume<'a, I>(x: I) -> Vec<u64>
-where
-    I: Iterator<Item = &'a MarketItemOrder>,
-{
-    x
-        .filter(|x| x.volume == 0)
-        .map(|x| x.order_id)
-        .collect::<Vec<_>>()
-}
-
-fn expired_time<'a, I>(x: I) -> Vec<u64>
-where
-    I: Iterator<Item = &'a MarketOrderInfoEntry>,
-{
-    let now = Utc::now().timestamp() as u64;
-    x
-        .filter(|x| x.expire < now)
-        .map(|x| x.order_id)
-        .collect::<Vec<_>>()
-}
-
-///
-/// * `true` -> The info is a buy order
-/// * `false` -> The info is a sell order
-fn info_type<'a, I>(x: I, is_buy: bool) -> Vec<MarketOrderInfoEntry>
-where
-    I: Iterator<Item = &'a MarketOrderInfoEntry>
-{
-    x
-        .filter(|x| x.is_buy_order == is_buy)
-        .map(|x| *x)
-        .collect::<Vec<_>>()
-}
-
-fn min_max_price<'a, I>(x: I) -> (f32, f32)
-where
-    I: Iterator<Item = &'a MarketOrderInfoEntry>
-{
-    let mut max = f32::MIN;
-    let mut min = f32::MAX;
-    for i in x {
-        max = max.max(i.price);
-        min = min.min(i.price);
+        let average_price = weighted_avg / weighted_total as f32;
+        market_historic_vals.insert(material.material_type_id, average_price);
     }
 
-    (max, min)
-}
+    let rep_amount = QUANTITY as f32 / 100f32;
+    let mut tax_amount = 0f32;
+    for material in reprocess.get(&MOON_ORE.into()).unwrap().materials.clone() {
+        let avg = market_historic_vals.get(&material.material_type_id).unwrap();
+        let avg = f32::round(*avg);
+        // Amount of goo mined * Moving average * quantity of refined
+        let rep_result = rep_amount * (avg * (material.quantity as f32 * 0.86));
 
-fn volume_total<'a, I>(x: I) -> u64
-where
-    I: Iterator<Item = &'a MarketOrderInfoEntry>
-{
-    x
-        .map(|x| x.volume_total as u64)
-        .sum::<u64>()
-}
+        // R4, R8, R16, R32, R64
+        let rarity = rarity.get(&material.material_type_id).unwrap();
+        let tax = *taxes.get(&rarity).unwrap() as f32 / 100f32;
+        tax_amount += rep_result * tax;
+    }
 
+    dbg!(tax_amount);
+
+    Ok(())
+}

@@ -9,5 +9,6 @@ sde.checksum
 db/db
 db_v2/db
 cache
+server_v2/assets
 skillplans.out.json
 evemon_to_json/skillplans/*

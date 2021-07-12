@@ -184,6 +184,21 @@ impl BlueprintEntry {
     }
 }
 
+impl BlueprintEntry {
+    /// Returns either a manufacture activity or a reaction activity
+    pub fn production_activity(&self) -> Activity {
+        if let Some(man) = &self.manufacture {
+            man.clone()
+        } else if let Some(reac) = &self.reaction {
+            reac.clone()
+        } else {
+            // This should never every be the case
+            log::error!("The blueprint {:?} has an invalid acitivity state", self.bid);
+            Activity::default()
+        }
+    }
+}
+
 impl From<&caph_eve_data_wrapper::BlueprintEntry> for BlueprintEntry {
     fn from(x: &caph_eve_data_wrapper::BlueprintEntry) -> Self {
         let copy = if let Some(x) = &x.activities.copying {
@@ -227,6 +242,65 @@ pub struct Activity {
     pub time:      u32,
 }
 
+impl Default for Activity {
+    fn default() -> Self {
+        Self {
+            materials: None,
+            products:  None,
+            skills:    None,
+            time:      0
+        }
+    }
+}
+
+impl Activity {
+    /// Gets the `TypeId` of the product that this activity produces
+    ///
+    /// # Returns
+    ///
+    /// `TypeId` of the product. If there is no product `TypeId(0)` will
+    /// returned
+    ///
+    pub fn product_id(&self) -> TypeId {
+        if let Some(x) = self.products.as_ref() {
+            x[0].mid
+        } else {
+            log::error!("Activity without product {:?}", self);
+            TypeId(0)
+        }
+    }
+
+    /// Returns the required materials to produce the product
+    ///
+    /// # Returns
+    ///
+    /// A vector of [Material]. If there are no materials, an empty vector is
+    /// returned
+    ///
+    pub fn materials(&self) -> Vec<Material> {
+        if let Some(x) = self.materials.as_ref() {
+            x.to_vec()
+        } else {
+            log::error!("Activity without materials {:?}", self);
+            Vec::new()
+        }
+    }
+
+    /// Gets the list of required materials by their id
+    ///
+    /// # Returns
+    ///
+    /// Vector of [TypeId]
+    ///
+    pub fn material_ids(&self) -> Vec<TypeId> {
+        self
+            .materials()
+            .into_iter()
+            .map(|x| x.mid)
+            .collect::<Vec<_>>()
+    }
+}
+
 impl From<&BlueprintAdditional> for Activity {
     fn from(x: &BlueprintAdditional) -> Self {
         let materials = if let Some(x) = &x.materials {
@@ -249,20 +323,24 @@ impl From<&BlueprintAdditional> for Activity {
 }
 
 #[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Clone, Debug, PartialEq, Parse)]
+#[derive(Clone, Copy, Debug, PartialEq, Parse)]
 pub struct Material {
-    pub mid:      TypeId,
-    pub quantity: u32,
+    pub mid:         TypeId,
+    pub quantity:    u32,
+
+    pub probability: Option<f32>,
 }
 
 impl Material {
     pub fn new(
-        mid:      TypeId,
-        quantity: u32,
+        mid:         TypeId,
+        quantity:    u32,
+        probability: Option<f32>,
     ) -> Self {
         Self {
             mid,
             quantity,
+            probability
         }
     }
 }
@@ -270,8 +348,9 @@ impl Material {
 impl From<&BlueprintMaterial> for Material {
     fn from(x: &BlueprintMaterial) -> Self {
         Self {
-            mid:      x.type_id,
-            quantity: x.quantity,
+            mid:         x.type_id,
+            quantity:    x.quantity,
+            probability: x.probability,
         }
     }
 }
