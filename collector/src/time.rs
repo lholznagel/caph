@@ -3,8 +3,7 @@ use std::time::Duration;
 
 use crate::error::CollectorError;
 
-/// Sets the given timestamp to the previous 20 or 50 minute mark
-pub fn previous_30_minute(timestamp: u64) -> Result<u64, CollectorError> {
+pub fn previous_10_minute(timestamp: u64) -> Result<u64, CollectorError> {
     let date_time = NaiveDateTime::from_timestamp(timestamp as i64, 0);
     let time = if date_time.minute() >= 50 {
         NaiveTime::from_hms(date_time.hour(), 50, 0)
@@ -19,9 +18,9 @@ pub fn previous_30_minute(timestamp: u64) -> Result<u64, CollectorError> {
 }
 
 /// Create a duration to the next 30 minute mark
-pub fn duration_to_next_30_minute() -> Result<Duration, CollectorError> {
+pub fn duration_to_next_10_minute() -> Result<Duration, CollectorError> {
     let current = Utc::now().timestamp() as u64;
-    let next = next_30_minutes(current)?;
+    let next = next_10_minutes(current)?;
     let diff = next - current;
     Ok(Duration::from_secs(diff))
 }
@@ -49,46 +48,15 @@ pub fn duration_next_sde_download() -> Result<Duration, CollectorError> {
     Ok(Duration::from_secs(diff as u64))
 }
 
-/// Adds 30 minutes to the given timestamp
-fn next_30_minutes(timestamp: u64) -> Result<u64, CollectorError> {
+/// Adds 10 minutes to the given timestamp
+fn next_10_minutes(timestamp: u64) -> Result<u64, CollectorError> {
     let date_time = NaiveDateTime::from_timestamp(timestamp as i64, 0);
-    // add 30 minutes
-    let date_time = date_time.checked_add_signed(chrono::Duration::minutes(30)).ok_or(CollectorError::ChronoError)?;
+    // add 10 minutes
+    let date_time = date_time
+        .checked_add_signed(chrono::Duration::minutes(20))
+        .ok_or(CollectorError::ChronoError)?;
+    Ok(date_time.timestamp() as u64)
     // calculate it down to be even 30 minutes
-    previous_30_minute(date_time.timestamp() as u64)
+    //previous_10_minute(date_time.timestamp() as u64)
 }
 
-#[cfg(test)]
-mod time_tests {
-    use super::*;
-
-    #[test]
-    fn previous_30_min_01() {
-        // 1970.01.01 00:21:00
-        let start = 21 * 60;
-        let is = previous_30_minute(start).unwrap();
-
-        let expected = 20 * 60;
-        assert_eq!(is, expected);
-    }
-
-    #[test]
-    fn previous_30_min_02() {
-        // 1970.01.01 00:21:00
-        let start = 51 * 60;
-        let is = previous_30_minute(start).unwrap();
-
-        let expected = 50 * 60;
-        assert_eq!(is, expected);
-    }
-
-    #[test]
-    fn previous_30_min_03() {
-        // 1970.01.01 01:10:00
-        let start = 60 * 60 + 10 * 60;
-        let is = previous_30_minute(start).unwrap();
-
-        let expected = 50 * 60;
-        assert_eq!(is, expected);
-    }
-}

@@ -5,8 +5,6 @@
     <n-input v-model:value="blueprintEntries" type="textarea" />
 
     <n-button @click="save">Parse</n-button>
-
-    <pre>{{ a }}</pre>
   </n-card>
 </template>
 
@@ -32,7 +30,6 @@ export default class CorpBlueprints extends Vue {
   public busy: boolean = false;
   public blueprintEntries: string = '';
 
-  public a: any[] = [];
   public error: string = '';
 
   public async save() {
@@ -45,11 +42,15 @@ export default class CorpBlueprints extends Vue {
       .split('\n')
       .map(x => {
         const splitted = x.split('\t');
-        let name = splitted[0].slice(splitted[0].indexOf(' x ') + 3, splitted[0].length);
+
+        let name = splitted[0];
+        if (name.indexOf(' x ') !== -1) {
+          name = splitted[0].slice(splitted[0].indexOf(' x ') + 3, splitted[0].length);
+        }
+
         return name;
       });
     let names_resolved = await NameService.resolve_names_to_id(names);
-    console.log(names_resolved);
 
     this.blueprintEntries
       .split('\n')
@@ -68,29 +69,28 @@ export default class CorpBlueprints extends Vue {
           return;
         }
 
-        let name = splitted[0].slice(splitted[0].indexOf(' x ') + 3, splitted[0].length);
-        let type_id = Object
-          .keys(names_resolved)
-          .find(key => names_resolved[key] === name);
+        let name = splitted[0];
+        if (name.indexOf(' x ') !== -1) {
+          name = splitted[0].slice(splitted[0].indexOf(' x ') + 3, splitted[0].length);
+        }
+        let type_id = (names_resolved.find(x => x.name === name)) || { id: 0 };
         if (splitted[0].indexOf(' x ') !== -1) {
           quantity = Number(splitted[0].slice(0, splitted[0].indexOf(' x ')));
         }
 
         blueprints.push({
-          location_id: location_id.id,
+          location_id: location_id.id || 0,
           material_efficiency,
           quantity,
           runs,
           time_efficiency,
-          type_id: Number(type_id) || 1,
+          type_id: type_id.id,
+          corp_id: (<any>window).whoami.corp_id
         });
       });
 
-    this.a = blueprints;
     await CorporationService.deleteBlueprints();
     await CorporationService.setBlueprints(blueprints);
-
-    this.a = 'ok';
   }
 }
 </script>

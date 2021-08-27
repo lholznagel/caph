@@ -1,21 +1,20 @@
 <template>
-  <n-space align="center">
-    <n-image
-      class="owner"
+  <!--n-space-->
+    <n-avatar
+      style="margin-top: 10px"
       :src="getCharacterPortrait(id)"
       :key="id"
-      width="32"
-      height="32"
       v-for="id in ids"
+      size="small"
     />
-    <span v-if="withText" style="">
+    <!--span v-if="withText" style="">
       {{ ids[0] }}
     </span>
-  </n-space>
+  </n-space-->
 </template>
 
 <script lang="ts">
-import { NAvatar, NSpace, NImage } from 'naive-ui';
+import { NAvatar, NSpace } from 'naive-ui';
 import { Options, Vue, prop } from 'vue-class-component';
 
 const BASE_URL_CHAR = 'https://images.evetech.net/characters';
@@ -35,8 +34,7 @@ class Props {
 @Options({
   components: {
     NAvatar,
-    NSpace,
-    NImage
+    NSpace
   }
 })
 export default class Owner extends Vue.with(Props) {

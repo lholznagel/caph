@@ -3,16 +3,18 @@
     <n-skeleton text v-if="busy" :repeat="5" />
 
     <div v-if="!busy">
-      <n-input
-        type="input"
-        placeholder="#WithFilter"
-        style="margin-bottom: 5px"
-        clearable
-        v-model="filterName"
-        @input="handleNameFilter"
+      <filter-text
+        :filters="filters"
+        :options="filterOptions"
+      />
+      <filter-element
+        style="margin-top: 5px"
+        :filters="filters"
+        :options="filterOptions"
       />
 
       <n-data-table
+        style="margin-top: 5px"
         ref="table"
         :columns="columns"
         :data="entries"
@@ -28,6 +30,8 @@ import { NButton, NButtonGroup, NCard, NDataTable, NInput, NSkeleton, NTag } fro
 import { Options, Vue } from 'vue-class-component';
 import { h } from 'vue';
 
+import FilterText, { IFilterOption } from '@/components/Filter.vue';
+import FilterElement from '@/components/FilterElement.vue';
 import ItemIcon from '@/components/ItemIcon.vue';
 import NameById from '@/components/NameById.vue';
 import Owner from '@/components/Owner.vue';
@@ -46,6 +50,8 @@ import { NameService } from '@/services/name';
     NSkeleton,
     NTag,
 
+    FilterText,
+    FilterElement,
     ItemIcon,
     NameById,
     Owner,
@@ -55,6 +61,7 @@ export default class CharacterBlueprint extends Vue {
   public busy: boolean = false;
   public entries: IBlueprint[] = [];
 
+  public filters = {};
   public filterName: string = '';
 
   public columns: any = [];
@@ -62,13 +69,24 @@ export default class CharacterBlueprint extends Vue {
     pageSize: 10
   };
 
+  public filterOptions: { [key: string]: IFilterOption } = {
+    name: {
+      label: 'Name',
+    },
+    owner: {
+      label: 'Owner',
+      element: 'OWNER',
+      options: ['2117441999', '692480993']
+    }
+  };
 
   public async created() {
     this.busy = true;
     this.columns = createColumns(this.openDetails, this.newProject);
 
     const charBlueprints = await CharacterService.blueprints();
-    const corpBlueprints = await CorporationService.blueprints();
+    //const corpBlueprints = await CorporationService.blueprints();
+    const corpBlueprints = [];
 
     const blueprints = await this.joinCharCorpBp(charBlueprints, corpBlueprints);
     this.entries = await this.groupItems(blueprints);
@@ -136,11 +154,9 @@ export default class CharacterBlueprint extends Vue {
       }
     }
 
-    let wtf = Array.from(map.values()).find(x => x.name === null || x.name === undefined);
-    console.log(wtf);
-
     return Array
       .from(map.values())
+      .filter(x => x.name)
       .sort((a: IBlueprint, b: IBlueprint) => a.name.localeCompare(b.name))
   }
 
@@ -257,7 +273,7 @@ const createColumns = (openDetails: any, newProject: any) => {
     render(row: IBlueprint) {
       return h(
         Owner,
-        { ids: row.owners }
+        { ids: row.owners, withText: false }
       )
     }
   }, {

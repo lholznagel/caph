@@ -1,54 +1,49 @@
 use async_trait::*;
-use caph_eve_data_wrapper::{MarketPrice, TypeId};
-use cachem::{Parse, Cache, Command, Get, Key, Set, Save};
+use cachem::{Parse, Cache, Command, Get2, Set2, Save};
+use caph_eve_data_wrapper::{AllianceId, CharacterId, CorporationId};
+use uuid::Uuid;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::BufStream;
 use tokio::net::TcpStream;
 use tokio::sync::{RwLock, watch::Receiver};
 
-type Id  = TypeId;
-type Val = MarketPriceEntry;
+type Id  = Uuid;
+type Val = LoginEntry;
 type Typ = HashMap<Id, Val>;
 
-#[derive(Clone)]
-pub struct MarketPriceCache {
-    cache: Arc<RwLock<Typ>>,
+pub struct LoginCache {
+    cache: RwLock<Typ>,
     cnc:   Receiver<Command>,
 }
 
-impl MarketPriceCache {
+impl LoginCache {
     pub fn new(cnc: Receiver<Command>) -> Self {
         Self {
-            cache: Arc::new(RwLock::default()),
+            cache: RwLock::default(),
             cnc,
         }
     }
 }
 
-impl Into<Arc<dyn Cache>> for MarketPriceCache {
+impl Into<Arc<dyn Cache>> for LoginCache {
     fn into(self) -> Arc<dyn Cache> {
         Arc::new(self)
     }
 }
 
 #[async_trait]
-impl Cache for MarketPriceCache {
+impl Cache for LoginCache {
     fn name(&self) -> String {
-        "market_prices".into()
+        "logins".into()
     }
 
     async fn handle(&self, cmd: Command, buf: &mut BufStream<TcpStream>) {
         match cmd {
             Command::Get => {
                 let key = Id::read(buf).await.unwrap();
-                let val = self.get(key, None).await;
+                let val = self.get(key).await;
                 val.write(buf).await.unwrap();
-            }
-            Command::MGet => {
-                let keys = Vec::<Id>::read(buf).await.unwrap();
-                let vals = self.mget(keys, None).await;
-                vals.write(buf).await.unwrap();
             }
             Command::Set => {
                 let key = Id::read(buf).await.unwrap();
@@ -56,15 +51,6 @@ impl Cache for MarketPriceCache {
                 self.set(key, val).await;
                 self.save().await;
                 0u8.write(buf).await.unwrap();
-            }
-            Command::MSet => {
-                let vals = HashMap::<Id, Val>::read(buf).await.unwrap();
-                self.mset(vals).await;
-                self.save().await;
-                0u8.write(buf).await.unwrap();
-            }
-            Command::Keys => {
-                self.keys().await.write(buf).await.unwrap();
             }
             _ => {
                 log::error!("Invalid cmd {:?}", cmd);
@@ -87,12 +73,8 @@ impl Cache for MarketPriceCache {
 }
 
 #[async_trait]
-impl Get for MarketPriceCache {
-    type Id  =   Id;
-    type Res =   Val;
-    type Param = ();
-
-    async fn get(&self, id: Self::Id, _: Option<Self::Param>) -> Option<Self::Res> {
+impl Get2<Uuid, LoginEntry> for LoginCache {
+    async fn get(&self, id: Uuid) -> Option<LoginEntry> {
         self
             .cache
             .read()
@@ -103,11 +85,8 @@ impl Get for MarketPriceCache {
 }
 
 #[async_trait]
-impl Set for MarketPriceCache {
-    type Id  = Id;
-    type Val = Val;
-
-    async fn set(&self, id: Self::Id, val: Self::Val) {
+impl Set2<Uuid, LoginEntry> for LoginCache {
+    async fn set(&self, id: Uuid, val: LoginEntry) {
         self
             .cache
             .write()
@@ -117,26 +96,11 @@ impl Set for MarketPriceCache {
 }
 
 #[async_trait]
-impl Key for MarketPriceCache {
-    type Id = Id;
-
-    async fn keys(&self) -> Vec<Self::Id> {
-        self
-            .cache
-            .read()
-            .await
-            .keys()
-            .map(|x| *x)
-            .collect::<Vec<_>>()
-    }
-}
-
-#[async_trait]
-impl Save for MarketPriceCache {
+impl Save for LoginCache {
     type Typ = Typ;
 
     fn file(&self) -> &str {
-        "./db/market_price.cachem"
+        "./db/logins.cachem"
     }
 
     async fn read(&self) -> Self::Typ {
@@ -150,19 +114,13 @@ impl Save for MarketPriceCache {
 
 #[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, PartialEq, Parse)]
-pub struct MarketPriceEntry {
-    pub adjusted_price: f32,
-    pub average_price:  f32,
-    pub type_id:        TypeId,
-}
-
-impl From<MarketPrice> for MarketPriceEntry {
-    fn from(x: MarketPrice) -> Self {
-        Self {
-            adjusted_price: x.adjusted_price,
-            average_price:  x.average_price,
-            type_id:        x.type_id,
-        }
-    }
+pub struct LoginEntry {
+    pub alliance_id:   AllianceId,
+    pub alliance_name: String,
+    pub corp_id:       CorporationId,
+    pub corp_name:     String,
+    pub user_id:       CharacterId,
+    pub user_name:     String,
+    pub aliase:        Vec<LoginEntry>,
 }
 

@@ -1,5 +1,5 @@
 [Unit]
-Description=Caph data collector
+Description=Caph server
 After=caph_db.service
 
 [Service]
@@ -10,7 +10,7 @@ Environment=EVE_REDIRECT_URL=
 Environment=EVE_CLIENT_ID=
 Environment=EVE_SECRET_KEY=
 ExecStartPre=/bin/sleep 2
-ExecStart=/opt/caph/caph_collector
+ExecStart=/opt/caph/caph_server
 Restart=always
 
 [Install]

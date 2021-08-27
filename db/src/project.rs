@@ -1,5 +1,5 @@
 use async_trait::*;
-use cachem::{Parse, v2::{Cache, Command, Del, Get, Key, Set, Save}};
+use cachem::{Parse, Cache, Command, Del, Get, Key, Set, Save};
 use caph_eve_data_wrapper::{CharacterId, ItemId, SolarSystemId, TypeId};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -8,9 +8,9 @@ use tokio::net::TcpStream;
 use tokio::sync::{RwLock, watch::Receiver};
 use uuid::Uuid;
 
-type Idx = Uuid;
+type Id  = Uuid;
 type Val = ProjectEntry;
-type Typ = HashMap<Idx, Val>;
+type Typ = HashMap<Id, Val>;
 
 #[derive(Clone)]
 pub struct ProjectCache {
@@ -27,9 +27,9 @@ impl ProjectCache {
     }
 }
 
-impl Into<Arc<Box<dyn Cache>>> for ProjectCache {
-    fn into(self) -> Arc<Box<dyn Cache>> {
-        Arc::new(Box::new(self))
+impl Into<Arc<dyn Cache>> for ProjectCache {
+    fn into(self) -> Arc<dyn Cache> {
+        Arc::new(self)
     }
 }
 
@@ -42,18 +42,18 @@ impl Cache for ProjectCache {
     async fn handle(&self, cmd: Command, buf: &mut BufStream<TcpStream>) {
         match cmd {
             Command::Del => {
-                let key = Idx::read(buf).await.unwrap();
+                let key = Id::read(buf).await.unwrap();
                 self.del(key).await;
                 self.save().await;
                 0u8.write(buf).await.unwrap();
             }
             Command::Get => {
-                let key = Idx::read(buf).await.unwrap();
+                let key = Id::read(buf).await.unwrap();
                 let val = self.get(key, None).await;
                 val.write(buf).await.unwrap();
             }
             Command::MGet => {
-                let keys = Vec::<Idx>::read(buf).await.unwrap();
+                let keys = Vec::<Id>::read(buf).await.unwrap();
                 let vals = self.mget(keys, None).await;
                 vals.write(buf).await.unwrap();
             }
@@ -61,7 +61,7 @@ impl Cache for ProjectCache {
                 self.keys().await.write(buf).await.unwrap();
             }
             Command::Set => {
-                let key = Idx::read(buf).await.unwrap();
+                let key = Id::read(buf).await.unwrap();
                 let val = Val::read(buf).await.unwrap();
                 self.set(key, val).await;
                 self.save().await;
@@ -89,52 +89,52 @@ impl Cache for ProjectCache {
 
 #[async_trait]
 impl Del for ProjectCache {
-    type Idx = Idx;
+    type Id = Id;
 
-    async fn del(&self, idx: Self::Idx) {
+    async fn del(&self, id: Self::Id) {
         self
             .cache
             .write()
             .await
-            .remove(&idx);
+            .remove(&id);
     }
 }
 
 #[async_trait]
 impl Get for ProjectCache {
-    type Idx =   Idx;
+    type Id  =   Id ;
     type Res =   Val;
     type Param = ();
 
-    async fn get(&self, idx: Self::Idx, _: Option<Self::Param>) -> Option<Self::Res> {
+    async fn get(&self, id: Self::Id, _: Option<Self::Param>) -> Option<Self::Res> {
         self
             .cache
             .read()
             .await
-            .get(&idx)
+            .get(&id)
             .cloned()
     }
 }
 
 #[async_trait]
 impl Set for ProjectCache {
-    type Idx = Idx;
+    type Id  = Id;
     type Val = Val;
 
-    async fn set(&self, idx: Self::Idx, val: Self::Val) {
+    async fn set(&self, id: Self::Id, val: Self::Val) {
         self
             .cache
             .write()
             .await
-            .insert(idx, val);
+            .insert(id, val);
     }
 }
 
 #[async_trait]
 impl Key for ProjectCache {
-    type Idx = Idx;
+    type Id = Id;
 
-    async fn keys(&self) -> Vec<Self::Idx> {
+    async fn keys(&self) -> Vec<Self::Id> {
         self
             .cache
             .read()

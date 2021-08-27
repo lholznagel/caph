@@ -38,7 +38,7 @@ const COLOR_SYSTEM_TEXT: string = '#ffffff';
   }
 })
 export default class Network extends Vue {
-  public nodes: INode[] = [{
+  /*public nodes: INode[] = [{
     id: 'P-ZMZV',
     connections: ['9CG6-H'],
     cx: 750,
@@ -357,10 +357,10 @@ export default class Network extends Vue {
       }
     }));
     drawSvg()
-  }
+  }*/
 }
 
-interface IConfig {
+/*interface IConfig {
   events?: IEvent;
   nodes:   INode[];
 }
@@ -389,6 +389,6 @@ interface INodeData {
   procB:       boolean,
   // ChiefOmncron Propoise
   porp:        boolean
-}
+}*/
 </script>
 

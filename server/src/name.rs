@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::error::EveServerError;
 
-use cachem::v2::ConnectionPool;
-use caph_db_v2::CacheName;
+use cachem::ConnectionPool;
+use caph_db::CacheName;
 use caph_eve_data_wrapper::TypeId;
 
 #[derive(Clone)]

@@ -24,7 +24,7 @@ pub struct DogmaAttribute {
 #[serde(deny_unknown_fields)]
 pub struct DogmaEffect {
     #[serde(rename = "effectID")]
-    pub attribute_id: EffectId,
+    pub effect_id: EffectId,
     #[serde(rename = "isDefault")]
     pub is_default:   bool,
 }

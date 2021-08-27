@@ -1,6 +1,6 @@
 use async_trait::*;
 use caph_eve_data_wrapper::{TypeId, OrderId};
-use cachem::{Parse, v2::{Cache, Command, Get, Key, Set, Save}};
+use cachem::{Parse, Cache, Command, Get, Key, Set, Save};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::BufStream;
@@ -9,9 +9,9 @@ use tokio::sync::{RwLock, watch::Receiver};
 
 use crate::MarketInfoCache;
 
-type Idx = TypeId;
+type Id  = TypeId;
 type Val = MarketOrder;
-type Typ = HashMap<Idx, HashMap<OrderId, Vec<Val>>>;
+type Typ = HashMap<Id, HashMap<OrderId, Vec<Val>>>;
 
 pub struct MarketOrderCache {
     cache: RwLock<Typ>,
@@ -35,9 +35,9 @@ impl MarketOrderCache {
     }
 }
 
-impl Into<Arc<Box<dyn Cache>>> for MarketOrderCache {
-    fn into(self) -> Arc<Box<dyn Cache>> {
-        Arc::new(Box::new(self))
+impl Into<Arc<dyn Cache>> for MarketOrderCache {
+    fn into(self) -> Arc<dyn Cache> {
+        Arc::new(self)
     }
 }
 
@@ -50,20 +50,20 @@ impl Cache for MarketOrderCache {
     async fn handle(&self, cmd: Command, buf: &mut BufStream<TcpStream>) {
         match cmd {
             Command::Get => {
-                let key = Idx::read(buf).await.unwrap();
+                let key = Id::read(buf).await.unwrap();
                 let params = Option::<MarketOrderRequest>::read(buf).await.unwrap();
                 let val = self.get(key, params).await;
                 val.write(buf).await.unwrap();
             }
             Command::Set => {
-                let key = Idx::read(buf).await.unwrap();
+                let key = Id::read(buf).await.unwrap();
                 let val = Vec::<MarketOrderEntry>::read(buf).await.unwrap();
                 self.set(key, val).await;
                 self.save().await;
                 0u8.write(buf).await.unwrap();
             }
             Command::MSet => {
-                let data = HashMap::<Idx, Vec<MarketOrderEntry>>::read(buf).await.unwrap();
+                let data = HashMap::<Id, Vec<MarketOrderEntry>>::read(buf).await.unwrap();
                 self.mset(data).await;
                 self.save().await;
                 0u8.write(buf).await.unwrap();
@@ -93,11 +93,11 @@ impl Cache for MarketOrderCache {
 
 #[async_trait]
 impl Get for MarketOrderCache {
-    type Idx   = Idx;
+    type Id    = Id;
     type Res   = Vec<MarketOrderResponse>;
     type Param = MarketOrderRequest;
 
-    async fn get(&self, idx: Self::Idx, params: Option<Self::Param>) -> Option<Self::Res> {
+    async fn get(&self, id: Self::Id, params: Option<Self::Param>) -> Option<Self::Res> {
         let ts_start = params.clone().unwrap_or_default().start;
         let ts_stop  = params.unwrap_or_default().end;
 
@@ -108,7 +108,7 @@ impl Get for MarketOrderCache {
             .await;
 
         let mut items = Vec::new();
-        let entries = if let Some(e) = historic.get(&idx) { e.clone() } else { HashMap::new() };
+        let entries = if let Some(e) = historic.get(&id) { e.clone() } else { HashMap::new() };
         for (_, entries) in entries.iter() {
             let mut index = 0;
             loop {
@@ -187,7 +187,7 @@ impl Get for MarketOrderCache {
                             .read()
                             .await;
                         let mut items = items
-                            .get(&idx)
+                            .get(&id)
                             .unwrap()
                             .get(order_id)
                             .unwrap()
@@ -258,10 +258,10 @@ impl Get for MarketOrderCache {
 
 #[async_trait]
 impl Set for MarketOrderCache {
-    type Idx = Idx;
+    type Id  = Id;
     type Val = Vec<MarketOrderEntry>;
 
-    async fn set(&self, _idx: Self::Idx, val: Self::Val) {
+    async fn set(&self, _id: Self::Id, val: Self::Val) {
         for entry in val {
             self
                 .cache
@@ -312,9 +312,9 @@ impl Set for MarketOrderCache {
 
 #[async_trait]
 impl Key for MarketOrderCache {
-    type Idx = Idx;
+    type Id = Id;
 
-    async fn keys(&self) -> Vec<Self::Idx> {
+    async fn keys(&self) -> Vec<Self::Id> {
         self
             .cache
             .read()

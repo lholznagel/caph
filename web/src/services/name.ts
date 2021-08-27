@@ -87,7 +87,6 @@ export class NameService {
         unknown.push(name);
       }
     }
-    console.log(unknown.length);
 
     if (unknown.length > 0) {
       // fetch all unknown ids

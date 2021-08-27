@@ -17,7 +17,7 @@ pub struct DogmaService {
     attributes: HashMap<AttributeId, DogmaAttributeEntry>,
     categories: HashMap<DogmaCategoryId, DogmaAttributeCategoryEntry>,
     effects:    HashMap<u32, DogmaEffectEntry>,
-    typ:        HashMap<AttributeId, TypeDogmaEntry>,
+    typ:        HashMap<TypeId, TypeDogmaEntry>,
 }
 
 impl DogmaService {
@@ -33,5 +33,9 @@ impl DogmaService {
             effects:    crate::parse_zip_file(Self::PATH_EFFECTS, &mut zip)?,
             typ:        crate::parse_zip_file(Self::PATH_TYPE, &mut zip)?,
         })
+    }
+
+    pub fn get_type_dogma(&self) -> HashMap<TypeId, TypeDogmaEntry> {
+        self.typ.clone()
     }
 }

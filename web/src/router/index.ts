@@ -86,11 +86,19 @@ const routes: Array<RouteRecordRaw> = [
     )
   },
   {
-    path: '/admin/blueprints',
+    path: '/admin/corp/blueprints',
     name: 'corp_blueprints',
     component: () => import(
       /* webpackChunkName: "corp_blueprints" */
       '@/views/CorpBlueprints.vue'
+    )
+  },
+  {
+    path: '/admin/alliance/fittings',
+    name: 'alliance_fittings',
+    component: () => import(
+      /* webpackChunkName: "alliance_fittings" */
+      '@/views/AllianceFittings.vue'
     )
   }
 ]

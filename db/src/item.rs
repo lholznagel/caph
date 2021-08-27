@@ -1,15 +1,15 @@
 use async_trait::*;
 use caph_eve_data_wrapper::{CategoryId, GroupId, TypeId};
-use cachem::{Parse, v2::{Cache, Command, Get, Key, Set, Save}};
+use cachem::{Parse, Cache, Command, Get, Key, Set, Save};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::BufStream;
 use tokio::net::TcpStream;
 use tokio::sync::{RwLock, watch::Receiver};
 
-type Idx = TypeId;
+type Id  = TypeId;
 type Val = ItemEntry;
-type Typ = HashMap<Idx, Val>;
+type Typ = HashMap<Id, Val>;
 
 pub struct ItemCache {
     cache: RwLock<Typ>,
@@ -25,9 +25,9 @@ impl ItemCache {
     }
 }
 
-impl Into<Arc<Box<dyn Cache>>> for ItemCache {
-    fn into(self) -> Arc<Box<dyn Cache>> {
-        Arc::new(Box::new(self))
+impl Into<Arc<dyn Cache>> for ItemCache {
+    fn into(self) -> Arc<dyn Cache> {
+        Arc::new(self)
     }
 }
 
@@ -40,24 +40,24 @@ impl Cache for ItemCache {
     async fn handle(&self, cmd: Command, buf: &mut BufStream<TcpStream>) {
         match cmd {
             Command::Get => {
-                let key = Idx::read(buf).await.unwrap();
+                let key = Id::read(buf).await.unwrap();
                 let val = self.get(key, None).await;
                 val.write(buf).await.unwrap();
             }
             Command::MGet => {
-                let keys = Vec::<Idx>::read(buf).await.unwrap();
+                let keys = Vec::<Id>::read(buf).await.unwrap();
                 let vals = self.mget(keys, None).await;
                 vals.write(buf).await.unwrap();
             }
             Command::Set => {
-                let key = Idx::read(buf).await.unwrap();
+                let key = Id::read(buf).await.unwrap();
                 let val = Val::read(buf).await.unwrap();
                 self.set(key, val).await;
                 self.save().await;
                 0u8.write(buf).await.unwrap();
             }
             Command::MSet => {
-                let vals = HashMap::<Idx, Val>::read(buf).await.unwrap();
+                let vals = HashMap::<Id, Val>::read(buf).await.unwrap();
                 self.mset(vals).await;
                 self.save().await;
                 0u8.write(buf).await.unwrap();
@@ -87,39 +87,39 @@ impl Cache for ItemCache {
 
 #[async_trait]
 impl Get for ItemCache {
-    type Idx =   Idx;
+    type Id  =   Id;
     type Res =   Val;
     type Param = ();
 
-    async fn get(&self, idx: Self::Idx, _: Option<Self::Param>) -> Option<Self::Res> {
+    async fn get(&self, id: Self::Id, _: Option<Self::Param>) -> Option<Self::Res> {
         self
             .cache
             .read()
             .await
-            .get(&idx)
+            .get(&id)
             .cloned()
     }
 }
 
 #[async_trait]
 impl Set for ItemCache {
-    type Idx = Idx;
+    type Id  = Id;
     type Val = Val;
 
-    async fn set(&self, idx: Self::Idx, val: Self::Val) {
+    async fn set(&self, id: Self::Id, val: Self::Val) {
         self
             .cache
             .write()
             .await
-            .insert(idx, val);
+            .insert(id, val);
     }
 }
 
 #[async_trait]
 impl Key for ItemCache {
-    type Idx = Idx;
+    type Id = Id;
 
-    async fn keys(&self) -> Vec<Self::Idx> {
+    async fn keys(&self) -> Vec<Self::Id> {
         self
             .cache
             .read()

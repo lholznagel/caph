@@ -144,7 +144,7 @@ impl CharacterService {
 
     pub async fn alliance_name(
         &self,
-        aid: u32,
+        aid: AllianceId,
     ) -> Result<String, EveConnectError> {
         #[derive(Deserialize)]
         struct Alliance {
@@ -216,8 +216,8 @@ impl CharacterService {
 
 #[derive(Deserialize)]
 pub struct Character {
-    pub alliance_id:    Option<u32>,
-    pub corporation_id: u32,
+    pub alliance_id:    Option<AllianceId>,
+    pub corporation_id: CorporationId,
     pub name:           String,
 }
 

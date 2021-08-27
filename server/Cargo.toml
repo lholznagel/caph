@@ -1,12 +1,12 @@
 [package]
-name = "caph_server_v2"
+name = "caph_server"
 version = "0.1.0"
 authors = ["lholznagel <contact@lholznagel.info>"]
 edition = "2018"
 
 [dependencies]
 cachem = { path = "../../cachem/cachem", features = ["derive"] }
-caph_db_v2 = { path = "../db_v2", features = ["with_serde"] }
+caph_db = { path = "../db", features = ["with_serde"] }
 caph_eve_data_wrapper = { path = "../eve_data_wrapper" }
 chrono = "0.4.19"
 log = "0.4.14"

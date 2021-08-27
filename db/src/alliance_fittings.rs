@@ -1,23 +1,24 @@
 use async_trait::*;
-use caph_eve_data_wrapper::{IndustrySystem, SolarSystemId};
-use cachem::{Parse, Cache, Command, Get, Key, Set, Save};
+use caph_eve_data_wrapper::TypeId;
+use cachem::{Cache, Command, Del, Get2, Key, Parse, Save, Set};
+use uuid::Uuid;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::BufStream;
 use tokio::net::TcpStream;
 use tokio::sync::{RwLock, watch::Receiver};
 
-type Id  = SolarSystemId;
-type Val = IndustryCostEntry;
+type Id  = Uuid;
+type Val = AllianceFittingEntry;
 type Typ = HashMap<Id, Val>;
 
 #[derive(Clone)]
-pub struct IndustryCostCache {
+pub struct AllianceFittingCache {
     cache: Arc<RwLock<Typ>>,
     cnc:   Receiver<Command>,
 }
 
-impl IndustryCostCache {
+impl AllianceFittingCache {
     pub fn new(cnc: Receiver<Command>) -> Self {
         Self {
             cache: Arc::new(RwLock::default()),
@@ -26,29 +27,44 @@ impl IndustryCostCache {
     }
 }
 
-impl Into<Arc<dyn Cache>> for IndustryCostCache {
+impl Into<Arc<dyn Cache>> for AllianceFittingCache {
     fn into(self) -> Arc<dyn Cache> {
         Arc::new(self)
     }
 }
 
 #[async_trait]
-impl Cache for IndustryCostCache {
+impl Cache for AllianceFittingCache {
     fn name(&self) -> String {
-        "industry_cost".into()
+        "alliance_fittings".into()
     }
 
     async fn handle(&self, cmd: Command, buf: &mut BufStream<TcpStream>) {
         match cmd {
+            Command::Del => {
+                let key = Id::read(buf).await.unwrap();
+                self.del(key).await;
+                self.save().await;
+                0u8.write(buf).await.unwrap();
+            }
+            Command::MDel => {
+                let keys = Vec::<Id>::read(buf).await.unwrap();
+                self.mdel(keys).await;
+                self.save().await;
+                0u8.write(buf).await.unwrap();
+            }
             Command::Get => {
                 let key = Id::read(buf).await.unwrap();
-                let val = self.get(key, None).await;
+                let val = self.get(key).await;
                 val.write(buf).await.unwrap();
             }
             Command::MGet => {
                 let keys = Vec::<Id>::read(buf).await.unwrap();
-                let vals = self.mget(keys, None).await;
+                let vals = self.mget(keys).await;
                 vals.write(buf).await.unwrap();
+            }
+            Command::Keys => {
+                self.keys().await.write(buf).await.unwrap();
             }
             Command::Set => {
                 let key = Id::read(buf).await.unwrap();
@@ -62,9 +78,6 @@ impl Cache for IndustryCostCache {
                 self.mset(vals).await;
                 self.save().await;
                 0u8.write(buf).await.unwrap();
-            }
-            Command::Keys => {
-                self.keys().await.write(buf).await.unwrap();
             }
             _ => {
                 log::error!("Invalid cmd {:?}", cmd);
@@ -87,12 +100,21 @@ impl Cache for IndustryCostCache {
 }
 
 #[async_trait]
-impl Get for IndustryCostCache {
-    type Id  =   Id;
-    type Res =   Val;
-    type Param = ();
+impl Del for AllianceFittingCache {
+    type Id = Id;
 
-    async fn get(&self, id: Self::Id, _: Option<Self::Param>) -> Option<Self::Res> {
+    async fn del(&self, id: Self::Id) {
+        self
+            .cache
+            .write()
+            .await
+            .remove(&id);
+    }
+}
+
+#[async_trait]
+impl Get2<Id, AllianceFittingEntry> for AllianceFittingCache {
+    async fn get(&self, id: Uuid) -> Option<AllianceFittingEntry> {
         self
             .cache
             .read()
@@ -103,7 +125,7 @@ impl Get for IndustryCostCache {
 }
 
 #[async_trait]
-impl Set for IndustryCostCache {
+impl Set for AllianceFittingCache {
     type Id  = Id;
     type Val = Val;
 
@@ -117,7 +139,7 @@ impl Set for IndustryCostCache {
 }
 
 #[async_trait]
-impl Key for IndustryCostCache {
+impl Key for AllianceFittingCache {
     type Id = Id;
 
     async fn keys(&self) -> Vec<Self::Id> {
@@ -132,11 +154,11 @@ impl Key for IndustryCostCache {
 }
 
 #[async_trait]
-impl Save for IndustryCostCache {
+impl Save for AllianceFittingCache {
     type Typ = Typ;
 
     fn file(&self) -> &str {
-        "./db/industry_cost.cachem"
+        "./db/alliance_fittings.cachem"
     }
 
     async fn read(&self) -> Self::Typ {
@@ -150,32 +172,20 @@ impl Save for IndustryCostCache {
 
 #[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, PartialEq, Parse)]
-pub struct IndustryCostEntry {
-    pub cost_indices:    Vec<CostIndex>,
-    pub solar_system_id: SolarSystemId
-}
+pub struct AllianceFittingEntry {
+    pub fittings:   Vec<Fitting>,
+    pub id:         Uuid,
+    pub name:       String,
+    pub url:        String,
 
-impl From<IndustrySystem> for IndustryCostEntry {
-    fn from(x: IndustrySystem) -> Self {
-        Self {
-            cost_indices:    x.cost_indices.into_iter().map(CostIndex::from).collect(),
-            solar_system_id: x.solar_system_id,
-        }
-    }
+    pub how_to_fit: Option<String>,
+    pub how_to_fly: Option<String>,
 }
 
 #[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, PartialEq, Parse)]
-pub struct CostIndex {
-    pub activity:   String,
-    pub cost_index: f32,
+pub struct Fitting {
+    pub name:     String,
+    pub type_ids: Vec<TypeId>
 }
 
-impl From<caph_eve_data_wrapper::CostIndex> for CostIndex {
-    fn from(x: caph_eve_data_wrapper::CostIndex) -> Self {
-        Self {
-            activity:   x.activity,
-            cost_index: x.cost_index,
-        }
-    }
-}

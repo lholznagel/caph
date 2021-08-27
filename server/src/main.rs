@@ -2,6 +2,7 @@
 
 //! API-Server for the frontend
 
+mod alliance;
 mod blueprint;
 mod character;
 mod corporation;
@@ -12,6 +13,7 @@ mod item;
 mod name;
 mod project;
 
+use crate::alliance::AllianceService;
 use crate::blueprint::BlueprintService;
 use crate::character::CharacterService;
 use crate::corporation::CorporationService;
@@ -22,8 +24,9 @@ use crate::project::ProjectService;
 
 use self::eve::*;
 
-use cachem::v2::ConnectionPool;
-use caph_db_v2::CorporationBlueprintEntry;
+use alliance::NewAllianceFitting;
+use cachem::ConnectionPool;
+use caph_db::CorporationBlueprintEntry;
 use caph_eve_data_wrapper::{CorporationId, EveDataWrapper, TypeId};
 use project::ProjectNew;
 use serde::{Deserialize, Serialize};
@@ -37,16 +40,17 @@ use warp::{Filter, Rejection, Reply};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     morgan::Morgan::init(vec!["tracing".into()]);
 
-    let pool     = ConnectionPool::new("0.0.0.0:55555", 100).await?;
+    let pool     = ConnectionPool::new("0.0.0.0:55555", 100usize).await?;
     let eve_data = EveDataWrapper::new().await?;
 
-    let eve_auth  = EveAuthService::new(pool.clone());
+    let eve_auth  = EveAuthService::new(pool.clone(), eve_data.clone());
     let industry  = IndustryService::new(eve_auth.clone(), eve_data.clone());
 
     let blueprint   = BlueprintService::new(pool.clone(), eve_auth.clone(), industry.clone());
     let character   = CharacterService::new(pool.clone(), eve_auth.clone(), eve_data.clone());
     let corporation = CorporationService::new(pool.clone(), eve_auth.clone());
     let item        = ItemService::new(pool.clone());
+    let alliance    = AllianceService::new(pool.clone(), eve_auth.clone(), character.clone(), item.clone());
     let name        = NameService::new(pool.clone());
     let project     = ProjectService::new(pool.clone(), blueprint.clone(), character.clone(), eve_auth.clone());
 
@@ -55,6 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ApiServer::new(
         eve_auth,
 
+        alliance,
         blueprint,
         character,
         corporation,
@@ -74,6 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 pub struct ApiServer {
     eve_auth:  EveAuthService,
 
+    alliance:    AllianceService,
     blueprint:   BlueprintService,
     character:   CharacterService,
     corporation: CorporationService,
@@ -88,6 +94,7 @@ impl ApiServer {
     pub fn new(
         eve_auth:  EveAuthService,
 
+        alliance:    AllianceService,
         blueprint:   BlueprintService,
         character:   CharacterService,
         corporation: CorporationService,
@@ -99,6 +106,7 @@ impl ApiServer {
         Self {
             eve_auth,
 
+            alliance,
             blueprint,
             character,
             corporation,
@@ -127,6 +135,39 @@ impl ApiServer {
         let root = warp::any()
             .map(move || _self.clone())
             .and(warp::path!("api" / ..));
+
+        let alliance = root
+            .clone()
+            .and(warp::path!("alliance" / ..));
+        let alliance_get_fittings = alliance
+            .clone()
+            .and(warp::path!("fittings"))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::alliance_get_fittings);
+        let alliance_get_fitting = alliance
+            .clone()
+            .and(warp::path!("fittings" / Uuid))
+            .and(warp::get())
+            .and(warp::cookie("token"))
+            .and_then(Self::alliance_get_fitting);
+        let alliance_set_fittings = alliance
+            .clone()
+            .and(warp::path!("fittings"))
+            .and(warp::post())
+            .and(warp::body::json())
+            .and(warp::cookie("token"))
+            .and_then(Self::alliance_set_fitting);
+        let alliance_del_fitting = alliance
+            .clone()
+            .and(warp::path!("fittings" / Uuid))
+            .and(warp::delete())
+            .and(warp::cookie("token"))
+            .and_then(Self::alliance_del_fitting);
+        let alliance = alliance_get_fittings
+            .or(alliance_get_fitting)
+            .or(alliance_set_fittings)
+            .or(alliance_del_fitting);
 
         let blueprint = root
             .clone()
@@ -247,14 +288,14 @@ impl ApiServer {
             .and(warp::path!("keys"))
             .and(warp::get())
             .and_then(Self::item_keys);
-        let item_meta = item
+        let item_dogma_skill = item
             .clone()
-            .and(warp::path!(TypeId / "meta"))
+            .and(warp::path!(TypeId / "dogma" / "skill"))
             .and(warp::get())
-            .and_then(Self::item_meta);
+            .and_then(Self::item_dogma_skill);
         let item = item_all
             .or(item_keys)
-            .or(item_meta);
+            .or(item_dogma_skill);
 
         let industry = root
             .clone()
@@ -379,7 +420,8 @@ impl ApiServer {
             .or(project_tree)
             .or(project_required_products);
 
-        let api = blueprint
+        let api = alliance
+            .or(blueprint)
             .or(character)
             .or(corporation)
             .or(eve)
@@ -392,6 +434,57 @@ impl ApiServer {
         warp::serve(api)
             .run(([0, 0, 0, 0], 10101))
             .await;
+    }
+
+    async fn alliance_get_fittings(
+        self:  Arc<Self>,
+        token: Uuid,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .alliance
+            .get_fittings(token)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn alliance_get_fitting(
+        self:  Arc<Self>,
+        id:    Uuid,
+        token: Uuid,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .alliance
+            .get_fitting(token, id)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn alliance_set_fitting(
+        self:  Arc<Self>,
+        entry: NewAllianceFitting,
+        token: Uuid,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .alliance
+            .set_fitting(token, entry)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
+    }
+
+    async fn alliance_del_fitting(
+        self:  Arc<Self>,
+        id:    Uuid,
+        token: Uuid,
+    ) -> Result<impl Reply, Rejection> {
+        self
+            .alliance
+            .del_fitting(token, id)
+            .await
+            .map(|x| warp::reply::json(&x))
+            .map_err(Into::into)
     }
 
     async fn blueprint_all(
@@ -419,11 +512,11 @@ impl ApiServer {
 
     async fn character_assets(
         self:  Arc<Self>,
-        token: String
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .character
-            .assets(&token)
+            .assets(token)
             .await
             .map(|x| warp::reply::json(&x))
             .map_err(Into::into)
@@ -431,7 +524,7 @@ impl ApiServer {
 
     async fn character_blueprints(
         self:  Arc<Self>,
-        token: String,
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .character
@@ -443,7 +536,7 @@ impl ApiServer {
 
     async fn character_info(
         self:  Arc<Self>,
-        token: String,
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .character
@@ -456,7 +549,7 @@ impl ApiServer {
     async fn character_item_location(
         self:  Arc<Self>,
         id:    u64,
-        token: String,
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .character
@@ -469,7 +562,7 @@ impl ApiServer {
     async fn corporation_blueprints(
         self:  Arc<Self>,
         cid:   CorporationId,
-        token: String,
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .corporation
@@ -483,7 +576,7 @@ impl ApiServer {
         self:  Arc<Self>,
         cid:   CorporationId,
         body:  Vec<CorporationBlueprintEntry>,
-        token: String,
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .corporation
@@ -496,7 +589,7 @@ impl ApiServer {
     async fn corporation_delete_blueprints(
         self:  Arc<Self>,
         cid:   CorporationId,
-        token: String,
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .corporation
@@ -548,7 +641,7 @@ impl ApiServer {
 
     async fn eve_login_alt(
         self:  Arc<Self>,
-        token: String,
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         let uri = self.eve_auth.login_alt(&token).await?;
         let uri = warp::http::uri::Builder::new()
@@ -562,7 +655,7 @@ impl ApiServer {
 
     async fn eve_whoami(
         self:  Arc<Self>,
-        token: String,
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .character
@@ -610,7 +703,7 @@ impl ApiServer {
 
     async fn projects(
         self:  Arc<Self>,
-        token: String,
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .project
@@ -623,7 +716,7 @@ impl ApiServer {
     async fn project_id(
         self:  Arc<Self>,
         id:    Uuid,
-        token: String,
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .project
@@ -636,11 +729,11 @@ impl ApiServer {
     async fn project_delete(
         self:  Arc<Self>,
         id:    Uuid,
-        token: String,
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .project
-            .delete(id, &token)
+            .delete(id, token)
             .await
             .map(|x| warp::reply::json(&x))
             .map_err(Into::into)
@@ -649,7 +742,7 @@ impl ApiServer {
     async fn project_new(
         self:  Arc<Self>,
         body:  ProjectNew,
-        token: String,
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .project
@@ -662,7 +755,7 @@ impl ApiServer {
     async fn project_cost(
         self:  Arc<Self>,
         id:    Uuid,
-        token: String,
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .project
@@ -675,7 +768,7 @@ impl ApiServer {
     async fn project_materials(
         self:  Arc<Self>,
         id:    Uuid,
-        token: String,
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .project
@@ -688,7 +781,7 @@ impl ApiServer {
     async fn project_materials_raw(
         self:  Arc<Self>,
         id:    Uuid,
-        token: String,
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .project
@@ -701,7 +794,7 @@ impl ApiServer {
     async fn project_materials_stored(
         self:  Arc<Self>,
         id:    Uuid,
-        token: String
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .project
@@ -714,7 +807,7 @@ impl ApiServer {
     async fn project_blueprints(
         self:  Arc<Self>,
         id:    Uuid,
-        token: String
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .project
@@ -727,7 +820,7 @@ impl ApiServer {
     async fn project_tree(
         self:  Arc<Self>,
         id:    Uuid,
-        token: String
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .project
@@ -740,7 +833,7 @@ impl ApiServer {
     async fn project_required_products(
         self:  Arc<Self>,
         id:    Uuid,
-        token: String
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .project
@@ -752,7 +845,7 @@ impl ApiServer {
 
     async fn industry_jobs(
         self:  Arc<Self>,
-        token: String,
+        token: Uuid,
     ) -> Result<impl Reply, Rejection> {
         self
             .industry
@@ -796,13 +889,13 @@ impl ApiServer {
             .map_err(Into::into)
     }
 
-    async fn item_meta(
-        self: Arc<Self>,
-        tid:  TypeId
+    async fn item_dogma_skill(
+        self:    Arc<Self>,
+        type_id: TypeId,
     ) -> Result<impl Reply, Rejection> {
         self
             .item
-            .meta(tid)
+            .dogma_skill(type_id)
             .await
             .map(|x| warp::reply::json(&x))
             .map_err(Into::into)
@@ -811,8 +904,8 @@ impl ApiServer {
 
 #[derive(Debug, Deserialize)]
 struct EveAuthQuery {
-    code: String,
-    state: String,
+    code:  String,
+    state: Uuid,
 }
 
 #[derive(Debug, Serialize)]

@@ -1,7 +1,7 @@
 use crate::error::CollectorError;
 
-use cachem::v2::ConnectionPool;
-use caph_db_v2::{CacheName, CharacterAssetEntry, CharacterBlueprintEntry, CharacterFittingEntry, UserEntry};
+use cachem::ConnectionPool;
+use caph_db::{CacheName, CharacterAssetEntry, CharacterBlueprintEntry, CharacterFittingEntry, UserEntry};
 use caph_eve_data_wrapper::{CharacterId, CharacterService, EveClient, EveDataWrapper, EveOAuthUser, FittingId, ItemId};
 use std::collections::HashMap;
 
@@ -77,7 +77,14 @@ impl Character {
         character_service: CharacterService,
     ) -> Result<(), CollectorError> {
         let mut con = self.pool.acquire().await?;
-        let prices = character_service
+
+        // TODO: Implement clear
+        let keys = con
+            .keys::<_, ItemId>(CacheName::CharacterBlueprint)
+            .await?;
+        con.mdel(CacheName::CharacterBlueprint, keys).await?;
+
+        let assets = character_service
             .assets(&token, user_id)
             .await
             .unwrap_or_default()
@@ -85,7 +92,7 @@ impl Character {
             .map(|x| CharacterAssetEntry::from(x, user_id))
             .map(|x| (x.item_id, x))
             .collect::<HashMap<ItemId, CharacterAssetEntry>>();
-        con.mset(CacheName::CharacterAsset, prices).await.unwrap();
+        con.mset(CacheName::CharacterAsset, assets).await.unwrap();
         Ok(())
     }
 
@@ -96,7 +103,14 @@ impl Character {
         character_service: CharacterService
     ) -> Result<(), CollectorError> {
         let mut con = self.pool.acquire().await?;
-        let prices = character_service
+
+        // TODO: Implement clear
+        let keys = con
+            .keys::<_, ItemId>(CacheName::CharacterBlueprint)
+            .await?;
+        con.mdel(CacheName::CharacterBlueprint, keys).await?;
+
+        let blueprints = character_service
             .blueprints(&token, user_id)
             .await
             .unwrap_or_default()
@@ -104,7 +118,7 @@ impl Character {
             .map(|x| CharacterBlueprintEntry::from(x, user_id))
             .map(|x| (x.item_id, x))
             .collect::<HashMap<ItemId, CharacterBlueprintEntry>>();
-        con.mset(CacheName::CharacterBlueprint, prices).await.unwrap();
+        con.mset(CacheName::CharacterBlueprint, blueprints).await.unwrap();
         Ok(())
     }
 
@@ -115,7 +129,14 @@ impl Character {
         character_service: CharacterService
     ) -> Result<(), CollectorError> {
         let mut con = self.pool.acquire().await?;
-        let prices = character_service
+
+        // TODO: Implement clear
+        let keys = con
+            .keys::<_, FittingId>(CacheName::CharacterFitting)
+            .await?;
+        con.mdel(CacheName::CharacterFitting, keys).await?;
+
+        let fittings = character_service
             .fitting(&token, user_id)
             .await
             .unwrap_or_default()
@@ -123,7 +144,7 @@ impl Character {
             .map(|x| CharacterFittingEntry::from(x, user_id))
             .map(|x| (x.fitting_id, x))
             .collect::<HashMap<FittingId, CharacterFittingEntry>>();
-        con.mset(CacheName::CharacterFitting, prices).await.unwrap();
+        con.mset(CacheName::CharacterFitting, fittings).await.unwrap();
         Ok(())
     }
 

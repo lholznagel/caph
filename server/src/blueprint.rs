@@ -1,11 +1,10 @@
 use crate::{error::EveServerError, eve::EveAuthService, industry::IndustryService};
 
-use cachem::v2::ConnectionPool;
-use caph_db_v2::{Activity, BlueprintEntry, CacheName, CorporationBlueprintEntry, IndustryCostEntry, MarketPriceEntry, Material, SchematicEntry};
+use cachem::ConnectionPool;
+use caph_db::{Activity, BlueprintEntry, CacheName, IndustryCostEntry, MarketPriceEntry, Material, SchematicEntry};
 use caph_eve_data_wrapper::{ItemId, SolarSystemId, TypeId};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct BlueprintService {

@@ -1,11 +1,8 @@
 use std::collections::HashMap;
 
-use cachem::v2::ConnectionPool;
-use caph_db_v2::{CacheName, CharacterAssetEntry, CharacterBlueprintEntry, CorporationBlueprintEntry};
-use caph_eve_data_wrapper::EveDataWrapper;
-use caph_eve_data_wrapper::ItemLocation;
-use caph_eve_data_wrapper::{CharacterId, CorporationId, ItemId};
-use serde::Serialize;
+use cachem::ConnectionPool;
+use caph_db::{CacheName, CorporationBlueprintEntry};
+use caph_eve_data_wrapper::CorporationId;
 use uuid::Uuid;
 
 use crate::error::EveServerError;
@@ -33,7 +30,7 @@ impl CorporationService {
     pub async fn blueprints(
         &self,
         cid:   CorporationId,
-        token: String
+        token: Uuid,
     ) -> Result<Vec<CorporationBlueprintEntry>, EveServerError> {
         let mut pool = self
             .pool
@@ -64,7 +61,7 @@ impl CorporationService {
         &self,
         _:          CorporationId,
         blueprints: Vec<CorporationBlueprintEntry>,
-        token:      String,
+        token:      Uuid,
     ) -> Result<(), EveServerError> {
         let user = self
             .eve_auth
@@ -98,7 +95,7 @@ impl CorporationService {
     pub async fn delete_blueprints(
         &self,
         cid:   CorporationId,
-        token: String
+        token: Uuid,
     ) -> Result<(), EveServerError> {
         let mut pool = self
             .pool

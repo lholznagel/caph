@@ -2,7 +2,7 @@ use crate::error::CollectorError;
 use crate::time::previous_30_minute;
 
 use cachem::v2::ConnectionPool;
-use caph_db_v2::*;
+use caph_db::*;
 use caph_eve_data_wrapper::{EveDataWrapper, IndustryService, MarketService, SolarSystemId, SystemService, TypeId};
 use chrono::{DateTime, Utc};
 use futures::stream::{FuturesUnordered, StreamExt};

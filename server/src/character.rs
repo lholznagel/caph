@@ -1,12 +1,13 @@
 use crate::error::EveServerError;
 use crate::eve::EveAuthService;
 
-use cachem::v2::ConnectionPool;
-use caph_db_v2::{CacheName, CharacterAssetEntry, CharacterBlueprintEntry};
-use caph_eve_data_wrapper::{CharacterId, CorporationId, ItemId};
+use cachem::ConnectionPool;
+use caph_db::{CacheName, CharacterAssetEntry, CharacterBlueprintEntry, LoginEntry};
+use caph_eve_data_wrapper::{AllianceId, CharacterId, CharacterSkillRes, CorporationId, ItemId};
 use caph_eve_data_wrapper::EveDataWrapper;
 use caph_eve_data_wrapper::ItemLocation;
 use serde::Serialize;
+use uuid::Uuid;
 
 /// Service for all character related interfaces
 #[derive(Clone)]
@@ -32,7 +33,7 @@ impl CharacterService {
 
     pub async fn assets(
         &self,
-        token: &str
+        token: Uuid,
     ) -> Result<Vec<CharacterAssetEntry>, EveServerError> {
         let mut con = self.pool.acquire().await?;
 
@@ -67,7 +68,7 @@ impl CharacterService {
     ///
     pub async fn blueprints(
         &self,
-        token: String
+        token: Uuid,
     ) -> Result<Vec<CharacterBlueprintEntry>, EveServerError> {
         let mut con = self.pool.acquire().await?;
 
@@ -127,8 +128,8 @@ impl CharacterService {
     ///
     pub async fn item_location(
         &self,
-        token: String,
-        id:    u64
+        token: Uuid,
+        id:    u64,
     ) -> Result<Option<ItemLocation>, EveServerError> {
         let charater_service = self.eve_data.character().await?;
         let user = self.eve_auth.refresh_token(&token).await?;
@@ -149,15 +150,15 @@ impl CharacterService {
     ///
     /// Struct containing the name, protrait, corp icon and alliance icon
     ///
-    pub async fn whoami(&self, token: String) -> Result<WhoAmI, EveServerError> {
+    pub async fn whoami(&self, token: Uuid) -> Result<WhoAmI, EveServerError> {
         let charater_service = self.eve_data.character().await?;
         let user = self.eve_auth.refresh_token(&token).await?;
 
-        let whoami = charater_service
-            .character(&user.access_token, user.user_id)
+        let whoami = self
+            .character_info(user.access_token, user.user_id)
             .await;
         if let Ok(x) = whoami {
-            Ok(WhoAmI::new(user.user_id, x))
+            Ok(WhoAmI::new(x))
         } else {
             Err(EveServerError::InvalidUser)
         }
@@ -173,7 +174,7 @@ impl CharacterService {
     ///
     /// Character information with all information about him and its alts
     ///
-    pub async fn info(&self, token: String) -> Result<Character, EveServerError> {
+    pub async fn info(&self, token: Uuid) -> Result<Character, EveServerError> {
         let user = self.eve_auth.lookup(&token).await?;
 
         let user = if let Some(user) = user {
@@ -199,11 +200,23 @@ impl CharacterService {
         Ok(character)
     }
 
+    pub async fn skills(&self, token: Uuid) -> Result<CharacterSkillRes, EveServerError> {
+        let character_service = self.eve_data.character().await?;
+        let user = self.eve_auth.refresh_token(&token).await?;
+
+        character_service.skills(
+            &user.access_token,
+            user.user_id
+        )
+        .await
+        .map_err(Into::into)
+    }
+
     /// Builds the character information together
     async fn character_info(
         &self,
         access_token: String,
-        uid: CharacterId
+        uid:          CharacterId
     ) -> Result<Character, EveServerError> {
         let character_service = self.eve_data.character().await?;
         let character = character_service
@@ -234,22 +247,27 @@ impl CharacterService {
 pub struct WhoAmI {
     /// Name of the user
     name:             String,
+    /// Id of the user
+    user_id:          CharacterId,
     /// https://images.evetech.net/characters/2117441999/portrait?size=1024
     portrait:         String,
     /// https://images.evetech.net/corporations/692480993/logo?size=1024
     corporation_icon: String,
-    /// https://images.evetech.net/alliances/99003214/logo?size=1024
-    alliance_icon:    Option<String>,
-    /// Id of the user
-    user_id:          CharacterId,
+    /// Name of the corporation
+    corporation_name: String,
     /// Id of the users corporation
     corp_id:          CorporationId,
+    /// https://images.evetech.net/alliances/99003214/logo?size=1024
+    alliance_icon:    Option<String>,
+    /// Name of the alliance
+    alliance_name:    Option<String>,
+    /// Id of the alliance
+    alliance_id:      Option<AllianceId>,
 }
 
 impl WhoAmI {
     pub fn new(
-        user_id:   CharacterId,
-        character: caph_eve_data_wrapper::Character
+        character:     Character
     ) -> Self {
         let alliance = if let Some(x) = character.alliance_id {
             Some(format!( "https://images.evetech.net/alliances/{}/logo?size=1024", x))
@@ -257,17 +275,20 @@ impl WhoAmI {
 
         WhoAmI {
             name: character.name,
+            user_id: character.user_id,
             portrait: format!(
                 "https://images.evetech.net/characters/{}/portrait?size=1024",
-                user_id
+                character.user_id
             ),
             corporation_icon: format!(
                 "https://images.evetech.net/corporations/{}/logo?size=1024",
-                character.corporation_id
+                character.corp_id
             ),
+            corporation_name: character.corp,
+            corp_id: character.corp_id.into(),
             alliance_icon: alliance,
-            user_id,
-            corp_id: character.corporation_id.into()
+            alliance_name: character.alliance,
+            alliance_id:   character.alliance_id
         }
     }
 }
@@ -276,14 +297,15 @@ impl WhoAmI {
 #[derive(Debug, Serialize)]
 pub struct Character {
     name:          String,
+    user_id:       CharacterId,
     portrait:      String,
     corp:          String,
     corp_icon:     String,
+    corp_id:       CorporationId,
     alliance:      Option<String>,
     alliance_icon: Option<String>,
+    alliance_id:   Option<AllianceId>,
     aliase:        Vec<Character>,
-    user_id:       CharacterId,
-    corp_id:       CorporationId,
 }
 
 impl Character {
@@ -301,6 +323,7 @@ impl Character {
 
         Self {
             name: character.name,
+            user_id,
             portrait: format!(
                 "https://images.evetech.net/characters/{}/portrait?size=1024",
                 user_id
@@ -310,11 +333,11 @@ impl Character {
                 "https://images.evetech.net/corporations/{}/logo?size=1024",
                 character.corporation_id
             ),
+            corp_id: character.corporation_id.into(),
             alliance,
             alliance_icon,
+            alliance_id: character.alliance_id,
             aliase,
-            user_id,
-            corp_id: character.corporation_id.into()
         }
     }
 }

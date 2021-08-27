@@ -142,6 +142,7 @@ impl EveDataWrapper {
 // TODO: validate if all are needed or if some can be merged
 eve_id!(ActivityId, u32);
 eve_id!(AgentId, u32);
+eve_id!(AllianceId, u32);
 eve_id!(AttributeId, u32);
 eve_id!(CategoryId, u32);
 eve_id!(CharacterId, u32);

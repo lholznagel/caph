@@ -4,7 +4,7 @@ const KV_NAME = 'resolve_locations';
 
 export class CharacterService {
   public static async assets(): Promise<any[]> {
-    return (await axios.get('/api/assets')).data;
+    return (await axios.get('/api/character/assets')).data;
   }
 
   public static async blueprints(): Promise<ICharacterBlueprint[]> {

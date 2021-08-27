@@ -1,5 +1,5 @@
 [package]
-name = "caph_db_v2"
+name = "caph_db"
 version = "0.1.0"
 authors = ["lholznagel <contact@lholznagel.info>"]
 edition = "2018"

@@ -1,18 +1,19 @@
+use crate::character::CharacterService;
 use crate::error::EveServerError;
 
-use cachem::v2::ConnectionPool;
-use caph_db_v2::{CacheName, UserEntry};
-use caph_eve_data_wrapper::{CharacterId, EveOAuthUser};
+use cachem::ConnectionPool;
+use caph_db::{CacheName, UserEntry};
+use caph_eve_data_wrapper::{AllianceId, Character, CharacterId, CorporationId, EveDataWrapper, EveOAuthUser};
 use caph_eve_data_wrapper::{EveClient, Url};
-use rand::distributions::Alphanumeric;
 use rand::prelude::*;
 use rand_chacha::ChaCha20Rng;
+use uuid::Uuid;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 /// Describes different type of session logins
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 enum SessionType {
     /// Login process with the main account
     Main,
@@ -26,15 +27,20 @@ enum SessionType {
 
 #[derive(Clone)]
 pub struct EveAuthService {
-    pool:     ConnectionPool,
-    sessions: Arc<Mutex<HashMap<String, SessionType>>>,
+    pool:      ConnectionPool,
+    eve_data:  EveDataWrapper,
+    sessions:  Arc<Mutex<HashMap<Uuid, SessionType>>>,
 }
 
 impl EveAuthService {
     /// Creates a new instance
-    pub fn new(pool: ConnectionPool) -> Self {
+    pub fn new(
+        pool:      ConnectionPool,
+        eve_data:  EveDataWrapper,
+    ) -> Self {
         Self {
             pool,
+            eve_data,
             sessions: Arc::new(Mutex::new(HashMap::new()))
         }
     }
@@ -51,11 +57,12 @@ impl EveAuthService {
     /// Returns an optional ChaCha20 64 chars generated token which should be
     /// used as cookie.
     /// This token is only returned when the logged in character is a main.
+    ///
     pub async fn auth(
         &self,
-        code: String,
-        state: String
-    ) -> Result<Option<String>, EveServerError> {
+        code:  String,
+        state: Uuid
+    ) -> Result<Option<Uuid>, EveServerError> {
         let session_entry = {
             // Make sure that the code is valid
             // If the code is valid, remove it from the map
@@ -113,7 +120,7 @@ impl EveAuthService {
         let key = self.generate_key();
         self.sessions.lock().await.insert(key.clone(), SessionType::Main);
 
-        EveClient::eve_auth_uri(&key)
+        EveClient::eve_auth_uri(&key.to_string())
             .map_err(Into::into)
     }
 
@@ -128,14 +135,14 @@ impl EveAuthService {
     ///
     /// Uri to the eve auth server
     ///
-    pub async fn login_alt(&self, token: &str) -> Result<Url, EveServerError> {
+    pub async fn login_alt(&self, token: &Uuid) -> Result<Url, EveServerError> {
         let user = self.lookup(token).await?;
 
         if let Some(x) = user {
             let key = self.generate_key();
             self.sessions.lock().await.insert(key.clone(), SessionType::Alt(x.user_id));
 
-            EveClient::eve_auth_uri(&key)
+            EveClient::eve_auth_uri(&key.to_string())
                 .map_err(Into::into)
         } else {
             Err(EveServerError::InvalidUser)
@@ -150,14 +157,13 @@ impl EveAuthService {
     ///
     pub async fn lookup(
         &self,
-        token: &str,
+        token: &Uuid,
     ) -> Result<Option<UserEntry>, EveServerError> {
         let uid = self
             .sessions
             .lock()
             .await;
-        let uid = uid
-            .get(token);
+        let uid = uid.get(token);
 
         if let Some(SessionType::Logged(x)) = uid {
             self
@@ -182,7 +188,7 @@ impl EveAuthService {
     ///
     /// New oauth user
     ///
-    pub async fn refresh_token(&self, token: &str) -> Result<EveOAuthUser, EveServerError> {
+    pub async fn refresh_token(&self, token: &Uuid) -> Result<EveOAuthUser, EveServerError> {
         let oauth = self
             .lookup(&token)
             .await?
@@ -209,7 +215,7 @@ impl EveAuthService {
     ///
     pub async fn refresh_token_alt(
         &self,
-        token: &str,
+        token: &Uuid,
         uid:   CharacterId,
     ) -> Result<EveOAuthUser, EveServerError> {
         let oauth = self
@@ -238,7 +244,7 @@ impl EveAuthService {
     ///
     async fn save_login(
         &self,
-        token:     &str,
+        token:     &Uuid,
         character: EveOAuthUser
     ) -> Result<(), EveServerError> {
         if let Some(x) = self.lookup(&token).await? {
@@ -249,11 +255,22 @@ impl EveAuthService {
             };
             self.save_user(user).await?;
         } else {
+            let character_service = self.eve_data.character().await?;
+            let character_info = character_service
+                .character(&character.access_token, character.user_id)
+                .await?;
+            let alliance_name = self.alliance_name(character.alliance_id).await?;
+            let corp_name = self.corp_name(character.corp_id).await?;
+
             let user = UserEntry {
                 access_token: character.access_token,
                 refresh_token: character.refresh_token,
+                alliance_id: character.alliance_id,
+                alliance_name,
                 user_id: character.user_id,
+                user_name: character_info.name,
                 corp_id: character.corp_id,
+                corp_name,
                 aliase: Vec::new(),
             };
             self.save_user(user).await?;
@@ -270,25 +287,38 @@ impl EveAuthService {
     ///
     async fn save_login_alt(
         &self,
-        token:     &str,
+        token:     &Uuid,
         character: EveOAuthUser
     ) -> Result<(), EveServerError> {
+        let character_service = self.eve_data.character().await?;
         let mut main = self
             .lookup(&token)
             .await?
             .ok_or(EveServerError::InvalidUser)?;
-        main
-            .aliase
-            .iter_mut()
-            .find(|x| x.user_id == character.user_id)
-            .map(|x| *x = UserEntry {
-                access_token:  character.access_token,
-                refresh_token: character.refresh_token,
-                user_id:       x.user_id,
-                corp_id:       x.corp_id,
-                aliase:        Vec::new(),
-            })
-            .ok_or(EveServerError::InvalidUser)?;
+
+        for alias in main
+                        .aliase
+                        .iter_mut()
+                        .find(|x| x.user_id == character.user_id) {
+
+            let character_info = character_service
+                .character(&character.access_token.clone(), character.user_id)
+                .await?;
+            let alliance_name = self.alliance_name(character.alliance_id).await?;
+            let corp_name = self.corp_name(character.corp_id).await?;
+
+            *alias = UserEntry {
+                access_token: character.access_token.clone(),
+                refresh_token: character.refresh_token.clone(),
+                alliance_id: character.alliance_id,
+                alliance_name,
+                user_id: character.user_id,
+                user_name: character_info.name,
+                corp_id: character.corp_id,
+                corp_name,
+                aliase: Vec::new(),
+            };
+        }
 
         self.save_user(main).await?;
         Ok(())
@@ -325,12 +355,22 @@ impl EveAuthService {
         main: UserEntry,
         alt:  EveOAuthUser,
     ) -> Result<(), EveServerError> {
+        let character_service = self.eve_data.character().await?;
+        let character_info = character_service
+            .character(&alt.access_token, alt.user_id)
+            .await?;
+        let alliance_name = self.alliance_name(alt.alliance_id).await?;
+        let corp_name = self.corp_name(alt.corp_id).await?;
         let alt = UserEntry {
-            access_token:  alt.access_token,
+            access_token: alt.access_token,
             refresh_token: alt.refresh_token,
-            user_id:       alt.user_id,
-            corp_id:       alt.corp_id,
-            aliase:        Vec::new(),
+            alliance_id: alt.alliance_id,
+            alliance_name,
+            user_id: alt.user_id,
+            user_name: character_info.name,
+            corp_id: alt.corp_id,
+            corp_name,
+            aliase: Vec::new(),
         };
 
         let mut main = main;
@@ -338,12 +378,26 @@ impl EveAuthService {
         self.save_user(main).await
     }
 
-    fn generate_key(&self) -> String {
-        ChaCha20Rng::from_entropy()
-            .sample_iter(&Alphanumeric)
-            .take(64)
-            .map(char::from)
-            .collect::<String>()
+    async fn alliance_name(
+        &self,
+        aid: AllianceId
+    ) -> Result<String, EveServerError> {
+        let character_service = self.eve_data.character().await?;
+        Ok(character_service.alliance_name(aid).await?)
+    }
+
+    async fn corp_name(
+        &self,
+        cid: CorporationId
+    ) -> Result<String, EveServerError> {
+        let character_service = self.eve_data.character().await?;
+        Ok(character_service.corporation_name(cid).await?)
+    }
+
+    /// Could be safer, but its good enough for out use case
+    fn generate_key(&self) -> Uuid {
+        let val: u128 = ChaCha20Rng::from_entropy().gen();
+        Uuid::from_u128(val)
     }
 }
 

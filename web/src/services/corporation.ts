@@ -2,17 +2,17 @@ import axios from "axios";
 
 export class CorporationService {
   public static async blueprints(): Promise<any[]> {
-    const corpId = window.whoami.corp_id;
+    const corpId = (<any>window).whoami.corp_id;
     return (await axios.get(`/api/corporation/${corpId}/blueprints`)).data;
   }
 
   public static async setBlueprints(blueprints: ICorporationBlueprint[]) {
-    const corpId = window.whoami.corp_id;
+    const corpId = (<any>window).whoami.corp_id;
     return await axios.post(`/api/corporation/${corpId}/blueprints`, blueprints);
   }
 
   public static async deleteBlueprints() {
-    const corpId = window.whoami.corp_id;
+    const corpId = (<any>window).whoami.corp_id;
     return await axios.delete(`/api/corporation/${corpId}/blueprints`);
   }
 }

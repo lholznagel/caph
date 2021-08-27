@@ -1,53 +1,52 @@
 use async_trait::*;
-use caph_eve_data_wrapper::{IndustrySystem, SolarSystemId};
-use cachem::{Parse, Cache, Command, Get, Key, Set, Save};
+use caph_eve_data_wrapper::TypeId;
+use cachem::{Cache, Command, Get2, Key, Parse, Save, Set};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::BufStream;
 use tokio::net::TcpStream;
 use tokio::sync::{RwLock, watch::Receiver};
 
-type Id  = SolarSystemId;
-type Val = IndustryCostEntry;
+type Id  = TypeId;
+type Val = ItemDogmaEntry;
 type Typ = HashMap<Id, Val>;
 
-#[derive(Clone)]
-pub struct IndustryCostCache {
-    cache: Arc<RwLock<Typ>>,
+pub struct ItemDogmaCache {
+    cache: RwLock<Typ>,
     cnc:   Receiver<Command>,
 }
 
-impl IndustryCostCache {
+impl ItemDogmaCache {
     pub fn new(cnc: Receiver<Command>) -> Self {
         Self {
-            cache: Arc::new(RwLock::default()),
+            cache: RwLock::default(),
             cnc,
         }
     }
 }
 
-impl Into<Arc<dyn Cache>> for IndustryCostCache {
+impl Into<Arc<dyn Cache>> for ItemDogmaCache {
     fn into(self) -> Arc<dyn Cache> {
         Arc::new(self)
     }
 }
 
 #[async_trait]
-impl Cache for IndustryCostCache {
+impl Cache for ItemDogmaCache {
     fn name(&self) -> String {
-        "industry_cost".into()
+        "item_dogmas".into()
     }
 
     async fn handle(&self, cmd: Command, buf: &mut BufStream<TcpStream>) {
         match cmd {
             Command::Get => {
                 let key = Id::read(buf).await.unwrap();
-                let val = self.get(key, None).await;
+                let val = self.get(key).await;
                 val.write(buf).await.unwrap();
             }
             Command::MGet => {
                 let keys = Vec::<Id>::read(buf).await.unwrap();
-                let vals = self.mget(keys, None).await;
+                let vals = self.mget(keys).await;
                 vals.write(buf).await.unwrap();
             }
             Command::Set => {
@@ -87,12 +86,8 @@ impl Cache for IndustryCostCache {
 }
 
 #[async_trait]
-impl Get for IndustryCostCache {
-    type Id  =   Id;
-    type Res =   Val;
-    type Param = ();
-
-    async fn get(&self, id: Self::Id, _: Option<Self::Param>) -> Option<Self::Res> {
+impl Get2<TypeId, ItemDogmaEntry> for ItemDogmaCache {
+    async fn get(&self, id: TypeId) -> Option<ItemDogmaEntry> {
         self
             .cache
             .read()
@@ -103,7 +98,7 @@ impl Get for IndustryCostCache {
 }
 
 #[async_trait]
-impl Set for IndustryCostCache {
+impl Set for ItemDogmaCache {
     type Id  = Id;
     type Val = Val;
 
@@ -117,7 +112,7 @@ impl Set for IndustryCostCache {
 }
 
 #[async_trait]
-impl Key for IndustryCostCache {
+impl Key for ItemDogmaCache {
     type Id = Id;
 
     async fn keys(&self) -> Vec<Self::Id> {
@@ -132,11 +127,11 @@ impl Key for IndustryCostCache {
 }
 
 #[async_trait]
-impl Save for IndustryCostCache {
+impl Save for ItemDogmaCache {
     type Typ = Typ;
 
     fn file(&self) -> &str {
-        "./db/industry_cost.cachem"
+        "./db/item_dogmas.cachem"
     }
 
     async fn read(&self) -> Self::Typ {
@@ -150,32 +145,33 @@ impl Save for IndustryCostCache {
 
 #[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, PartialEq, Parse)]
-pub struct IndustryCostEntry {
-    pub cost_indices:    Vec<CostIndex>,
-    pub solar_system_id: SolarSystemId
+pub struct ItemDogmaEntry {
+    pub attributes: Vec<DogmaAttribute>,
+    pub effects:    Vec<DogmaEffect>
 }
 
-impl From<IndustrySystem> for IndustryCostEntry {
-    fn from(x: IndustrySystem) -> Self {
+impl ItemDogmaEntry {
+    pub fn new(
+        attributes: Vec<DogmaAttribute>,
+        effects:    Vec<DogmaEffect>
+    ) -> Self {
         Self {
-            cost_indices:    x.cost_indices.into_iter().map(CostIndex::from).collect(),
-            solar_system_id: x.solar_system_id,
+            attributes,
+            effects
         }
     }
 }
 
 #[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, PartialEq, Parse)]
-pub struct CostIndex {
-    pub activity:   String,
-    pub cost_index: f32,
+pub struct DogmaAttribute {
+    pub attr_id: TypeId,
+    pub value:   f32,
 }
 
-impl From<caph_eve_data_wrapper::CostIndex> for CostIndex {
-    fn from(x: caph_eve_data_wrapper::CostIndex) -> Self {
-        Self {
-            activity:   x.activity,
-            cost_index: x.cost_index,
-        }
-    }
+#[cfg_attr(feature = "with_serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Debug, PartialEq, Parse)]
+pub struct DogmaEffect {
+    pub eff_id:  TypeId,
+    pub default: bool,
 }

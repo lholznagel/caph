@@ -1,7 +1,7 @@
 use crate::error::CollectorError;
 
-use cachem::v2::ConnectionPool;
-use caph_db_v2::*;
+use cachem::ConnectionPool;
+use caph_db::*;
 use caph_eve_data_wrapper::{EveDataWrapper, SolarsystemEntry};
 use std::collections::HashMap;
 
@@ -20,6 +20,7 @@ impl Sde {
         self.save_schematics(&self.eve).await?;
         self.save_reprocessing_info(&self.eve).await?;
         self.save_items(&self.eve).await?;
+        self.save_item_dogma(&self.eve).await?;
         self.save_names(&self.eve).await?;
         self.save_system_region(&self.eve).await?;
 
@@ -74,6 +75,44 @@ impl Sde {
             );
         }
         con.mset(CacheName::Item, entries).await.unwrap();
+
+        Ok(())
+    }
+
+    /// Collects all dogma attributes and effects for all items and stores them.
+    async fn save_item_dogma(&self, sde: &EveDataWrapper) -> Result<(), CollectorError> {
+        let dogma_service = sde.dogma().await?;
+
+        let mut con = self.pool.acquire().await?;
+        let mut entries = HashMap::new();
+
+        for (tid, entry) in dogma_service.get_type_dogma() {
+            let attributes = entry
+                .attributes
+                .iter()
+                .cloned()
+                .map(|x| DogmaAttribute {
+                    attr_id: (*x.attribute_id).into(),
+                    value:   x.value
+                })
+                .collect::<Vec<_>>();
+            let effects = entry
+                .effects
+                .iter()
+                .cloned()
+                .map(|x| DogmaEffect {
+                    eff_id:  (*x.effect_id).into(),
+                    default: x.is_default
+                })
+                .collect::<Vec<_>>();
+
+            let entry = ItemDogmaEntry {
+                attributes,
+                effects
+            };
+            entries.insert(tid, entry);
+        }
+        con.mset(CacheName::ItemDogma, entries).await.unwrap();
 
         Ok(())
     }

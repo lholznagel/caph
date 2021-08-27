@@ -1,5 +1,5 @@
-use cachem::v2::*;
-use caph_db_v2::*;
+use cachem::*;
+use caph_db::*;
 
 macro_rules! load_and_register {
     ($name:path, $cache:ident, $cnc:ident, $server:ident) => {
@@ -22,6 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     server.add(CacheName::MarketInfo, market_info.clone().into());
     server.add(CacheName::MarketOrder, market_order.into());
 
+    load_and_register!(CacheName::AllianceFitting,      AllianceFittingCache,      cnc, server);
     load_and_register!(CacheName::Blueprint,            BlueprintCache,            cnc, server);
     load_and_register!(CacheName::CharacterAsset,       CharacterAssetCache,       cnc, server);
     load_and_register!(CacheName::CharacterBlueprint,   CharacterBlueprintCache,   cnc, server);
@@ -29,6 +30,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     load_and_register!(CacheName::CorporationBlueprint, CorporationBlueprintCache, cnc, server);
     load_and_register!(CacheName::IndustryCost,         IndustryCostCache,         cnc, server);
     load_and_register!(CacheName::Item,                 ItemCache,                 cnc, server);
+    load_and_register!(CacheName::ItemDogma,            ItemDogmaCache,            cnc, server);
+    load_and_register!(CacheName::Login,                LoginCache,                cnc, server);
     load_and_register!(CacheName::Name,                 NameCache,                 cnc, server);
     load_and_register!(CacheName::Project,              ProjectCache,              cnc, server);
     load_and_register!(CacheName::MarketPrice,          MarketPriceCache,          cnc, server);

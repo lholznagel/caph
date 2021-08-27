@@ -128,12 +128,12 @@ export default class App extends Vue {
         key:   'meta'
       },
       {
-        label: 'Network',
-        key:   'network'
-      },
-      {
         label: 'Corp Blueprints',
         key:   'corp_blueprints'
+      },
+      {
+        label: 'Alliance Fittings',
+        key:   'alliance_fittings'
       }
     ]
   }];
@@ -142,7 +142,8 @@ export default class App extends Vue {
     const res = await (axios.get<WhoAmI>('/api/eve/whoami'));
     if (res.status === 200) {
       this.whoami = res.data;
-      window.whoami = res.data;
+      let globalWindow: any = window;
+      globalWindow.whoami = res.data;
     }
   }
 

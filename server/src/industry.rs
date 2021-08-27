@@ -2,6 +2,7 @@ use crate::{error::EveServerError, eve::EveAuthService};
 
 use caph_eve_data_wrapper::{EveDataWrapper, IndustryJob, TypeId};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct IndustryService {
@@ -22,7 +23,7 @@ impl IndustryService {
 
     pub async fn jobs(
         &self,
-        token: String,
+        token: Uuid,
     ) -> Result<Vec<IndustryJob>, EveServerError> {
         let user = self
             .eve_auth

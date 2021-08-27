@@ -3,8 +3,8 @@ use crate::character::CharacterService;
 use crate::error::EveServerError;
 use crate::eve::EveAuthService;
 
-use cachem::v2::ConnectionPool;
-use caph_db_v2::{CacheName, CharacterAssetEntry, Material, ProjectBlueprintEntry, ProjectEntry};
+use cachem::ConnectionPool;
+use caph_db::{CacheName, CharacterAssetEntry, Material, ProjectBlueprintEntry, ProjectEntry};
 use caph_eve_data_wrapper::{ItemId, SolarSystemId, TypeId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -35,7 +35,7 @@ impl ProjectService {
 
     pub async fn all(
         &self,
-        token: String,
+        token: Uuid,
     ) -> Result<Vec<ProjectEntry>, EveServerError> {
         let user_id = self
             .eve_auth
@@ -67,7 +67,7 @@ impl ProjectService {
     pub async fn by_id(
         &self,
         id:    Uuid,
-        token: String,
+        token: Uuid,
     ) -> Result<Option<ProjectEntry>, EveServerError> {
         let user_id = self
             .eve_auth
@@ -93,7 +93,7 @@ impl ProjectService {
     pub async fn delete(
         &self,
         id:    Uuid,
-        token: &str
+        token: Uuid,
     ) -> Result<(), EveServerError> {
         let _ = self
             .eve_auth
@@ -113,7 +113,7 @@ impl ProjectService {
     pub async fn blueprints(
         &self,
         id:    Uuid,
-        token: String,
+        token: Uuid,
     ) -> Result<Vec<Blueprint>, EveServerError> {
         let project = self.get_project(id, token.clone()).await?;
 
@@ -139,13 +139,6 @@ impl ProjectService {
             .await?
             .into_iter()
             .map(|x| (x.type_id, x))
-            .collect::<HashMap<_, _>>();
-        let character_bps = self
-            .character
-            .blueprints(token.clone())
-            .await?
-            .into_iter()
-            .map(|x| (x.item_id, x))
             .collect::<HashMap<_, _>>();
 
         let mut result = Vec::new();
@@ -194,7 +187,7 @@ impl ProjectService {
     pub async fn create(
         &self,
         body:  ProjectNew,
-        token: String,
+        token: Uuid,
     ) -> Result<Uuid, EveServerError> {
         let user_id = self
             .eve_auth
@@ -226,7 +219,7 @@ impl ProjectService {
     pub async fn cost(
         &self,
         id:    Uuid,
-        token: String,
+        token: Uuid,
     ) -> Result<Vec<ManufactureCost>, EveServerError> {
         let project = self.get_project(id, token).await?;
 
@@ -246,7 +239,7 @@ impl ProjectService {
     pub async fn materials(
         &self,
         id:    Uuid,
-        token: String,
+        token: Uuid,
     ) -> Result<Vec<Material>, EveServerError> {
         let project = self.get_project(id, token).await?;
 
@@ -268,7 +261,7 @@ impl ProjectService {
     pub async fn raw_materials(
         &self,
         id:    Uuid,
-        token: String
+        token: Uuid,
     ) -> Result<Vec<Material>, EveServerError> {
         let project = self.get_project(id, token).await?;
 
@@ -290,7 +283,7 @@ impl ProjectService {
     pub async fn stored_materials(
         &self,
         id:    Uuid,
-        token: String
+        token: Uuid,
     ) -> Result<Vec<CharacterAssetEntry>, EveServerError> {
         let project_chest = self
             .get_project(id, token)
@@ -319,7 +312,7 @@ impl ProjectService {
     pub async fn trees(
         &self,
         id:    Uuid,
-        token: String,
+        token: Uuid,
     ) -> Result<Vec<BlueprintTreeEntry>, EveServerError> {
         let project = self.get_project(id, token).await?;
 
@@ -338,7 +331,7 @@ impl ProjectService {
     pub async fn manufacture(
         &self,
         id:    Uuid,
-        token: String,
+        token: Uuid,
     ) -> Result<Vec<RequiredProducts>, EveServerError> {
         let project = self.get_project(id, token.clone()).await?;
         let bpids = project
@@ -424,8 +417,8 @@ impl ProjectService {
 
     async fn get_project(
         &self,
-        id: Uuid,
-        token: String
+        id:    Uuid,
+        token: Uuid,
     ) -> Result<ProjectEntry, EveServerError> {
         let user_id = self
             .eve_auth

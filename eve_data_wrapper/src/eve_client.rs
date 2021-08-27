@@ -1,4 +1,4 @@
-use crate::{Character, CharacterId, CorporationId, EveConnectError};
+use crate::{AllianceId, Character, CharacterId, CorporationId, EveConnectError};
 
 use reqwest::{Client, Response, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -344,6 +344,7 @@ impl EveOAuthToken {
 pub struct EveOAuthUser {
     pub access_token:  String,
     pub refresh_token: String,
+    pub alliance_id:   AllianceId,
     pub user_id:       CharacterId,
     pub corp_id:       CorporationId,
 }
@@ -368,6 +369,7 @@ impl EveOAuthUser {
         let res = Self {
             access_token: x.access_token.clone(),
             refresh_token: x.refresh_token.clone(),
+            alliance_id: res.alliance_id.unwrap_or(0u32.into()),
             corp_id: res.corporation_id.into(),
             user_id,
         };
