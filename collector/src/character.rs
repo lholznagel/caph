@@ -1,18 +1,16 @@
 use crate::error::CollectorError;
 
-use cachem::ConnectionPool;
-use caph_db::{CacheName, CharacterAssetEntry, CharacterBlueprintEntry, CharacterFittingEntry, UserEntry};
-use caph_eve_data_wrapper::{CharacterId, CharacterService, EveClient, EveDataWrapper, EveOAuthUser, FittingId, ItemId};
-use std::collections::HashMap;
+use caph_eve_data_wrapper::{CharacterId, CharacterService, EveClient, EveDataWrapper, EveOAuthUser};
+use sqlx::PgPool;
 
 
 pub struct Character {
     eve:  EveDataWrapper,
-    pool: ConnectionPool,
+    pool: PgPool,
 }
 
 impl Character {
-    pub fn new(eve: EveDataWrapper, pool: ConnectionPool) -> Self {
+    pub fn new(eve: EveDataWrapper, pool: PgPool) -> Self {
         Self {
             eve,
             pool
@@ -22,49 +20,41 @@ impl Character {
     /// Runs a task in the background that periodically collects all market
     /// entries from all markets and writes them into the database.
     pub async fn task(&mut self) -> Result<(), CollectorError> {
-        log::info!("Loading eve services");
+        tracing::info!("Loading eve services");
         let character_service = self.eve.character().await?;
-        log::info!("Services loaded");
+        tracing::info!("Services loaded");
 
-        let mut con = self.pool.acquire().await?;
-        let characters = con
-            .keys::<_, CharacterId>(CacheName::User)
-            .await
-            .unwrap_or_default();
-        let characters = con
-            .mget::<_, _, UserEntry>(CacheName::User, characters)
-            .await
-            .unwrap();
+        let refresh_tokens = sqlx::query!("
+                SELECT refresh_token
+                FROM login
+                WHERE character_id IS NOT NULL AND refresh_token IS NOT NULL
+            ")
+            .fetch_all(&self.pool)
+            .await?;
         let mut tokens = Vec::new();
-        for character in characters {
-            let character = character.unwrap();
-            let token = self.refresh_token(&character.refresh_token).await?;
+        for refresh_token in refresh_tokens {
+            let token = self.refresh_token(&refresh_token.refresh_token.unwrap()).await?;
             tokens.push(token);
-
-            for alt in character.aliase {
-                let token = self.refresh_token(&alt.refresh_token).await?;
-                tokens.push(token);
-            }
         }
 
+        let cids = tokens.iter().map(|x| *x.user_id as i32).collect::<Vec<_>>();
+        sqlx::query!("
+                DELETE FROM asset WHERE character_id = ANY($1)
+            ", &cids)
+            .execute(&self.pool)
+            .await?;
+
         for token in tokens {
-            let _ = tokio::join! {
-                self.assets(
-                    token.access_token.clone(),
-                    token.user_id,
-                    character_service.clone()
-                ),
-                self.blueprints(
-                    token.access_token.clone(),
-                    token.user_id,
-                    character_service.clone()
-                ),
-                self.fittings(
-                    token.access_token,
-                    token.user_id,
-                    character_service.clone()
-                )
-            };
+            self.assets(
+                token.access_token.clone(),
+                token.user_id,
+                character_service.clone()
+            ).await?;
+            self.blueprints(
+                token.access_token.clone(),
+                token.user_id,
+                character_service.clone()
+            ).await?;
         }
 
         Ok(())
@@ -72,79 +62,95 @@ impl Character {
 
     async fn assets(
         &self,
-        token: String,
-        user_id: CharacterId,
+        token:             String,
+        cid:               CharacterId,
         character_service: CharacterService,
     ) -> Result<(), CollectorError> {
-        let mut con = self.pool.acquire().await?;
-
-        // TODO: Implement clear
-        let keys = con
-            .keys::<_, ItemId>(CacheName::CharacterBlueprint)
-            .await?;
-        con.mdel(CacheName::CharacterBlueprint, keys).await?;
-
         let assets = character_service
-            .assets(&token, user_id)
-            .await
-            .unwrap_or_default()
-            .into_iter()
-            .map(|x| CharacterAssetEntry::from(x, user_id))
-            .map(|x| (x.item_id, x))
-            .collect::<HashMap<ItemId, CharacterAssetEntry>>();
-        con.mset(CacheName::CharacterAsset, assets).await.unwrap();
+            .assets(&token, cid)
+            .await?;
+
+        let item_id = assets.iter().map(|x| x.item_id).map(|x| *x as i64).collect::<Vec<_>>();
+        let location_flag = assets.iter().map(|x| x.clone().location_flag).collect::<Vec<_>>();
+        let location_id = assets.iter().map(|x| x.location_id).map(|x| *x as i64).collect::<Vec<_>>();
+        let quantity = assets.iter().map(|x| x.quantity).map(|x| x as i32).collect::<Vec<_>>();
+        let type_id = assets.iter().map(|x| x.type_id).map(|x| *x as i32).collect::<Vec<_>>();
+
+        sqlx::query!("
+                INSERT INTO asset
+                (
+                    character_id,
+
+                    item_id,
+                    location_id,
+                    quantity,
+                    type_id,
+                    location_flag
+                )
+                SELECT $1, * FROM UNNEST(
+                    $2::BIGINT[],
+                    $3::BIGINT[],
+                    $4::INTEGER[],
+                    $5::INTEGER[],
+                    $6::VARCHAR[]
+                )
+            ",
+                *cid as i32,
+                &item_id,
+                &location_id,
+                &quantity,
+                &type_id,
+                &location_flag,
+            )
+            .execute(&self.pool)
+            .await?;
+
         Ok(())
     }
 
     async fn blueprints(
         &self,
-        token: String,
-        user_id: CharacterId,
-        character_service: CharacterService
+        token:             String,
+        cid:               CharacterId,
+        character_service: CharacterService,
     ) -> Result<(), CollectorError> {
-        let mut con = self.pool.acquire().await?;
-
-        // TODO: Implement clear
-        let keys = con
-            .keys::<_, ItemId>(CacheName::CharacterBlueprint)
+        let bps = character_service
+            .blueprints(&token, cid)
             .await?;
-        con.mdel(CacheName::CharacterBlueprint, keys).await?;
 
-        let blueprints = character_service
-            .blueprints(&token, user_id)
-            .await
-            .unwrap_or_default()
-            .into_iter()
-            .map(|x| CharacterBlueprintEntry::from(x, user_id))
-            .map(|x| (x.item_id, x))
-            .collect::<HashMap<ItemId, CharacterBlueprintEntry>>();
-        con.mset(CacheName::CharacterBlueprint, blueprints).await.unwrap();
-        Ok(())
-    }
+        let item_id = bps.iter().map(|x| x.item_id).map(|x| *x as i64).collect::<Vec<_>>();
+        let quantity = bps.iter().map(|x| x.quantity).map(|x| x as i32).collect::<Vec<_>>();
+        let m_eff = bps.iter().map(|x| x.material_efficiency).map(|x| x as i32).collect::<Vec<_>>();
+        let t_eff = bps.iter().map(|x| x.time_efficiency).map(|x| x as i32).collect::<Vec<_>>();
+        let runs = bps.iter().map(|x| x.runs).map(|x| x as i32).collect::<Vec<_>>();
 
-    async fn fittings(
-        &self,
-        token: String,
-        user_id: CharacterId,
-        character_service: CharacterService
-    ) -> Result<(), CollectorError> {
-        let mut con = self.pool.acquire().await?;
+        sqlx::query!("
+                INSERT INTO asset_blueprint
+                (
+                    item_id,
 
-        // TODO: Implement clear
-        let keys = con
-            .keys::<_, FittingId>(CacheName::CharacterFitting)
+                    quantity,
+                    material_efficiency,
+                    time_efficiency,
+                    runs
+                )
+                SELECT * FROM UNNEST(
+                    $1::BIGINT[],
+                    $2::INTEGER[],
+                    $3::INTEGER[],
+                    $4::INTEGER[],
+                    $5::INTEGER[]
+                )
+            ",
+                &item_id,
+                &quantity,
+                &m_eff,
+                &t_eff,
+                &runs,
+            )
+            .execute(&self.pool)
             .await?;
-        con.mdel(CacheName::CharacterFitting, keys).await?;
 
-        let fittings = character_service
-            .fitting(&token, user_id)
-            .await
-            .unwrap_or_default()
-            .into_iter()
-            .map(|x| CharacterFittingEntry::from(x, user_id))
-            .map(|x| (x.fitting_id, x))
-            .collect::<HashMap<FittingId, CharacterFittingEntry>>();
-        con.mset(CacheName::CharacterFitting, fittings).await.unwrap();
         Ok(())
     }
 

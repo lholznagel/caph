@@ -146,7 +146,7 @@ impl ProjectService {
             let (is_stored, item_id) = if let Some(e) = stored.get(&bp.bid) {
                 (true, e.item_id)
             } else {
-                (false, 0.into())
+                (false, 0u64.into())
             };
 
             let product = bp.production_activity().product_id();

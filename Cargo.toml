@@ -8,9 +8,10 @@ panic = 'abort'
 [workspace]
 members = [
   'collector',
+  'connector',
   'db',
   'eve_data_wrapper',
   'evemon_to_json',
-  'market_analyzer',
   'server',
+  'server_v2',
 ]

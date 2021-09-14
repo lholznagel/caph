@@ -1,5 +1,14 @@
 .PHONY: docs docs-open musl deploy-collector deploy-db deploy-server deploy-web deploy sync-virgo
 
+# build with some more limitations
+build:
+	cargo clippy -- -D clippy::missing_docs_in_private_items \
+					-D clippy::missing_safety_doc \
+					-D clippy::missing_panics_doc \
+					-D clippy::missing_errors_doc
+	cargo test
+	cargo build
+
 docs:
 	cargo clippy
 	cargo doc --no-deps --document-private-items --all-features
@@ -39,3 +48,6 @@ stop:
 	sudo systemctl stop caph_collector
 	sudo systemctl stop caph_db
 
+sqlx:
+	cd collector; cargo sqlx prepare
+	cd server_v2; cargo sqlx prepare

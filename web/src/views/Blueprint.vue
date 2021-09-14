@@ -34,7 +34,8 @@
 import { Options, Vue } from 'vue-class-component';
 import { NCard, NTabs, NTabPane } from 'naive-ui';
 import { BlueprintService, IBlueprint } from '@/services/blueprint';
-import { CharacterService, ICharacterBlueprint } from '@/services/character';
+import { AssetService, IBlueprint as ICharacterBlueprint } from
+'@/services/asset';
 
 import BlueprintAction from '@/components/blueprint/Action.vue';
 import BlueprintInfo from '@/components/blueprint/Info.vue';
@@ -66,7 +67,7 @@ export default class Blueprint extends Vue {
 
     this.bp = await BlueprintService.blueprint(this.bid);
     if (this.iid) {
-      this.cbp = (await CharacterService.blueprints())
+      this.cbp = (await AssetService.blueprints())
         .find((x: ICharacterBlueprint) => x.item_id === Number(this.iid)) || {};
     }
   }

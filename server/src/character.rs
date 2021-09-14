@@ -2,7 +2,7 @@ use crate::error::EveServerError;
 use crate::eve::EveAuthService;
 
 use cachem::ConnectionPool;
-use caph_db::{CacheName, CharacterAssetEntry, CharacterBlueprintEntry, LoginEntry};
+use caph_db::{CacheName, CharacterAssetEntry, CharacterBlueprintEntry};
 use caph_eve_data_wrapper::{AllianceId, CharacterId, CharacterSkillRes, CorporationId, ItemId};
 use caph_eve_data_wrapper::EveDataWrapper;
 use caph_eve_data_wrapper::ItemLocation;
@@ -220,7 +220,7 @@ impl CharacterService {
     ) -> Result<Character, EveServerError> {
         let character_service = self.eve_data.character().await?;
         let character = character_service
-            .character(&access_token, uid)
+            .character(uid)
             .await?;
 
         let alliance_name = if let Some(x) = character.alliance_id {

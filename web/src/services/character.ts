@@ -3,12 +3,12 @@ import axios from 'axios';
 const KV_NAME = 'resolve_locations';
 
 export class CharacterService {
-  public static async assets(): Promise<any[]> {
-    return (await axios.get('/api/character/assets')).data;
+  public static async info(): Promise<ICharacter> {
+    return (await axios.get('/api/whoami')).data;
   }
 
-  public static async blueprints(): Promise<ICharacterBlueprint[]> {
-    return (await axios.get('/api/character/blueprints')).data;
+  public static async alts(): Promise<ICharacter[]> {
+    return (await axios.get('/api/character/alts')).data;
   }
 
   public static async itemLocation(id: number): Promise<IItemLocation> {
@@ -42,15 +42,26 @@ export class CharacterService {
 }
 
 export interface ICharacterBlueprint {
+  type_id:             number;
   item_id:             number;
-  location_flag:       string;
   location_id:         number;
+  owners:              number[];
   material_efficiency: number;
+  time_efficiency:     number;
   quantity:            number;
   runs:                number;
-  time_efficiency:     number;
+  count:               number;
+  name:                string;
+}
+
+export interface ICharacterAsset {
   type_id:             number;
-  user_id:             number;
+  item_id:             number;
+  location_id:         number;
+  owners:              number[];
+  quantity:            number;
+  count:               number;
+  name:                string;
 }
 
 export interface IItemLocation {
@@ -61,3 +72,27 @@ export interface IItemLocation {
   system_id: number;
   type_id:   number;
 }
+
+export interface ICharacter {
+  character:        string;
+  character_id:     number;
+  character_icon:   string;
+  alliance:         string;
+  alliance_id:      number;
+  alliance_icon:    string;
+  corporation:      string;
+  corporation_icon: string;
+  corporation_id:   number;
+}
+
+export const DEFAULT_CHARACTER: ICharacter = {
+  character:        '',
+  character_id:     0,
+  character_icon:   '',
+  alliance:         '',
+  alliance_id:      0,
+  alliance_icon:    '',
+  corporation:      '',
+  corporation_icon: '',
+  corporation_id:   0,
+};

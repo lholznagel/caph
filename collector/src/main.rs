@@ -1,3 +1,6 @@
+//! Collects EVE-Data from different sources and inserts them into the database
+//! for later usage.
+
 mod character;
 mod error;
 mod sde;
@@ -7,19 +10,35 @@ use self::character::*;
 use self::sde::*;
 use self::time::*;
 
-use cachem::ConnectionPool;
 use caph_eve_data_wrapper::EveDataWrapper;
+use sqlx::postgres::PgPoolOptions;
 use std::time::Duration;
+use tracing_subscriber::FmtSubscriber;
+use tracing::instrument;
+use tracing::Level;
+
+const PG_ADDR: &str = "DATABASE_URL";
 
 #[tokio::main]
+#[instrument]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    morgan::Morgan::init(vec![]);
+    dotenv::dotenv().ok();
 
-    let pool = ConnectionPool::new("0.0.0.0:55555", 10usize).await?;
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::INFO)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("setting default subscriber failed");
 
-    log::info!("Preparing SDE");
+    let pg_addr = std::env::var(PG_ADDR).unwrap();
+    let pool = PgPoolOptions::new()
+        .max_connections(10)
+        .connect(&pg_addr)
+        .await?;
+
+    tracing::info!("Preparing SDE.");
     let eve = EveDataWrapper::new().await?;
-    log::info!("Prepared SDE");
+    tracing::info!("Prepared SDE.");
 
     let eve_copy = eve.clone();
     let pool_copy = pool.clone();
@@ -27,11 +46,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut sde = Sde::new(eve_copy, pool_copy);
 
         loop {
-            log::info!("SDE start");
+            tracing::info!("SDE task started.");
             if let Err(e) = sde.run().await {
-                log::error!("Error running sde task {:?}", e);
+                tracing::error!("Error running SDE task {:?}", e);
             }
-            log::info!("SDE done");
+            tracing::info!("SDE task done.");
 
             let next_run = duration_next_sde_download()
                 .unwrap_or_else(|_| Duration::from_secs(24 * 60 * 60));
@@ -42,14 +61,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let eve_copy = eve.clone();
     let pool_copy = pool.clone();
     let character = tokio::task::spawn(async {
-        let mut market = Character::new(eve_copy, pool_copy);
+        let mut character = Character::new(eve_copy, pool_copy);
 
         loop {
-            log::info!("Character start");
-            if let Err(e) = market.task().await {
-                log::error!("Error running market task {:?}", e);
+            tracing::info!("Character task started.");
+            if let Err(e) = character.task().await {
+                tracing::error!("Error running character task {:?}", e);
             }
-            log::info!("Character done");
+            tracing::info!("Character task done.");
 
             let next_run = duration_to_next_10_minute()
                 .unwrap_or_else(|_| Duration::from_secs(30 * 60));

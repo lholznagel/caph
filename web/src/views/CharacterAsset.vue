@@ -3,36 +3,14 @@
     <n-skeleton text v-if="busy" :repeat="5" />
 
     <div v-if="!busy">
-      <n-table v-if="entries.length > 0">
-        <thead>
-          <tr>
-            <th width="48px"></th>
-            <th>Name</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="material in entries" :key="material.type_id">
-            <td><item-icon :id="material.type_id" type="icon" /></td>
-            <td><name-by-id :id="material.type_id" /></td>
-          </tr>
-        </tbody>
-      </n-table>
-      <!--n-input
-        type="input"
-        placeholder="#WithFilter"
-        style="margin-bottom: 5px"
-        clearable
-        v-model="filterName"
-        @input="handleNameFilter"
-      />
-
       <n-data-table
+        style="margin-top: 5px"
         ref="table"
         :columns="columns"
         :data="entries"
         :pagination="pagination"
         @update:sorter="handleSortChange"
-      /-->
+      />
     </div>
   </n-card>
 </template>
@@ -47,8 +25,7 @@ import ItemIcon from '@/components/ItemIcon.vue';
 import NameById from '@/components/NameById.vue';
 import Owner from '@/components/Owner.vue';
 
-import { CharacterService, ICharacterBlueprint } from '@/services/character';
-import { NameService } from '@/services/name';
+import { AssetService, IAsset } from '@/services/asset';
 
 @Options({
   components: {
@@ -68,7 +45,7 @@ import { NameService } from '@/services/name';
 })
 export default class CharacterAsset extends Vue {
   public busy: boolean = false;
-  public entries: IEntry[] = [];
+  public entries: IAsset[] = [];
 
   public filterName: string = '';
 
@@ -82,8 +59,7 @@ export default class CharacterAsset extends Vue {
     this.busy = true;
 
     this.columns = createColumns();
-
-    this.entries = await CharacterService.assets();
+    this.entries = await AssetService.assets();
 
     this.busy = false;
   }
@@ -112,26 +88,12 @@ export default class CharacterAsset extends Vue {
   }
 }
 
-interface IEntry {
-  quantity:            number;
-  type_id:             number;
-  name:                string;
-  // unique per item, used as key
-  item_id:             number;
-  // custom value for the real count
-  count:               number;
-  material_efficiency: number;
-  time_efficiency:     number;
-  runs:                number;
-  owners:              number[];
-}
-
 const createColumns = () => {
   return [{
     title: '',
     key:   'type_id',
     width: 48,
-    render(row: IEntry) {
+    render(row: IAsset) {
       return h(
         ItemIcon,
         {
@@ -145,13 +107,30 @@ const createColumns = () => {
     title: 'Name',
     key:   'name',
     width: 450,
-    filter(value: string, row: IEntry) {
+    filter(value: string, row: IAsset) {
       return ~row.name.toLowerCase().indexOf(value.toLowerCase());
     },
-    render(row: IEntry) {
+    render(row: IAsset) {
       return h(
         NameById,
         { id: row.type_id },
+      )
+    }
+  }, {
+    title: 'Count',
+    key:   'quantity',
+    sortOrder: false,
+    sorter(a: IAsset, b: IAsset) {
+      return a.quantity - b.quantity;
+    }
+  }, {
+    title: 'Owners',
+    key:   'owner',
+    width: 200,
+    render(row: IAsset) {
+      return h(
+        Owner,
+        { ids: row.owners, withText: false }
       )
     }
   }];

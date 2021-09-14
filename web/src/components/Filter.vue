@@ -150,7 +150,7 @@ export default class Filter extends Vue.with(Props) {
 
 export interface IFilterOption {
   label: string;
-  element: 'OWNER';
+  element: 'OWNER' | 'TEXT';
   options?: string[];
 }
 </script>

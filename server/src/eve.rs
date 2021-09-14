@@ -1,9 +1,8 @@
-use crate::character::CharacterService;
 use crate::error::EveServerError;
 
 use cachem::ConnectionPool;
 use caph_db::{CacheName, UserEntry};
-use caph_eve_data_wrapper::{AllianceId, Character, CharacterId, CorporationId, EveDataWrapper, EveOAuthUser};
+use caph_eve_data_wrapper::{AllianceId, CharacterId, CorporationId, EveDataWrapper, EveOAuthUser};
 use caph_eve_data_wrapper::{EveClient, Url};
 use rand::prelude::*;
 use rand_chacha::ChaCha20Rng;
@@ -120,7 +119,7 @@ impl EveAuthService {
         let key = self.generate_key();
         self.sessions.lock().await.insert(key.clone(), SessionType::Main);
 
-        EveClient::eve_auth_uri(&key.to_string())
+        EveClient::eve_auth_url(&key.to_string())
             .map_err(Into::into)
     }
 
@@ -142,7 +141,7 @@ impl EveAuthService {
             let key = self.generate_key();
             self.sessions.lock().await.insert(key.clone(), SessionType::Alt(x.user_id));
 
-            EveClient::eve_auth_uri(&key.to_string())
+            EveClient::eve_auth_url(&key.to_string())
                 .map_err(Into::into)
         } else {
             Err(EveServerError::InvalidUser)
@@ -257,7 +256,7 @@ impl EveAuthService {
         } else {
             let character_service = self.eve_data.character().await?;
             let character_info = character_service
-                .character(&character.access_token, character.user_id)
+                .character(character.user_id)
                 .await?;
             let alliance_name = self.alliance_name(character.alliance_id).await?;
             let corp_name = self.corp_name(character.corp_id).await?;
@@ -302,7 +301,7 @@ impl EveAuthService {
                         .find(|x| x.user_id == character.user_id) {
 
             let character_info = character_service
-                .character(&character.access_token.clone(), character.user_id)
+                .character(character.user_id)
                 .await?;
             let alliance_name = self.alliance_name(character.alliance_id).await?;
             let corp_name = self.corp_name(character.corp_id).await?;
@@ -357,7 +356,7 @@ impl EveAuthService {
     ) -> Result<(), EveServerError> {
         let character_service = self.eve_data.character().await?;
         let character_info = character_service
-            .character(&alt.access_token, alt.user_id)
+            .character(alt.user_id)
             .await?;
         let alliance_name = self.alliance_name(alt.alliance_id).await?;
         let corp_name = self.corp_name(alt.corp_id).await?;

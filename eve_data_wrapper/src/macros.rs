@@ -53,11 +53,12 @@ macro_rules! service_loader_gen {
 /// # Parameters
 ///
 /// * `name` - Name of the ID
-/// * `typ`  - Datatype of the ID
+/// * `typ`  - Datatype of the ID (e.g. u32)
+/// * `typ2` - Second datatype (e.g. i32)
 ///
 #[macro_export]
 macro_rules! eve_id {
-    ($name:ident, $typ:ty) => {
+    ($name:ident, $typ:ty, $typ2:ty) => {
         #[derive(
             Clone, Copy, Debug, Hash,
             PartialEq, Eq,
@@ -70,6 +71,12 @@ macro_rules! eve_id {
         impl From<$typ> for $name {
             fn from(x: $typ) -> Self {
                 Self(x)
+            }
+        }
+
+        impl From<$typ2> for $name {
+            fn from(x: $typ2) -> Self {
+                Self(x as $typ)
             }
         }
 

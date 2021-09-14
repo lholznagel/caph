@@ -39,13 +39,12 @@ impl CharacterService {
 
     pub async fn character(
         &self,
-        token: &str,
         character_id: CharacterId,
     ) -> Result<Character, EveConnectError> {
         let path = format!("characters/{}/", character_id);
         self
             .eve_client
-            .fetch_oauth(&token, &path)
+            .fetch(&path)
             .await?
             .json()
             .await

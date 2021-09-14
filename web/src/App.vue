@@ -14,9 +14,9 @@
           v-if="!isLoggedIn()"
         >Login with Eve</n-button>
         <div v-if="isLoggedIn()" class="nav-header-character">
-          <span class="nav-header-character-text">{{ whoami.name }}</span>
+          <span class="nav-header-character-text">{{ whoami.character }}</span>
 
-          <n-avatar size="medium" :src="whoami.portrait" />
+          <n-avatar size="medium" :src="whoami.character_icon" />
         </div>
       </n-layout-header>
 
@@ -77,7 +77,7 @@ export default class App extends Vue {
   public dark = darkTheme;
   public menuValue = '';
 
-  public whoami: WhoAmI = DEFAULT_WHOAMI;
+  public whoami: ICharacter = DEFAULT_CHARACTER;
 
   public options = [
   {
@@ -139,7 +139,7 @@ export default class App extends Vue {
   }];
 
   public async created() {
-    const res = await (axios.get<WhoAmI>('/api/eve/whoami'));
+    const res = await (axios.get<ICharacter>('/api/whoami'));
     if (res.status === 200) {
       this.whoami = res.data;
       let globalWindow: any = window;
@@ -157,21 +157,32 @@ export default class App extends Vue {
 
   public isLoggedIn() {
     // TODO: not very secure
-    return this.whoami.name !== '';
+    return this.whoami.character !== '';
   }
 }
 
-interface WhoAmI {
-  alliance_icon?:   string;
-  corporation_icon: string;
-  portrait:         string;
-  name:             string;
+interface ICharacter {
+  character:        string,
+  character_id:     number,
+  character_icon:   string,
+  corporation:      string,
+  corporation_icon: string,
+  corporation_id:   number,
+  alliance:         string,
+  alliance_icon:    string,
+  alliance_id:      number,
 }
-const DEFAULT_WHOAMI: WhoAmI ={
+const DEFAULT_CHARACTER: ICharacter = {
+  character:        '',
+  character_id:     0,
+  character_icon:   '',
+  corporation:      '',
   corporation_icon: '',
-  portrait:         '',
-  name:             '',
-};
+  corporation_id:   0,
+  alliance:         '',
+  alliance_icon:    '',
+  alliance_id:      0,
+}
 </script>
 
 <style scoped>

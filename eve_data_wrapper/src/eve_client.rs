@@ -1,5 +1,6 @@
 use crate::{AllianceId, Character, CharacterId, CorporationId, EveConnectError};
 
+use http::Uri;
 use reqwest::{Client, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
@@ -27,7 +28,7 @@ impl EveClient {
         Ok(Self(client))
     }
 
-    pub fn eve_auth_uri(state: &str) -> Result<Url, EveConnectError> {
+    pub fn eve_auth_url(state: &str) -> Result<Url, EveConnectError> {
         let mut url = Url::parse(Self::EVE_LOGIN_URL).unwrap();
 
         let client_id    = std::env::var(Self::ENV_CLIENT_ID)
@@ -42,6 +43,14 @@ impl EveClient {
             .append_pair("scope", &scope())
             .append_pair("state", state);
         Ok(url)
+    }
+
+    pub fn eve_auth_uri(state: &str) -> Result<Uri, EveConnectError> {
+        let uri = Self::eve_auth_url(state)?
+            .to_string()
+            .parse::<Uri>()
+            .unwrap();
+        Ok(uri)
     }
 
     // https://docs.esi.evetech.net/docs/sso/web_based_sso_flow.html
@@ -344,6 +353,7 @@ impl EveOAuthToken {
 pub struct EveOAuthUser {
     pub access_token:  String,
     pub refresh_token: String,
+    pub expires_in:    u32,
     pub alliance_id:   AllianceId,
     pub user_id:       CharacterId,
     pub corp_id:       CorporationId,
@@ -369,6 +379,7 @@ impl EveOAuthUser {
         let res = Self {
             access_token: x.access_token.clone(),
             refresh_token: x.refresh_token.clone(),
+            expires_in: x.expires_in,
             alliance_id: res.alliance_id.unwrap_or(0u32.into()),
             corp_id: res.corporation_id.into(),
             user_id,

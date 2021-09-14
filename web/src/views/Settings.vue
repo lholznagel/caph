@@ -2,14 +2,16 @@
   <n-card title="Settings">
     <n-skeleton text v-if="busy" :repeat="6" />
 
-    <n-grid x-gap="12" :cols="5">
+    <n-grid x-gap="12" :cols="5" v-if="!busy">
       <n-grid-item>
-        <n-image width="256" :src="character.portrait" />
-        <span>{{ character.name }}</span>
+        <div>
+          <n-image width="340" :src="character.character_icon" />
+          <span>{{ character.character }}</span>
+        </div>
       </n-grid-item>
-      <n-grid-item v-for="alias in character.aliase" :key="alias.name">
-        <n-image width="256" :src="alias.portrait" />
-        <span>{{ alias.name }}</span>
+      <n-grid-item v-for="alias in characterAlts" :key="alias.character_id">
+        <n-image width="340" :src="alias.character_icon" />
+        <span>{{ alias.character }}</span>
       </n-grid-item>
    </n-grid>
 
@@ -18,10 +20,8 @@
 </template>
 
 <script lang="ts">
-import axios from 'axios';
-import {
-  NButton, NCard, NImage, NSkeleton, NGrid, NGridItem
-} from 'naive-ui';
+import {CharacterService, DEFAULT_CHARACTER, ICharacter} from '@/services/character';
+import { NButton, NCard, NImage, NSkeleton, NGrid, NGridItem } from 'naive-ui';
 import { Options, Vue } from 'vue-class-component';
 
 @Options({
@@ -37,12 +37,14 @@ import { Options, Vue } from 'vue-class-component';
 export default class Settings extends Vue {
   public busy: boolean = false;
 
-  public character: ICharacter = DEFAULT_CHARACTER;
+  public character: ICharacter        = DEFAULT_CHARACTER;
+  public characterAlts: ICharacter[] = [];
 
   public async created() {
     this.busy = true;
 
-    this.character = (await axios.get('/api/character/info')).data;
+    this.character     = await CharacterService.info();
+    this.characterAlts = await CharacterService.alts();
 
     this.busy = false;
   }
@@ -51,24 +53,4 @@ export default class Settings extends Vue {
     window.location.href = `/api/eve/login/alt`;
   }
 }
-
-interface ICharacter {
-  aliase:         ICharacter[];
-  alliance?:      String;
-  alliance_icon?: String;
-  corp:           String;
-  corp_icon:      String;
-  name:           String;
-  portrait:       String;
-  user_id:        number;
-}
-
-const DEFAULT_CHARACTER: ICharacter = {
-  aliase:    [],
-  corp:      '',
-  corp_icon: '',
-  name:      '',
-  portrait:  '',
-  user_id:   0,
-};
 </script>

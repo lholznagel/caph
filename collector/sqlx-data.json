@@ -1,0 +1,207 @@
+{
+  "db": "PostgreSQL",
+  "007d0c06266b825c80681db548de24d6ad1e2d7abcc0580eb5abbf8b630ad4b9": {
+    "query": "DELETE FROM reprocess",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": []
+    }
+  },
+  "07c75840b5d840cadb675e2388f9745707f61b4176bcc427edcae80142126647": {
+    "query": "\n                DELETE FROM asset WHERE character_id = ANY($1)\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "13442451afe34fc379cd1f0d64d3964be5a6451320d31260ae9327fb1d816a09": {
+    "query": "\n                INSERT INTO blueprint_skill\n                (\n                    blueprint,\n\n                    activity,\n\n                    type_id,\n                    level\n                )\n                SELECT * FROM UNNEST(\n                    $1::UUID[],\n                    $2::SMALLINT[],\n                    $3::INTEGER[],\n                    $4::INTEGER[]\n                )\n                ON CONFLICT DO NOTHING\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "Int2Array",
+          "Int4Array",
+          "Int4Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "2adcc6cc95bb4c817c723c16b2d335712a59174dc2797b9b87b293c1380f2315": {
+    "query": "\n                INSERT INTO asset_blueprint\n                (\n                    item_id,\n\n                    quantity,\n                    material_efficiency,\n                    time_efficiency,\n                    runs\n                )\n                SELECT * FROM UNNEST(\n                    $1::BIGINT[],\n                    $2::INTEGER[],\n                    $3::INTEGER[],\n                    $4::INTEGER[],\n                    $5::INTEGER[]\n                )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8Array",
+          "Int4Array",
+          "Int4Array",
+          "Int4Array",
+          "Int4Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "4059c6479632b2cb2e465c0c2f6d7ed4895ee931b06f45d40220ca96c6a7bbb4": {
+    "query": "\n                INSERT INTO asset\n                (\n                    character_id,\n\n                    item_id,\n                    location_id,\n                    quantity,\n                    type_id,\n                    location_flag\n                )\n                SELECT $1, * FROM UNNEST(\n                    $2::BIGINT[],\n                    $3::BIGINT[],\n                    $4::INTEGER[],\n                    $5::INTEGER[],\n                    $6::VARCHAR[]\n                )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int8Array",
+          "Int8Array",
+          "Int4Array",
+          "Int4Array",
+          "VarcharArray"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "538eda4476509d5744bd2fac0db05528e2b7316539fa38007b8177a7a4f2a9ec": {
+    "query": "\n                INSERT INTO item\n                (\n                    type_id,\n                    category_id,\n                    group_id,\n                    volume,\n                    name\n                )\n                SELECT * FROM UNNEST(\n                    $1::INTEGER[],\n                    $2::INTEGER[],\n                    $3::INTEGER[],\n                    $4::REAL[],\n                    $5::VARCHAR[]\n                )\n                ON CONFLICT(type_id) DO UPDATE\n                SET category_id = excluded.category_id,\n                    group_id    = excluded.group_id,\n                    volume      = excluded.volume,\n                    name        = excluded.name\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4Array",
+          "Int4Array",
+          "Int4Array",
+          "Float4Array",
+          "VarcharArray"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "53e54df2795c32d33e189c294c33b731ab5199db8875340785423cf7b3f07a33": {
+    "query": "\n                INSERT INTO schematic_material\n                (\n                    schematic,\n\n                    type_id,\n                    is_input,\n                    quantity\n                )\n                SELECT * FROM UNNEST(\n                    $1::UUID[],\n                    $2::INTEGER[],\n                    $3::BOOLEAN[],\n                    $4::INTEGER[]\n                )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "Int4Array",
+          "BoolArray",
+          "Int4Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "62e63daee8f4bcbc61600f7c89826075f3eabeab5acbab1b541287f0df318ef7": {
+    "query": "\n                SELECT refresh_token\n                FROM login\n                WHERE character_id IS NOT NULL AND refresh_token IS NOT NULL\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "refresh_token",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        true
+      ]
+    }
+  },
+  "6f6a62d4dfbe42373ceccde19d00e5a7577edaec0216f0f83f3943214fb088c7": {
+    "query": "\n                INSERT INTO blueprint_material\n                (\n                    blueprint,\n                    activity,\n                    type_id,\n\n                    quantity,\n                    is_product,\n                    probability\n                )\n                SELECT * FROM UNNEST(\n                    $1::UUID[],\n                    $2::SMALLINT[],\n                    $3::INTEGER[],\n                    $4::INTEGER[],\n                    $5::BOOLEAN[],\n                    $6::REAL[]\n                )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "Int2Array",
+          "Int4Array",
+          "Int4Array",
+          "BoolArray",
+          "Float4Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "8d1d9471695841d12aeb7ff831754c6ae45e9cfefd15d3fa6f746e4691a309d5": {
+    "query": "\n                INSERT INTO blueprint\n                (\n                    id,\n                    type_id,\n                    limit_,\n\n                    copy,\n                    invention,\n                    manufacture,\n                    reaction,\n                    research_material,\n                    research_time\n                )\n                SELECT * FROM UNNEST(\n                    $1::UUID[],\n                    $2::INTEGER[],\n                    $3::INTEGER[],\n                    $4::INTEGER[],\n                    $5::INTEGER[],\n                    $6::INTEGER[],\n                    $7::INTEGER[],\n                    $8::INTEGER[],\n                    $9::INTEGER[]\n                )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "Int4Array",
+          "Int4Array",
+          "Int4Array",
+          "Int4Array",
+          "Int4Array",
+          "Int4Array",
+          "Int4Array",
+          "Int4Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "8dfd0ddcf7d0b1318e68797d3a55bae6104151a389c5a36a2890c00a73d6e6ec": {
+    "query": "\n                INSERT INTO reprocess\n                (\n                    type_id,\n                    material_id,\n                    quantity\n                )\n                SELECT * FROM UNNEST(\n                    $1::INTEGER[],\n                    $2::INTEGER[],\n                    $3::INTEGER[]\n                )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4Array",
+          "Int4Array",
+          "Int4Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "a442358d21f446115ca9775535b263818bafa6caf63a537c968555eb323aa63a": {
+    "query": "\n                INSERT INTO schematic\n                (\n                    id,\n\n                    type_id,\n                    cycle_time\n                )\n                SELECT * FROM UNNEST(\n                    $1::UUID[],\n                    $2::INTEGER[],\n                    $3::INTEGER[]\n                )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "UuidArray",
+          "Int4Array",
+          "Int4Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "de6a7998e5f21ff6be659022fdeaff88c9443b326c772a17a6f0be0c186ed753": {
+    "query": "DELETE FROM schematic CASCADE",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": []
+    }
+  },
+  "e88049b1c4ee0210a459fa200ffa99109c0c7abb17229fe0441030493f0f000d": {
+    "query": "DELETE FROM blueprint CASCADE",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": []
+    }
+  }
+}
