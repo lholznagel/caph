@@ -14,7 +14,7 @@ pub fn duration_to_next_10_minute() -> Result<Duration, CollectorError> {
 /// Creates a new duration to the next 14:20:00 time.
 ///
 /// Eve´s downtime is at 14:00, so giving them 30 minutes should be ok.
-pub fn duration_next_sde_download() -> Result<Duration, CollectorError> {
+pub fn duration_next_sde_download() -> Duration {
     // Current timestamp
     let timestamp = Utc::now().timestamp();
     // Create a naive date time and add one day to it
@@ -23,9 +23,8 @@ pub fn duration_next_sde_download() -> Result<Duration, CollectorError> {
     if date_time.hour() > 14 ||
        date_time.hour() == 14 && date_time.minute() > 30 {
 
-        date_time
-            .checked_add_signed(chrono::Duration::days(1))
-            .ok_or(CollectorError::ChronoError)?;
+        let _ = date_time
+            .checked_add_signed(chrono::Duration::days(1));
     }
 
     // Creates a new naive date time based on the date time that is one day
@@ -38,7 +37,7 @@ pub fn duration_next_sde_download() -> Result<Duration, CollectorError> {
 
     // Execute at exactly 14:30
     let diff = next - timestamp;
-    Ok(Duration::from_secs(diff as u64))
+    Duration::from_secs(diff as u64)
 }
 
 /// Gets the next full ten minutes time frame

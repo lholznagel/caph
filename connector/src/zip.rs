@@ -1,13 +1,15 @@
-use std::{io::Cursor, path::Path};
-
-use zip::ZipArchive;
-
 use crate::ConnectError;
 
+use serde::de::DeserializeOwned;
+use std::{io::Cursor, path::Path};
+use tracing::instrument;
+use zip::ZipArchive;
+
 /// Type alias for `ZipArchive<Cursor<Vec<u8>>>`
-pub(crate) type CursorSdeZip = ZipArchive<Cursor<Vec<u8>>>;
+pub type CursorSdeZip = ZipArchive<Cursor<Vec<u8>>>;
 
 /// Wrapper for managing the SDE.zip file
+#[derive(Clone, Debug)]
 pub struct SdeService(CursorSdeZip);
 
 impl SdeService {
@@ -45,6 +47,36 @@ impl SdeService {
         let zip = ZipArchive::new(zip)
             .map_err(ConnectError::SdeZipLoadError)?;
         Ok(Self (zip))
+    }
+
+    /// Takes a path and parses the file content into a defined structure.
+    ///
+    /// # Parameters
+    ///
+    /// * `T`    - Type the file should be parsed to (in most cases rust figures
+    ///            out the type)
+    /// * `path` - Path in the zip file for the file to parse
+    ///
+    /// # Errors
+    ///
+    /// When the file is not parsable or the path is not found in the zip.
+    ///
+    /// # Returns
+    ///
+    /// Parsed yaml version of the file, based on the generic parameter `T`
+    ///
+    #[instrument(level = "debug")]
+    pub fn get_file<T>(
+        &mut self,
+        path: &str,
+    ) -> Result<T, ConnectError>
+        where T: DeserializeOwned {
+
+        let mut file = self.0
+            .by_name(path)
+            .map_err(|_| ConnectError::SdeFileNotFound(path.into()))?;
+        serde_yaml::from_reader(&mut file)
+            .map_err(ConnectError::SdeParseError)
     }
 
     /// Downloads the SDE.zip file.

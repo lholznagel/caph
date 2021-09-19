@@ -5,11 +5,11 @@ authors = ["lholznagel <contact@lholznagel.info>"]
 edition = "2018"
 
 [dependencies]
-caph_eve_data_wrapper = { path = "../eve_data_wrapper" }
+caph_connector = { path = "../connector" }
 chrono = "0.4.19"
 dotenv = "0.15.0"
 sqlx = { version = "0.5.7", features = ["chrono", "runtime-tokio-rustls", "postgres", "uuid", "offline"] }
-tokio = { version = "1.2.0", features = ["full"] }
-tracing = "0.1.27"
-tracing-subscriber = "0.2.22"
-uuid = { version = "0.8.2", features = ["v4"]}
+tokio = { version = "1.12.0", features = ["full"] }
+tracing = "0.1.28"
+tracing-subscriber = "0.2.24"
+uuid = { version = "0.8.2", features = ["v4"] }

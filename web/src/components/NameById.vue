@@ -25,8 +25,8 @@ export default class NameById extends Vue.with(Props) {
   public async created() {
     this.name = await NameService.resolve(this.id);
     this.$watch('id', async () => {
-      this.name = (await NameService.resolve(this.id));
-    })
+      this.name = await NameService.resolve(this.id);
+    });
   }
 }
 </script>

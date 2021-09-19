@@ -1,16 +1,19 @@
 [Unit]
-Description=Caph data collector
+Description=Caph server
 
 [Service]
 Type=simple
 
 Environment=RUST_BACKTRACE=1
+Environment=BIND=
 Environment=DATABASE_URL=
 Environment=EVE_USER_AGENT=
+Environment=EVE_CALLBACK=
 Environment=EVE_CLIENT_ID=
 Environment=EVE_SECRET_KEY=
+Environment=REDIRECT=
 
-ExecStart=/opt/caph/collector
+ExecStart=/opt/caph/caph_server
 Restart=always
 
 [Install]

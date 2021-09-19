@@ -53,8 +53,8 @@
       "nullable": []
     }
   },
-  "4059c6479632b2cb2e465c0c2f6d7ed4895ee931b06f45d40220ca96c6a7bbb4": {
-    "query": "\n                INSERT INTO asset\n                (\n                    character_id,\n\n                    item_id,\n                    location_id,\n                    quantity,\n                    type_id,\n                    location_flag\n                )\n                SELECT $1, * FROM UNNEST(\n                    $2::BIGINT[],\n                    $3::BIGINT[],\n                    $4::INTEGER[],\n                    $5::INTEGER[],\n                    $6::VARCHAR[]\n                )\n            ",
+  "4d6c6e8be92b9e9c89c06c36ad3bf63270457f823721069f1fdf732e218d3a07": {
+    "query": "\n                INSERT INTO asset\n                (\n                    character_id,\n\n                    item_id,\n                    location_id,\n                    quantity,\n                    type_id\n                )\n                SELECT $1, * FROM UNNEST(\n                    $2::BIGINT[],\n                    $3::BIGINT[],\n                    $4::INTEGER[],\n                    $5::INTEGER[]\n                )\n            ",
     "describe": {
       "columns": [],
       "parameters": {
@@ -63,8 +63,7 @@
           "Int8Array",
           "Int8Array",
           "Int4Array",
-          "Int4Array",
-          "VarcharArray"
+          "Int4Array"
         ]
       },
       "nullable": []
@@ -99,24 +98,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "62e63daee8f4bcbc61600f7c89826075f3eabeab5acbab1b541287f0df318ef7": {
-    "query": "\n                SELECT refresh_token\n                FROM login\n                WHERE character_id IS NOT NULL AND refresh_token IS NOT NULL\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "refresh_token",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        true
-      ]
     }
   },
   "6f6a62d4dfbe42373ceccde19d00e5a7577edaec0216f0f83f3943214fb088c7": {
@@ -182,6 +163,30 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "bfed0a24ca4beb5c51ee9122ec9a87fd5b7917cf9460b55ff924eb3cde108852": {
+    "query": "\n                SELECT character_id, refresh_token\n                FROM login\n                WHERE character_id IS NOT NULL AND refresh_token IS NOT NULL\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "character_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "refresh_token",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        true,
+        true
+      ]
     }
   },
   "de6a7998e5f21ff6be659022fdeaff88c9443b326c772a17a6f0be0c186ed753": {

@@ -11,6 +11,15 @@ export class CharacterService {
     return (await axios.get('/api/character/alts')).data;
   }
 
+  public static async ids(): Promise<number[]> {
+    return (await axios.get('/api/character/ids')).data;
+  }
+
+  public static async char_name(id: number): Promise<string> {
+    return (await axios.get(`/api/character/${id}/name`)).data;
+  }
+
+
   public static async itemLocation(id: number): Promise<IItemLocation> {
     const localItems: IItemLocation[] = this.load();
 

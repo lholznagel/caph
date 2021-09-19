@@ -3,18 +3,19 @@
     <n-tag
       style="height: 40px"
       closable
-      @close="handleClose(key)"
+      @close="handleClose(key.toString())"
       v-for="(value, key) in filters"
       :key="key"
     >
       <n-space class="filter" align="center" size="small">
         <strong >{{ options[key].label }}: </strong>
 
-        <owner
-          v-if="options[key].element === 'OWNER'"
-          :ids="[Number(value)]"
-          withText
-        />
+        <div v-if="options[key].element === 'OWNER'">
+          <owner
+            :id="Number(value)"
+            withText
+          />
+        </div>
         <span v-else>{{ value }}</span>
       </n-space>
     </n-tag>

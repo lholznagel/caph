@@ -16,12 +16,23 @@ pub enum ConnectError {
     /// Generic reqwest error
     ReqwestError(reqwest::Error),
 
+    /// The payload could not be decoded
+    OAuthPayloadDecode(base64::DecodeError),
+    /// Could not parse the decoded payload
+    OAuthParseError(serde_json::Error),
+    /// Failed to parse the character id
+    OAuthParseCharacterId(std::num::ParseIntError),
+
     /// Downloading the SDE.zip file failed
     SdeDownloadFailed(reqwest::Error),
+    /// The requested file could not be found in the zip
+    SdeFileNotFound(String),
+    /// Error while parsing the file into yaml
+    SdeParseError(serde_yaml::Error),
     /// Reading the SDE.zip file from disk failed
     SdeReadError(std::io::Error),
     /// Loading the SDE.zip file failed
-    SdeZipLoadError(zip::result::ZipError)
+    SdeZipLoadError(zip::result::ZipError),
 }
 
 impl ConnectError {

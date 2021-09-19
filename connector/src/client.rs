@@ -1,9 +1,10 @@
-use std::collections::HashMap;
+use crate::CharacterId;
 
 use async_trait::*;
 use reqwest::{Client, Response, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use url::Url;
 
@@ -132,6 +133,7 @@ impl EveClient {
     ///
     /// Response of the request, ready to work with
     ///
+    #[tracing::instrument(level = "debug")]
     async fn send(&self, path: &str) -> Result<Response, ConnectError> {
         let mut retry_counter = 0usize;
 
@@ -174,6 +176,7 @@ impl EveClient {
     /// - If the header exists, it will try to parse it, if that fails a 0 is
     ///   is returned
     ///
+    #[tracing::instrument(level = "debug")]
     fn page_count(&self, response: &Response) -> u8 {
         let headers = response.headers();
         if let Some(x) = headers.get("x-pages") {
@@ -189,7 +192,7 @@ impl EveClient {
 
 #[async_trait]
 impl RequestClient for EveClient {
-    #[tracing::instrument]
+    #[tracing::instrument(level = "debug")]
     async fn fetch<T>(
         &self,
         path: &str
@@ -204,7 +207,7 @@ impl RequestClient for EveClient {
         Ok(json)
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(level = "debug")]
     async fn fetch_page<T>(
         &self,
         path: &str
@@ -297,6 +300,8 @@ impl EveAuthClient {
     const ENV_SECRET_KEY: &'static str = "EVE_SECRET_KEY";
     /// Name of the ENV of the user agent
     const ENV_USER_AGENT: &'static str = "EVE_USER_AGENT";
+    /// Default scope that is used
+    const DEFAULT_SCOPE:  &'static str = "publicData";
 
     /// Gets the initial access token,
     ///
@@ -447,6 +452,7 @@ impl EveAuthClient {
     /// # Params
     ///
     /// * `state` -> Unique key, used for extra security
+    /// * `scope` -> Required scope, musst be a lost of space seperated entries
     ///
     /// # Errors
     ///
@@ -466,7 +472,14 @@ impl EveAuthClient {
     /// // redirect user to the returned url
     /// ```
     ///
-    pub fn auth_uri(state: &str, scope: &str) -> Result<Url, ConnectError> {
+    #[tracing::instrument(level = "debug")]
+    pub fn auth_uri(state: &str, scope: Option<&str>) -> Result<Url, ConnectError> {
+        let scope = if let Some(x) = scope {
+            x
+        } else {
+            Self::DEFAULT_SCOPE
+        };
+
         let mut url = Url::parse(Self::EVE_LOGIN_URL)
             .map_err(|_| ConnectError::UrlParseError)?;
 
@@ -484,16 +497,6 @@ impl EveAuthClient {
             .append_pair("scope", scope)
             .append_pair("state", state);
         Ok(url)
-    }
-
-    /// Default scope for EVE
-    ///
-    /// # Returns
-    ///
-    /// String containing all default scopes
-    ///
-    pub fn default_scope() -> String {
-        "publicData".into()
     }
 
     /// Gets a new `access_token` using the `refresh_token`.
@@ -542,15 +545,19 @@ impl EveAuthClient {
     ///
     /// Response of the request, ready to work with
     ///
-    #[tracing::instrument]
+    #[tracing::instrument(level = "debug")]
     async fn send(&self, path: &str) -> Result<Response, ConnectError> {
         let access_token = {
             #[allow(clippy::unwrap_used)]
             self.access_token.lock().unwrap().clone()
         };
-        if access_token.is_none() {
+        let access_token = if access_token.is_none() {
             self.refresh_token().await?;
-        }
+            #[allow(clippy::unwrap_used)]
+            self.access_token.lock().unwrap().clone()
+        } else {
+            access_token
+        };
 
         let mut retry_counter = 0usize;
 
@@ -579,10 +586,8 @@ impl EveAuthClient {
             if !response.status().is_success() {
                 retry_counter += 1;
                 tracing::error!(
-                    r#"Fetch resulted in non successful status code.
-                       Statuscode was {}. Retrying {}."#,
-                    response.status(),
-                    retry_counter
+                    { retry = retry_counter, status = response.status().as_u16() },
+                    "Fetch resulted in non successful status code.",
                 );
                 continue;
             }
@@ -603,6 +608,7 @@ impl EveAuthClient {
     /// - If the header exists, it will try to parse it, if that fails a 0 is
     ///   is returned
     ///
+    #[tracing::instrument(level = "debug")]
     fn page_count(&self, response: &Response) -> u8 {
         let headers = response.headers();
         if let Some(x) = headers.get("x-pages") {
@@ -625,7 +631,7 @@ impl std::fmt::Debug for EveAuthClient {
 
 #[async_trait]
 impl RequestClient for EveAuthClient {
-    #[tracing::instrument]
+    #[tracing::instrument(level = "debug")]
     async fn fetch<T>(
         &self,
         path: &str
@@ -640,15 +646,16 @@ impl RequestClient for EveAuthClient {
         Ok(json)
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(level = "debug")]
     async fn fetch_page<T>(
         &self,
         path: &str
     ) -> Result<Vec<T>, ConnectError>
     where T: DeserializeOwned + Send {
+        let path = format!("{}/{}", Self::EVE_API_URL, path);
         let response = self
-        .send(path)
-        .await?;
+            .send(&path)
+            .await?;
 
         let pages = self.page_count(&response);
 
@@ -678,6 +685,13 @@ impl RequestClient for EveAuthClient {
     }
 }
 
+/// Decoded access token
+#[derive(Debug, Deserialize)]
+pub struct EveOAuthPayload {
+    /// User identification
+    pub sub: String,
+}
+
 /// Parsed version of the response from EVE after a successfull login.
 ///
 #[derive(Debug, Deserialize)]
@@ -687,17 +701,49 @@ pub struct EveOAuthToken {
     /// Type of the token
     pub token_type:    String,
     /// Lifetime of the token, typically 1199 seconds
-    pub expires_in:    String,
+    pub expires_in:    i32,
     /// Token to get a new access token
     pub refresh_token: String,
 }
 
-/// Contains the deserialized information about a `access_token`
-///
-#[derive(Debug, Deserialize)]
-pub struct EveOAuthTokenInfo {
-    /// Contains a list of all requested scopes
-    pub scp: Vec<String>,
-    /// Issuer of the token
-    pub iss: String,
+impl EveOAuthToken {
+    /// Extracts the payload from the access token
+    ///
+    /// # Errors
+    ///
+    /// Fails when the payload could not be decoded or parsed
+    ///
+    /// # Returns
+    ///
+    /// Payload of the access token
+    ///
+    pub fn payload(&self) -> Result<EveOAuthPayload, ConnectError> {
+        let payload = self.access_token.to_string();
+        let payload = payload.split('.').collect::<Vec<_>>();
+        let payload = payload.get(1).copied().unwrap_or_default();
+        let decoded = base64::decode(payload)
+            .map_err(ConnectError::OAuthPayloadDecode)?;
+        serde_json::from_slice(&decoded)
+            .map_err(ConnectError::OAuthParseError)
+    }
+
+    /// Gets the character id from the token
+    ///
+    /// # Errors
+    ///
+    /// Fails when either getting the payload fails or the user identification
+    /// could not be parsed
+    ///
+    /// # Returns
+    ///
+    /// The character id
+    ///
+    pub fn character_id(&self) -> Result<CharacterId, ConnectError> {
+        let character_id = self.payload()?
+            .sub
+            .replace("CHARACTER:EVE:", "")
+            .parse::<i32>()
+            .map_err(ConnectError::OAuthParseCharacterId)?;
+        Ok(character_id.into())
+    }
 }

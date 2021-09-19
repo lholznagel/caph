@@ -6,9 +6,13 @@ pub enum CollectorError {
     /// Wrapper for chrono errors
     ChronoError,
     /// Error getting data from sd
-    SdeError(caph_eve_data_wrapper::EveConnectError),
+    SdeError(caph_connector::ConnectError),
     /// Generic database error
-    DatabaseError(sqlx::Error)
+    DatabaseError(sqlx::Error),
+    /// Some unspecified connect error
+    GeneralConnectError(caph_connector::ConnectError),
+    /// Error while downloading the SDE zip file
+    LoadingZipError(caph_connector::ConnectError),
 }
 impl std::error::Error for CollectorError {}
 
@@ -24,8 +28,8 @@ impl From<sqlx::Error> for CollectorError {
     }
 }
 
-impl From<caph_eve_data_wrapper::EveConnectError> for CollectorError {
-    fn from(x: caph_eve_data_wrapper::EveConnectError) -> Self {
+impl From<caph_connector::ConnectError> for CollectorError {
+    fn from(x: caph_connector::ConnectError) -> Self {
         Self::SdeError(x)
     }
 }

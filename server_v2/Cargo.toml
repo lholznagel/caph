@@ -5,16 +5,15 @@ edition = "2018"
 
 [dependencies]
 async-trait = "0.1.51"
-axum = { version = "0.2.3", features = ["headers"] }
+axum = { version = "0.2.5", features = ["headers"] }
 caph_connector = { path = "../connector" }
-caph_eve_data_wrapper = { path = "../eve_data_wrapper" }
 chrono = "0.4.19"
 dotenv = "0.15.0"
 headers = "0.3.4"
-serde = { version = "1.0.129", features = ["derive"] }
-serde_json = "1.0.66"
+serde = { version = "1.0.130", features = ["derive"] }
+serde_json = "1.0.68"
 sqlx = { version = "0.5.7", features = ["chrono", "runtime-tokio-rustls", "postgres", "uuid", "offline"] }
-tokio = { version = "1.10.1", features = ["full"] }
-tracing = "0.1.27"
-tracing-subscriber = "0.2.22"
+tokio = { version = "1.12.0", features = ["full"] }
+tracing = "0.1.28"
+tracing-subscriber = "0.2.24"
 uuid = { version = "0.8.2", features = ["v4", "serde"] }

@@ -97,7 +97,6 @@ export default class Filter extends Vue.with(Props) {
             key: option
           });
         }
-        console.log(this.filterOptions)
       }
     } else {
       this.filters[this.selectedKey] = key;
@@ -136,7 +135,7 @@ export default class Filter extends Vue.with(Props) {
     } else if(entry.element === 'OWNER') {
       return h(
         Owner,
-        { ids: [Number(x.key)], withText: true }
+        { id: Number(x.key), withText: true }
       )
     } else {
       return x.label;

@@ -1,6 +1,6 @@
 use crate::error::ServerError;
 
-use caph_eve_data_wrapper::{AllianceId, CharacterId, CorporationId, EveDataWrapper};
+use caph_connector::{AllianceId, CharacterId, ConnectCharacterService, CorporationId, EveAuthClient};
 use serde::Serialize;
 use sqlx::PgPool;
 
@@ -26,9 +26,79 @@ impl CharacterService {
     ///
     /// List of alt characters
     ///
-    pub async fn alts(
+    pub async fn by_id(
         &self,
         cid: CharacterId
+    ) -> Result<Character, ServerError> {
+        let character = sqlx::query!("
+                SELECT *
+                FROM character
+                WHERE character_id = $1
+            ", *cid as i32)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        if let Some(c) = character {
+            let character = Character::new(
+                c.alliance_name,
+                c.alliance_id.into(),
+                c.character_name,
+                c.character_id.into(),
+                c.corporation_name,
+                c.corporation_id.into()
+            );
+            Ok(character)
+        } else {
+            Err(ServerError::InvalidUser)
+        }
+    }
+
+    /// Gets a list of all character ids that are associated with the given
+    /// character id
+    ///
+    /// # Params
+    ///
+    /// * `cid` - Logged in character id
+    ///
+    /// # Error
+    ///
+    /// Failes when there is a database problem
+    ///
+    /// # Returns
+    ///
+    /// List of all character ids
+    ///
+    pub async fn ids(
+        &self,
+        cid: CharacterId
+    ) -> Result<Vec<i32>, ServerError> {
+        let ids = sqlx::query!("
+                SELECT character_id
+                FROM   character
+                WHERE  character_id = $1 OR character_main = $1
+            ", *cid as i32)
+            .fetch_all(&self.pool)
+            .await?
+            .into_iter()
+            .map(|x| x.character_id)
+            .collect::<Vec<_>>();
+        Ok(ids)
+    }
+
+    /// Gets a list of alts for the given [CharacterId]
+    ///
+    /// # Params
+    ///
+    /// * `cid` -> [CharacterId] of the requesting character
+    ///
+    /// # Returns
+    ///
+    /// List of alt characters
+    ///
+    pub async fn alts(
+        &self,
+        client: EveAuthClient,
+        cid:    CharacterId
     ) -> Result<Vec<Character>, ServerError> {
         let alts = sqlx::query!("
                 SELECT DISTINCT character_id
@@ -43,8 +113,8 @@ impl CharacterService {
             let character_id = alt.character_id;
 
             if let Some(x) = character_id {
-                let character_id = (x as u32).into();
-                let character = self.info(character_id, Some(cid)).await?;
+                let character_id = x.into();
+                let character = self.info(client.clone(), character_id, Some(cid)).await?;
                 characters.push(character);
             }
         }
@@ -65,8 +135,9 @@ impl CharacterService {
     ///
     pub async fn info(
         &self,
-        cid:  CharacterId,
-        main: Option<CharacterId>
+        client: EveAuthClient,
+        cid:    CharacterId,
+        main:   Option<CharacterId>
     ) -> Result<Character, ServerError> {
         let character = sqlx::query!("
             SELECT
@@ -87,15 +158,15 @@ impl CharacterService {
         if let Some(x) = character {
             let character = Character::new(
                 x.alliance_name,
-                (x.alliance_id as u32).into(),
+                x.alliance_id.into(),
                 x.character_name,
-                (x.character_id as u32).into(),
+                x.character_id.into(),
                 x.corporation_name,
-                (x.corporation_id as u32).into(),
+                x.corporation_id.into(),
             );
             Ok(character)
         } else {
-            let character = self.eve_character_info(cid).await?;
+            let character = self.eve_character_info(client, cid).await?;
             self.save(&character, main).await?;
             Ok(character)
         }
@@ -149,33 +220,26 @@ impl CharacterService {
     ///
     async fn eve_character_info(
         &self,
-        cid: CharacterId
+        client: EveAuthClient,
+        cid:    CharacterId,
     ) -> Result<Character, ServerError> {
-        let character_service = EveDataWrapper::new()
-            .await?
-            .character()
-            .await?;
-        let character = character_service
-            .character(cid)
-            .await?;
+        let character_service = ConnectCharacterService::new(client, cid);
 
-        let alliance_id = character.alliance_id.unwrap();
-        let alliance = character_service
-            .alliance_name(alliance_id)
-            .await?;
+        let character = character_service.info().await?;
 
-        let corporation_id = character.corporation_id;
-        let corporation = character_service
-            .corporation_name(corporation_id.into())
-            .await?;
+        let aid = character.alliance_id.unwrap();
+        let alliance = character_service.alliance_name(aid).await?;
+
+        let coid = character.corporation_id;
+        let corporation = character_service.corporation_name( coid).await?;
 
         Ok(Character::new(
             alliance,
-            alliance_id,
+            aid,
             character.name,
             cid,
             corporation,
-            corporation_id
+            coid
         ))
     }
 }
@@ -183,24 +247,24 @@ impl CharacterService {
 /// Represents a character with all its information
 #[derive(Debug, Serialize)]
 pub struct Character {
-    alliance:         String,
-    alliance_icon:    String,
-    alliance_id:      AllianceId,
-    character:        String,
-    character_id:     CharacterId,
-    character_icon:   String,
-    corporation:      String,
-    corporation_icon: String,
-    corporation_id:   CorporationId,
+    pub alliance:         String,
+    pub alliance_icon:    String,
+    pub alliance_id:      AllianceId,
+    pub character:        String,
+    pub character_id:     CharacterId,
+    pub character_icon:   String,
+    pub corporation:      String,
+    pub corporation_icon: String,
+    pub corporation_id:   CorporationId,
 }
 
 impl Character {
     pub fn new(
-        alliance: String,
-        alliance_id: AllianceId,
-        character: String,
-        character_id: CharacterId,
-        corporation: String,
+        alliance:       String,
+        alliance_id:    AllianceId,
+        character:      String,
+        character_id:   CharacterId,
+        corporation:    String,
         corporation_id: CorporationId
     ) -> Self {
         Self {

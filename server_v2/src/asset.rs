@@ -1,6 +1,6 @@
 use crate::error::ServerError;
 
-use caph_eve_data_wrapper::{AllianceId, CharacterId, CorporationId, EveDataWrapper};
+use caph_connector::CharacterId;
 use serde::Serialize;
 use sqlx::PgPool;
 

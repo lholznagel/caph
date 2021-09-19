@@ -5,7 +5,7 @@ use crate::error::{ServerError, internal_error};
 use async_trait::async_trait;
 use axum::extract::{Extension, FromRequest, RequestParts, TypedHeader};
 use axum::http::{StatusCode, Uri};
-use caph_eve_data_wrapper::{CharacterId, EveClient, EveOAuthUser};
+use caph_connector::{CharacterId, EveAuthClient, EveOAuthToken};
 use headers::Cookie;
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -20,7 +20,6 @@ const EVE_SCOPE: &[&'static str] = &[
     "esi-fittings.read_fittings.v1",
     "esi-fittings.write_fittings.v1",
     "esi-industry.read_character_jobs.v1",
-    "esi-industry.read_corporation_jobs.v1",
     "esi-industry.read_character_mining.v1",
     "esi-markets.read_character_orders.v1",
     "esi-markets.structure_markets.v1",
@@ -61,8 +60,8 @@ impl EveService {
         code:  &str,
         token: Uuid
     ) -> Result<Option<Uuid>, ServerError> {
-        let character = EveClient::retrieve_authorization_token(&code).await;
-        self.save_login(&token, character?).await?;
+        let character = EveAuthClient::access_token(&code).await?;
+        self.save_login(&token, character).await?;
 
         if self.is_alt(&token).await? {
             Ok(None)
@@ -86,10 +85,10 @@ impl EveService {
         .await?
         .token;
 
-        let url = EveClient::eve_auth_uri(
-            &token.to_string(),
-        )?;
-        let uri = url
+        let uri = EveAuthClient::auth_uri(
+                &token.to_string(),
+                Some(&EVE_SCOPE.join(" "))
+            )?
             .to_string()
             .parse::<Uri>()
             .unwrap();
@@ -131,7 +130,14 @@ impl EveService {
         .await?
         .token;
 
-        EveClient::eve_auth_uri(&token.to_string()).map_err(Into::into)
+        let uri = EveAuthClient::auth_uri(
+                &token.to_string(),
+                Some(&EVE_SCOPE.join(" "))
+            )?
+            .to_string()
+            .parse::<Uri>()
+            .unwrap();
+        Ok(uri)
     }
 
     /// Gets a list of alts for the given [CharacterId]
@@ -163,6 +169,25 @@ impl EveService {
         Ok(alts)
     }
 
+    pub async fn refresh_token(
+        &self,
+        cid:   &CharacterId,
+        token: &Uuid,
+    ) -> Result<String, ServerError> {
+        let refresh_token = sqlx::query!("
+                SELECT refresh_token
+                FROM login
+                WHERE character_id = $1
+                  AND token        = $2
+            ", **cid, token)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|_| ServerError::InvalidUser)?
+            .refresh_token
+            .ok_or(ServerError::InvalidUser)?;
+        Ok(refresh_token)
+    }
+
     /// Gets the character id from the database
     ///
     /// # Parameters
@@ -189,7 +214,7 @@ impl EveService {
 
         if let Some(x) = character {
             if let Some(id) = x.character_id {
-                Ok((id as u32).into())
+                Ok(id.into())
             } else {
                 Err(ServerError::InvalidUser)
             }
@@ -208,11 +233,13 @@ impl EveService {
     async fn save_login(
         &self,
         token:     &Uuid,
-        character: EveOAuthUser
+        character: EveOAuthToken
     ) -> Result<(), ServerError> {
+        let character_id = character.character_id()?;
+
         sqlx::query!("
             DELETE FROM login WHERE character_id = $1
-        ", *character.user_id as i32)
+        ", *character_id)
         .execute(&self.pool)
         .await?;
 
@@ -225,7 +252,7 @@ impl EveService {
                     expire_date = NOW() + interval '1199' second
                 WHERE token = $4
             ",
-            *character.user_id as i32,
+            *character_id,
             character.access_token,
             character.refresh_token,
             token
@@ -285,14 +312,15 @@ impl LoggedInCharacter {
         }
     }
 
-    /// Gets a valid `access_token` for the eve api
-    ///
-    /// # Returns
-    ///
-    /// Valid `access_token` that can be used for requests to the eve api
-    ///
-    pub async fn get_token(&self) -> Result<String, ServerError> {
-        Ok(String::new())
+    pub async fn eve_auth_client(&self) -> Result<EveAuthClient, ServerError> {
+        let refresh_token = self.eve_service.refresh_token(
+            &self.character_id().await?,
+            &self.token
+        )
+        .await?;
+
+        let client = EveAuthClient::new(refresh_token)?;
+        Ok(client)
     }
 
     /// Gets the character id of requesting character

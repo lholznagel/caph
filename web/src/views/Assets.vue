@@ -3,6 +3,16 @@
     <n-skeleton text v-if="busy" :repeat="5" />
 
     <div v-if="!busy">
+      <filter-text
+        :filters="filters"
+        :options="filterOptions"
+      />
+      <filter-element
+        style="margin-top: 5px"
+        :filters="filters"
+        :options="filterOptions"
+      />
+
       <n-data-table
         style="margin-top: 5px"
         ref="table"
@@ -16,8 +26,8 @@
 </template>
 
 <script lang="ts">
-import { NButton, NButtonGroup, NCard, NDataTable, NInput, NSkeleton, NTag,
-NTable } from 'naive-ui';
+import { NButton, NButtonGroup, NCard, NDataTable, NInput, NSkeleton, NSpace,
+NTag, NTable } from 'naive-ui';
 import { Options, Vue } from 'vue-class-component';
 import { h } from 'vue';
 
@@ -26,6 +36,9 @@ import NameById from '@/components/NameById.vue';
 import Owner from '@/components/Owner.vue';
 
 import { AssetService, IAsset } from '@/services/asset';
+import { CharacterService } from '@/services/character';
+import FilterText, { IFilterOption } from '@/components/Filter.vue';
+import FilterElement from '@/components/FilterElement.vue';
 
 @Options({
   components: {
@@ -35,9 +48,12 @@ import { AssetService, IAsset } from '@/services/asset';
     NDataTable,
     NInput,
     NSkeleton,
-    NTag,
+    NSpace,
     NTable,
+    NTag,
 
+    FilterText,
+    FilterElement,
     ItemIcon,
     NameById,
     Owner,
@@ -47,6 +63,7 @@ export default class CharacterAsset extends Vue {
   public busy: boolean = false;
   public entries: IAsset[] = [];
 
+  public filters = {};
   public filterName: string = '';
 
   public columns: any = [];
@@ -54,14 +71,35 @@ export default class CharacterAsset extends Vue {
     pageSize: 10
   };
 
+  public filterOptions: { [key: string]: IFilterOption } = {};
 
   public async created() {
     this.busy = true;
 
     this.columns = createColumns();
-    this.entries = await AssetService.assets();
+    this.entries = await AssetService.assets(this.filters);
+
+    let character_opts = (await CharacterService.ids()).map(x => x.toString());
+    this.filterOptions = {
+      name: {
+        label: 'Name',
+        element: 'TEXT'
+      },
+      owner: {
+        label: 'Owner',
+        element: 'OWNER',
+        options: character_opts
+      }
+    };
+
+    this.$watch(() => this.filters, async () => {
+      this.entries = await AssetService.assets(this.filters);
+    }, { deep: true });
 
     this.busy = false;
+  }
+
+  public mounted() {
   }
 
   public handleNameFilter(val: string) {
@@ -129,9 +167,15 @@ const createColumns = () => {
     width: 200,
     render(row: IAsset) {
       return h(
-        Owner,
-        { ids: row.owners, withText: false }
-      )
+        NSpace,
+        {},
+        {
+          default: () => row.owners
+            .map(x => h(
+              Owner,
+              { id: x, withText: false }
+            ))
+        })
     }
   }];
 }

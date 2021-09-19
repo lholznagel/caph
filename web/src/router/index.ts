@@ -7,10 +7,10 @@ const routes: Array<RouteRecordRaw> = [
   },
   {
     path: '/assets',
-    name: 'character_assets',
+    name: 'assets',
     component: () => import(
       /* webpackChunkName: "assets" */
-      '@/views/CharacterAsset.vue'
+      '@/views/Assets.vue'
     )
   },
   {

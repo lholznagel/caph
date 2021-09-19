@@ -25,16 +25,41 @@
 )]
 #![feature(stmt_expr_attributes)]
 
+/// Module for handling assets
+mod asset;
 /// Module for handling blueprints
 mod blueprint;
+/// Module for handling characters
+mod character;
 /// Module containing clients to the EVE-API
 mod client;
 /// Module containing possible errors
 mod error;
+/// Module containing all macros
+mod macros;
+/// Module for handling reprocessing information
+mod reprocess;
+/// Module for handling schematics
+mod schematic;
 /// Module contains the wrapper for managing the SDE.zip
 mod zip;
 
+pub use self::asset::*;
 pub use self::blueprint::*;
+pub use self::character::*;
 pub use self::client::*;
 pub use self::error::*;
+pub use self::reprocess::*;
+pub use self::schematic::*;
 pub use self::zip::*;
+
+use serde::{Deserialize, Serialize};
+
+eve_id!(AllianceId, i32);
+eve_id!(CategoryId, i32);
+eve_id!(CharacterId, i32);
+eve_id!(CorporationId, i32);
+eve_id!(GroupId, i32);
+eve_id!(ItemId, i64);
+eve_id!(LocationId, i64);
+eve_id!(TypeId, i32);

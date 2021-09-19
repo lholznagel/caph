@@ -2,28 +2,26 @@
   <n-space align="center">
     <n-image
       class="owner"
-      :src="getCharacterPortrait(id)"
-      :key="id"
+      :src="getCharacterPortrait()"
       width="32"
       height="32"
-      v-for="id in ids"
     />
     <span v-if="withText" style="">
-      {{ ids[0] }}
+      {{ name || id }}
     </span>
   </n-space>
 </template>
 
 <script lang="ts">
+import {CharacterService} from '@/services/character';
 import { NAvatar, NSpace, NImage } from 'naive-ui';
 import { Options, Vue, prop } from 'vue-class-component';
 
 const BASE_URL_CHAR = 'https://images.evetech.net/characters';
-const BASE_URL_CORP = 'https://images.evetech.net/corporations'
 
 class Props {
-  ids = prop({
-    type: Array,
+  id = prop({
+    type: Number,
     required: true
   });
   withText = prop({
@@ -40,13 +38,16 @@ class Props {
   }
 })
 export default class Owner extends Vue.with(Props) {
-  public getCharacterPortrait(id: number): string {
-    // FIXME: Hack!
-    if (id === 692480993) {
-      return `${BASE_URL_CORP}/${id}/logo?size?1024`;
-    }
+  public name: string = '';
 
-    return `${BASE_URL_CHAR}/${id}/portrait?size?1024`;
+  public async loadName() {
+    const name = await CharacterService.char_name(this.id);
+    this.name = name;
+  }
+
+  public getCharacterPortrait(): string {
+    this.loadName();
+    return `${BASE_URL_CHAR}/${this.id}/portrait?size?1024`;
   }
 }
 </script>

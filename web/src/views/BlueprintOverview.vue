@@ -26,7 +26,8 @@
 </template>
 
 <script lang="ts">
-import { NButton, NButtonGroup, NCard, NDataTable, NInput, NSkeleton, NTag } from 'naive-ui';
+import { NButton, NButtonGroup, NCard, NDataTable, NInput, NSkeleton, NSpace,
+NTag } from 'naive-ui';
 import { Options, Vue } from 'vue-class-component';
 import { h } from 'vue';
 
@@ -37,6 +38,7 @@ import NameById from '@/components/NameById.vue';
 import Owner from '@/components/Owner.vue';
 
 import { AssetService, IBlueprint } from '@/services/asset';
+import { CharacterService } from '@/services/character';
 
 @Options({
   components: {
@@ -46,6 +48,7 @@ import { AssetService, IBlueprint } from '@/services/asset';
     NDataTable,
     NInput,
     NSkeleton,
+    NSpace,
     NTag,
 
     FilterText,
@@ -67,23 +70,27 @@ export default class CharacterBlueprint extends Vue {
     pageSize: 10
   };
 
-  public filterOptions: { [key: string]: IFilterOption } = {
-    name: {
-      label: 'Name',
-      element: 'TEXT'
-    },
-    owner: {
-      label: 'Owner',
-      element: 'OWNER',
-      options: ['2117441999', '692480993']
-    }
-  };
+  public filterOptions: { [key: string]: IFilterOption } = {};
 
   public async created() {
     this.busy = true;
     this.columns = createColumns(this.openDetails, this.newProject);
 
     this.entries = await AssetService.blueprints();
+
+    let character_opts = (await CharacterService.ids()).map(x => x.toString());
+    this.filterOptions = {
+      name: {
+        label: 'Name',
+        element: 'TEXT'
+      },
+      owner: {
+        label: 'Owner',
+        element: 'OWNER',
+        options: character_opts
+      }
+    };
+
     this.busy = false;
   }
 
@@ -171,15 +178,24 @@ const createColumns = (openDetails: any, newProject: any) => {
   }, {
     title: 'Time Eff',
     key:   'time_efficiency',
-  }, {
+  },  {
+    title: 'Runs',
+    key:   'runs',
+  },{
     title: 'Owners',
     key:   'owner',
     width: 200,
     render(row: IBlueprint) {
       return h(
-        Owner,
-        { ids: row.owners, withText: false }
-      )
+        NSpace,
+        {},
+        {
+          default: () => row.owners
+            .map(x => h(
+              Owner,
+              { id: x, withText: false }
+            ))
+        })
     }
   }, {
     title: '',

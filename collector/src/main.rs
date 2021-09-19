@@ -1,22 +1,12 @@
 //! Collects EVE-Data from different sources and inserts them into the database
-//! for later usage.
+//! for later usage
 
-mod character;
-mod error;
-mod sde;
-mod time;
-
-use self::character::*;
-use self::sde::*;
-use self::time::*;
-
-use caph_eve_data_wrapper::EveDataWrapper;
+use caph_collector::{Character, Sde, duration_next_sde_download, duration_to_next_10_minute};
 use sqlx::postgres::PgPoolOptions;
 use std::time::Duration;
-use tracing_subscriber::FmtSubscriber;
-use tracing::instrument;
-use tracing::Level;
+use tracing::{instrument, Level};
 
+/// Env variable for the database URL
 const PG_ADDR: &str = "DATABASE_URL";
 
 #[tokio::main]
@@ -24,11 +14,10 @@ const PG_ADDR: &str = "DATABASE_URL";
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv::dotenv().ok();
 
-    let subscriber = FmtSubscriber::builder()
+    tracing_subscriber::fmt()
+        .pretty()
         .with_max_level(Level::INFO)
-        .finish();
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("setting default subscriber failed");
+        .init();
 
     let pg_addr = std::env::var(PG_ADDR).unwrap();
     let pool = PgPoolOptions::new()
@@ -36,14 +25,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .connect(&pg_addr)
         .await?;
 
-    tracing::info!("Preparing SDE.");
-    let eve = EveDataWrapper::new().await?;
-    tracing::info!("Prepared SDE.");
-
-    let eve_copy = eve.clone();
     let pool_copy = pool.clone();
     let sde = tokio::task::spawn(async {
-        let mut sde = Sde::new(eve_copy, pool_copy);
+        let mut sde = Sde::new(pool_copy);
 
         loop {
             tracing::info!("SDE task started.");
@@ -52,16 +36,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             tracing::info!("SDE task done.");
 
-            let next_run = duration_next_sde_download()
-                .unwrap_or_else(|_| Duration::from_secs(24 * 60 * 60));
+            let next_run = duration_next_sde_download();
             tokio::time::sleep(next_run).await;
         }
     });
 
-    let eve_copy = eve.clone();
     let pool_copy = pool.clone();
     let character = tokio::task::spawn(async {
-        let mut character = Character::new(eve_copy, pool_copy);
+        let mut character = Character::new(pool_copy);
 
         loop {
             tracing::info!("Character task started.");

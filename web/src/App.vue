@@ -87,7 +87,7 @@ export default class App extends Vue {
     children: [
       {
         label: 'All',
-        key:   'character_assets',
+        key:   'assets',
       },
       {
         label: 'Blueprints',

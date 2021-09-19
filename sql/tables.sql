@@ -137,8 +137,6 @@ CREATE TABLE asset(
     quantity                INTEGER     NOT NULL,
     type_id                 INTEGER     NOT NULL,
 
-    location_flag           VARCHAR(50) NOT NULL,
-
     PRIMARY KEY (item_id),
 
     FOREIGN KEY (character_id)

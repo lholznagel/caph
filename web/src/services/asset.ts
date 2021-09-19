@@ -1,8 +1,11 @@
 import axios from 'axios';
 
 export class AssetService {
-  public static async assets(): Promise<IAsset[]> {
-    return (await axios.get('/api/assets')).data;
+  public static async assets(
+    params: { [key: string]: any }
+  ): Promise<IAsset[]> {
+    console.log(params)
+    return (await axios.get('/api/assets', { params })).data;
   }
 
   public static async blueprints(): Promise<IBlueprint[]> {

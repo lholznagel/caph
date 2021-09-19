@@ -58,6 +58,27 @@
       ]
     }
   },
+  "3821604e68461f4ec06e9b999d3c63e228e58f17888654395768ba46e895bf72": {
+    "query": "\n                SELECT refresh_token\n                FROM login\n                WHERE character_id = $1\n                  AND token        = $2\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "refresh_token",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        true
+      ]
+    }
+  },
   "60c9dfb0d466a03411aa86bfe1d7b1e96847531125ba27ae25cafa07385e130f": {
     "query": "\n                SELECT\n                    DISTINCT(a.type_id),\n                    ARRAY_AGG(DISTINCT a.character_id) AS owners,\n                    ARRAY_AGG(DISTINCT a.item_id) AS item_ids,\n                    SUM(a.quantity) AS quantity,\n                    i.name\n                FROM asset a\n                LEFT JOIN item i\n                    ON i.type_id = a.type_id\n                WHERE character_id = ANY($1)\n                GROUP BY\n                    a.type_id,\n                    i.name\n                ORDER BY i.name\n            ",
     "describe": {
@@ -219,6 +240,26 @@
       ]
     }
   },
+  "a3fba43bca6aeefbe956748a7f0a701910b6a2f36a06aeb890bc4ea3574b45f7": {
+    "query": "\n                SELECT character_id\n                FROM   character\n                WHERE  character_id = $1 OR character_main = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "character_id",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "b2e17eb6b7fbebf68473a6610bf7d13daf695635ac5fe8956ec2d9e49705521d": {
     "query": "\n                INSERT INTO character\n                (\n                    alliance_id, alliance_name,\n                    character_id, character_name,\n                    corporation_id, corporation_name,\n                    character_main\n                )\n                VALUES ($1, $2, $3, $4, $5, $6, $7)\n            ",
     "describe": {
@@ -235,6 +276,62 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "b310adceb0d56dc1dda0aa8a331e88a3ea40753d84dbf8834ed363e45012b0c0": {
+    "query": "\n                SELECT *\n                FROM character\n                WHERE character_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "alliance_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "character_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "corporation_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 3,
+          "name": "character_main",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 4,
+          "name": "alliance_name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "character_name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 6,
+          "name": "corporation_name",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false
+      ]
     }
   },
   "bb5c14456aae91074220f9d4073967c296570bbca5a84342a91f1e899d2dc07a": {

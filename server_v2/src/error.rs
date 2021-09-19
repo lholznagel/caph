@@ -10,7 +10,6 @@ use serde_json::json;
 
 #[derive(Debug)]
 pub enum ServerError {
-    EveConnectError(caph_eve_data_wrapper::EveConnectError),
     SerdeJsonError(serde_json::Error),
     DatabaseError(sqlx::Error),
     ConnectError(caph_connector::ConnectError),
@@ -19,12 +18,6 @@ pub enum ServerError {
 }
 
 impl Error for ServerError {}
-
-impl From<caph_eve_data_wrapper::EveConnectError> for ServerError {
-    fn from(e: caph_eve_data_wrapper::EveConnectError) -> Self {
-        Self::EveConnectError(e)
-    }
-}
 
 impl From<serde_json::Error> for ServerError {
     fn from(e: serde_json::Error) -> Self {
