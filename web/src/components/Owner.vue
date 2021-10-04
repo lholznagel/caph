@@ -13,7 +13,7 @@
 </template>
 
 <script lang="ts">
-import {CharacterService} from '@/services/character';
+import { CharacterService } from '@/services/character';
 import { NAvatar, NSpace, NImage } from 'naive-ui';
 import { Options, Vue, prop } from 'vue-class-component';
 
@@ -41,7 +41,7 @@ export default class Owner extends Vue.with(Props) {
   public name: string = '';
 
   public async loadName() {
-    const name = await CharacterService.char_name(this.id);
+    const name = await CharacterService.character_name(this.id);
     this.name = name;
   }
 

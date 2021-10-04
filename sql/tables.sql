@@ -2,6 +2,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 DROP TABLE IF EXISTS asset CASCADE;
 DROP TABLE IF EXISTS asset_blueprint CASCADE;
+DROP TABLE IF EXISTS asset_name CASCADE;
 DROP TABLE IF EXISTS blueprint CASCADE;
 DROP TABLE IF EXISTS blueprint_material CASCADE;
 DROP TABLE IF EXISTS blueprint_skill CASCADE;
@@ -11,23 +12,6 @@ DROP TABLE IF EXISTS login CASCADE;
 DROP TABLE IF EXISTS reprocess CASCADE;
 DROP TABLE IF EXISTS schematic CASCADE;
 DROP TABLE IF EXISTS schematic_material CASCADE;
-
-CREATE TABLE character(
-    alliance_id             INTEGER     NOT NULL,
-    character_id            INTEGER     NOT NULL,
-    corporation_id          INTEGER     NOT NULL,
-
-    character_main          INTEGER,
-
-    alliance_name           VARCHAR(50) NOT NULL,
-    character_name          VARCHAR(50) NOT NULL,
-    corporation_name        VARCHAR(50) NOT NULL,
-
-    PRIMARY KEY(character_id),
-    FOREIGN KEY(character_main)
-        REFERENCES character(character_id)
-        ON DELETE CASCADE
-);
 
 -- Provided by SDE
 CREATE TABLE item(
@@ -128,14 +112,27 @@ CREATE TABLE schematic_material(
         ON DELETE CASCADE
 );
 
+-- Provided by SDE and custom user input
+CREATE TABLE station(
+    id   BIGINT  NOT NULL,
+    name VARCHAR NOT NULL,
+
+    pos  BOOLEAN NOT NULL DEFAULT FALSE,
+
+    PRIMARY KEY(id)
+);
+
 -- Character assets
 CREATE TABLE asset(
-    item_id                 BIGINT      NOT NULL,
-    location_id             BIGINT      NOT NULL,
+    item_id       BIGINT  NOT NULL,
+    location_id   BIGINT  NOT NULL,
+    reference_id  BIGINT,
 
-    character_id            INTEGER     NOT NULL,
-    quantity                INTEGER     NOT NULL,
-    type_id                 INTEGER     NOT NULL,
+    character_id  INTEGER NOT NULL,
+    type_id       INTEGER NOT NULL,
+    quantity      INTEGER NOT NULL,
+
+    location_flag VARCHAR NOT NULL,
 
     PRIMARY KEY (item_id),
 
@@ -160,6 +157,40 @@ CREATE TABLE asset_blueprint(
         ON DELETE CASCADE
 );
 
+-- Character asset names
+CREATE TABLE asset_name(
+    item_id      BIGINT  NOT NULL,
+    character_id INTEGER NOT NULL,
+    name         VARCHAR NOT NULL,
+
+    PRIMARY KEY (item_id),
+
+    FOREIGN KEY (item_id)
+        REFERENCES asset(item_id)
+        ON DELETE CASCADE,
+
+    FOREIGN KEY (character_id)
+        REFERENCES character(character_id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE character(
+    alliance_id             INTEGER     NOT NULL,
+    character_id            INTEGER     NOT NULL,
+    corporation_id          INTEGER     NOT NULL,
+
+    character_main          INTEGER,
+
+    alliance_name           VARCHAR(50) NOT NULL,
+    character_name          VARCHAR(50) NOT NULL,
+    corporation_name        VARCHAR(50) NOT NULL,
+
+    PRIMARY KEY(character_id),
+    FOREIGN KEY(character_main)
+        REFERENCES character(character_id)
+        ON DELETE CASCADE
+);
+
 CREATE TABLE login(
     token                   UUID NOT NULL DEFAULT uuid_generate_v4(),
 
@@ -175,4 +206,4 @@ CREATE TABLE login(
 );
 
 CREATE INDEX asset_type_id ON asset(type_id);
-CREATE INDEX blueprint_type_id ON blueprint (type_id);
+CREATE INDEX blueprint_type_id ON blueprint(type_id);

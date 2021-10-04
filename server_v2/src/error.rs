@@ -1,12 +1,11 @@
+use axum::body::{Bytes, Full};
+use axum::http::StatusCode;
+use axum::Json;
+use axum::response::IntoResponse;
+use serde_json::json;
 use std::convert::Infallible;
 use std::error::Error;
 use std::fmt;
-
-use axum::Json;
-use axum::body::{Bytes, Full};
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
-use serde_json::json;
 
 #[derive(Debug)]
 pub enum ServerError {
@@ -14,7 +13,13 @@ pub enum ServerError {
     DatabaseError(sqlx::Error),
     ConnectError(caph_connector::ConnectError),
 
-    InvalidUser
+    InvalidUser,
+    NotFound,
+
+    /// The address could not be parsed
+    CouldNotParseServerListenAddr,
+    /// Could not start server
+    CouldNotStartServer,
 }
 
 impl Error for ServerError {}
@@ -50,6 +55,7 @@ impl IntoResponse for ServerError {
     fn into_response(self) -> axum::http::Response<Self::Body> {
         let (status, msg) = match self {
             ServerError::InvalidUser => (StatusCode::FORBIDDEN, "Forbidden"),
+            ServerError::NotFound    => (StatusCode::NOT_FOUND, "Requested entry not found"),
             _ => (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
         };
 

@@ -10,11 +10,8 @@
       <n-space class="filter" align="center" size="small">
         <strong >{{ options[key].label }}: </strong>
 
-        <div v-if="options[key].element === 'OWNER'">
-          <owner
-            :id="Number(value)"
-            withText
-          />
+        <div v-if="options[key].template">
+          <component v-bind:is="options[key].template(value)" />
         </div>
         <span v-else>{{ value }}</span>
       </n-space>
@@ -25,8 +22,6 @@
 <script lang="ts">
 import { Options, Vue, prop } from 'vue-class-component';
 import { NSpace, NTag } from 'naive-ui';
-
-import Owner from './Owner.vue';
 
 class Props {
   filters = prop({
@@ -43,8 +38,6 @@ class Props {
   components: {
     NSpace,
     NTag,
-
-    Owner
   }
 })
 export default class FilterElement extends Vue.with(Props) {
@@ -53,9 +46,3 @@ export default class FilterElement extends Vue.with(Props) {
   }
 }
 </script>
-
-<style>
-.filter .owner {
-  margin-top: 8px;
-}
-</style>

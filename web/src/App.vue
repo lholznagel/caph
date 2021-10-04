@@ -109,13 +109,13 @@ export default class App extends Vue {
       }
     ]
   }, {
-    label: 'Accounts',
-    key:   'accounts',
+    label: 'Settings',
+    key:   'settings',
     type:  'group',
     children: [
       {
-        label: 'Settings',
-        key:   'settings'
+        label: 'Characters',
+        key:   'characters'
       }
     ]
   }, {
@@ -139,7 +139,7 @@ export default class App extends Vue {
   }];
 
   public async created() {
-    const res = await (axios.get<ICharacter>('/api/whoami'));
+    const res = await (axios.get<ICharacter>('/api/auth/whoami'));
     if (res.status === 200) {
       this.whoami = res.data;
       let globalWindow: any = window;
@@ -152,7 +152,7 @@ export default class App extends Vue {
   }
 
   public redirectLogin() {
-    window.location.href = `/api/eve/login`;
+    window.location.href = `/api/auth/login`;
   }
 
   public isLoggedIn() {

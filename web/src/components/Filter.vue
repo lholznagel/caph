@@ -27,11 +27,10 @@
 
 <script lang="ts">
 import { Options, Vue, prop } from 'vue-class-component';
-import { NDropdown, NIcon, NInput } from 'naive-ui';
+import { NDropdown, NIcon, NInput, NSelect } from 'naive-ui';
 import { Search } from '@vicons/fa';
-import { h } from 'vue';
+import { VNode } from 'vue';
 
-import NameById from './NameById.vue';
 import Owner from './Owner.vue';
 
 class Props {
@@ -50,8 +49,8 @@ class Props {
     NDropdown,
     NIcon,
     NInput,
+    NSelect,
 
-    NameById,
     Search,
     Owner
   }
@@ -130,13 +129,8 @@ export default class Filter extends Vue.with(Props) {
   public renderLabel(x: any) {
     const entry = this.options[this.selectedKey];
 
-    if (!this.selectedKey) {
-      return x.label;
-    } else if(entry.element === 'OWNER') {
-      return h(
-        Owner,
-        { id: Number(x.key), withText: true }
-      )
+    if (entry && entry.template) {
+      return entry.template(x.key);
     } else {
       return x.label;
     }
@@ -148,9 +142,9 @@ export default class Filter extends Vue.with(Props) {
 }
 
 export interface IFilterOption {
-  label: string;
-  element: 'OWNER' | 'TEXT';
-  options?: string[];
+  label:     string;
+  options?:  string[];
+  template?: (val: string) => VNode;
 }
 </script>
 

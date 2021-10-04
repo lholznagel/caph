@@ -1,42 +1,79 @@
 use crate::error::CollectorError;
 
-use caph_connector::{BlueprintMaterial, BlueprintSkill, ConnectAssetService, ConnectBlueprintService, ConnectReprocessService, ConnectSchematicService, SdeService};
+use caph_connector::{BlueprintMaterial, BlueprintSkill, ConnectAssetService, ConnectBlueprintService, ConnectReprocessService, ConnectSchematicService, ConnectStationService, SdeService};
 use sqlx::{PgPool, Type};
 use std::fmt;
 use uuid::Uuid;
 
+/// Responsible for processing EVE-SDE files
 pub struct Sde {
+    /// Connection pool to a postgres database
     pool: PgPool,
 }
 
 impl Sde {
+    /// Creates a new instance
+    ///
+    /// # Params
+    ///
+    /// * `pool` -> Open connction pool to a postgres
+    ///
+    /// # Returns
+    ///
+    /// New instance
     pub fn new(pool: PgPool) -> Self {
         Self { pool}
     }
 
+    /// Starts the processing of a sde.zip file
+    ///
+    /// # Errors
+    ///
+    /// Fails when there is an error while processing the file
+    ///
+    /// # Returns
+    ///
+    /// Nothing
+    ///
     pub async fn run(&mut self) -> Result<(), CollectorError> {
         let mut zip = SdeService::new()
             .await
-            .map_err(CollectorError::LoadingZipError)?;
+            .map_err(CollectorError::LoadingSdeZip)?;
 
         let asset_service = ConnectAssetService::new(&mut zip)
-            .map_err(CollectorError::GeneralConnectError)?;
+            .map_err(CollectorError::LoadSdeFile)?;
         let blueprint_service = ConnectBlueprintService::new(&mut zip)
-            .map_err(CollectorError::GeneralConnectError)?;
+            .map_err(CollectorError::LoadSdeFile)?;
         let reprocess_service = ConnectReprocessService::new(&mut zip)
-            .map_err(CollectorError::GeneralConnectError)?;
+            .map_err(CollectorError::LoadSdeFile)?;
         let schematic_service = ConnectSchematicService::new(&mut zip)
-            .map_err(CollectorError::GeneralConnectError)?;
+            .map_err(CollectorError::LoadSdeFile)?;
+        let station_service = ConnectStationService::new(&mut zip)
+            .map_err(CollectorError::LoadSdeFile)?;
 
         self.save_blueprints(&blueprint_service).await?;
         self.save_assets(&asset_service).await?;
         self.save_reprocessing_info(&reprocess_service).await?;
         self.save_schematics(&schematic_service).await?;
+        self.save_stations(&station_service).await?;
 
         Ok(())
     }
 
     /// Extractes all items and inserts them into the database.
+    ///
+    /// # Params
+    ///
+    /// * `asset_service` -> Service that holds SDE information about assets
+    ///
+    /// # Errors
+    ///
+    /// Failes when a database operation fails
+    ///
+    /// # Returns
+    ///
+    /// Nothing
+    ///
     async fn save_assets(&self, asset_service: &ConnectAssetService) -> Result<(), CollectorError> {
         let mut type_ids = Vec::new();
         let mut categories = Vec::new();
@@ -55,7 +92,7 @@ impl Sde {
             let category = *asset_group_ids
                 .get(&entry.group_id)
                 .map(|x| x.category_id)
-                .unwrap();
+                .expect("Every entry should have a category id");
             let group_id = *entry.group_id;
             let name = entry.name().unwrap_or_default();
             let volume = entry.volume.unwrap_or(0f32);
@@ -69,7 +106,11 @@ impl Sde {
         tracing::debug!(task = "asset", "Finsihed preparing assets");
 
         tracing::debug!(task = "asset", "Start inserting assets in DB");
-        let mut trans = self.pool.begin().await?;
+        let mut trans = self.pool
+            .begin()
+            .await
+            .map_err(CollectorError::TransactionBeginNotSuccessfull)?;
+
         sqlx::query!("
                 INSERT INTO item
                 (
@@ -99,14 +140,32 @@ impl Sde {
                 &names
             )
             .execute(&mut trans)
-            .await?;
-        trans.commit().await?;
+            .await
+            .map_err(CollectorError::InsertingSdeItem)?;
+
+        trans.commit()
+            .await
+            .map_err(CollectorError::TransactionCommitNotSuccessfull)?;
         tracing::debug!(task = "asset", "Finished inserting assets in DB");
 
         Ok(())
     }
 
     /// Collect all item materials together and save them in the database.
+    ///
+    /// # Params
+    ///
+    /// * `reprocess_service` -> Service that holds SDE information about
+    ///                          reprocessing
+    ///
+    /// # Errors
+    ///
+    /// Failes when a database operation fails
+    ///
+    /// # Returns
+    ///
+    /// Nothing
+    ///
     async fn save_reprocessing_info(
         &self,
         reprocess_service: &ConnectReprocessService
@@ -127,8 +186,15 @@ impl Sde {
             }
         }
 
-        let mut trans = self.pool.begin().await?;
-        sqlx::query!("DELETE FROM reprocess").execute(&mut trans).await?;
+        let mut trans = self.pool
+            .begin()
+            .await
+            .map_err(CollectorError::TransactionBeginNotSuccessfull)?;
+
+        sqlx::query!("DELETE FROM reprocess")
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::DeletingSdeReprocess)?;
         sqlx::query!("
                 INSERT INTO reprocess
                 (
@@ -147,12 +213,31 @@ impl Sde {
                 &quantities,
             )
             .execute(&mut trans)
-            .await?;
-        trans.commit().await?;
+            .await
+            .map_err(CollectorError::InsertingSdeReprocess)?;
+
+        trans.commit()
+            .await
+            .map_err(CollectorError::TransactionCommitNotSuccessfull)?;
 
         Ok(())
     }
 
+    /// Collect all blueprints together and save them in the database.
+    ///
+    /// # Params
+    ///
+    /// * `blueprint_service` -> Service that holds SDE information about
+    ///                          blueprints
+    ///
+    /// # Errors
+    ///
+    /// Failes when a database operation fails
+    ///
+    /// # Returns
+    ///
+    /// Nothing
+    ///
     async fn save_blueprints(
         &self,
         blueprint_service: &ConnectBlueprintService
@@ -283,8 +368,15 @@ impl Sde {
             }
         }
 
-        let mut trans = self.pool.begin().await?;
-        sqlx::query!("DELETE FROM blueprint CASCADE").execute(&mut trans).await?;
+        let mut trans = self.pool
+            .begin()
+            .await
+            .map_err(CollectorError::TransactionBeginNotSuccessfull)?;
+
+        sqlx::query!("DELETE FROM blueprint CASCADE")
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::DeletingSdeBlueprint)?;
         sqlx::query!("
                 INSERT INTO blueprint
                 (
@@ -322,7 +414,8 @@ impl Sde {
                 &research_time as _
             )
             .execute(&mut trans)
-            .await?;
+            .await
+            .map_err(CollectorError::InsertingSdeBlueprint)?;
 
         sqlx::query!("
                 INSERT INTO blueprint_material
@@ -352,8 +445,8 @@ impl Sde {
                 &bm_probability as _,
             )
             .execute(&mut trans)
-            .await?;
-        trans.commit().await?;
+            .await
+            .map_err(CollectorError::InsertingSdeBlueprintMaterial)?;
 
         sqlx::query!("
                 INSERT INTO blueprint_skill
@@ -378,12 +471,32 @@ impl Sde {
                 &bs_type_id,
                 &bs_level,
             )
-            .execute(&self.pool)
-            .await?;
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::InsertingSdeBlueprintSkill)?;
+
+        trans.commit()
+            .await
+            .map_err(CollectorError::TransactionCommitNotSuccessfull)?;
 
         Ok(())
     }
 
+    /// Collect all schematic together and save them in the database.
+    ///
+    /// # Params
+    ///
+    /// * `schematic_service` -> Service that holds SDE information about
+    ///                          schematics
+    ///
+    /// # Errors
+    ///
+    /// Failes when a database operation fails
+    ///
+    /// # Returns
+    ///
+    /// Nothing
+    ///
     async fn save_schematics(
         &self,
         schematic_service: &ConnectSchematicService
@@ -412,8 +525,15 @@ impl Sde {
             }
         }
 
-        let mut trans = self.pool.begin().await?;
-        sqlx::query!("DELETE FROM schematic CASCADE").execute(&mut trans).await?;
+        let mut trans = self.pool
+            .begin()
+            .await
+            .map_err(CollectorError::TransactionBeginNotSuccessfull)?;
+
+        sqlx::query!("DELETE FROM schematic CASCADE")
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::DeletingSdeSchematic)?;
         sqlx::query!("
                 INSERT INTO schematic
                 (
@@ -433,7 +553,8 @@ impl Sde {
                 &s_cycle_times,
             )
             .execute(&mut trans)
-            .await?;
+            .await
+            .map_err(CollectorError::InsertingSdeSchematic)?;
 
         sqlx::query!("
                 INSERT INTO schematic_material
@@ -457,20 +578,95 @@ impl Sde {
                 &sm_quantity
             )
             .execute(&mut trans)
-            .await?;
-        trans.commit().await?;
+            .await
+            .map_err(CollectorError::InsertingSdeSchematicMaterial)?;
+
+        trans.commit()
+            .await
+            .map_err(CollectorError::TransactionCommitNotSuccessfull)?;
+
+        Ok(())
+    }
+
+    /// Collect all stations together and save them in the database.
+    ///
+    /// # Params
+    ///
+    /// * `station_service` -> Service that holds SDE information about
+    ///                        stations
+    ///
+    /// # Errors
+    ///
+    /// Failes when a database operation fails
+    ///
+    /// # Returns
+    ///
+    /// Nothing
+    ///
+    async fn save_stations(
+        &self,
+        station_service: &ConnectStationService
+    ) -> Result<(), CollectorError> {
+        let mut ids = Vec::new();
+        let mut names = Vec::new();
+
+        for entry in station_service.entries() {
+            ids.push(*entry.id);
+            names.push(entry.name.clone());
+        }
+
+        let mut trans = self.pool
+            .begin()
+            .await
+            .map_err(CollectorError::TransactionBeginNotSuccessfull)?;
+
+        sqlx::query!("
+                DELETE FROM station CASCADE
+                WHERE pos IS FALSE
+            ")
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::DeletingSdeStation)?;
+        sqlx::query!("
+                INSERT INTO station
+                (
+                    id,
+                    name
+                )
+                SELECT * FROM UNNEST(
+                    $1::BIGINT[],
+                    $2::VARCHAR[]
+                )
+            ",
+                &ids,
+                &names,
+            )
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::InsertingSdeStation)?;
+
+        trans.commit()
+            .await
+            .map_err(CollectorError::TransactionCommitNotSuccessfull)?;
 
         Ok(())
     }
 }
 
+/// All valid activities that a blueprint can have
 #[derive(Copy, Clone, Debug, Type)]
 pub enum BlueprintActivity {
+    /// Activity of copying a blueprint, to create a bpc
     Copy,
+    /// Activity of inventing a blueprint, to create an improved one
     Invention,
+    /// Activity of manufactoring an item from a blueprint
     Manufacture,
+    /// Activity of creating an item using reactions
     Reaction,
+    /// Activity of researching material to reduce the amount needed
     ResearchMaterial,
+    /// Activity of researching time to reduce the time needed to manufacture
     ResearchTime
 }
 
@@ -490,12 +686,12 @@ impl From<BlueprintActivity> for i16 {
 impl fmt::Display for BlueprintActivity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let x = match self {
-            Self::Copy => "COPY",
-            Self::Invention => "INVENTION",
-            Self::Manufacture => "MANUFACTURE",
-            Self::Reaction => "REACTION",
+            Self::Copy             => "COPY",
+            Self::Invention        => "INVENTION",
+            Self::Manufacture      => "MANUFACTURE",
+            Self::Reaction         => "REACTION",
             Self::ResearchMaterial => "RESEARCH_MATERIAL",
-            Self::ResearchTime => "RESEARCH_TIME"
+            Self::ResearchTime     => "RESEARCH_TIME"
         }
         .to_string();
 

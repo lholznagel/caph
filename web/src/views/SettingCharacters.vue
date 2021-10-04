@@ -50,7 +50,7 @@ export default class Settings extends Vue {
   }
 
   public addAlt() {
-    window.location.href = `/api/eve/login/alt`;
+    window.location.href = `/api/auth/login/alt`;
   }
 }
 </script>

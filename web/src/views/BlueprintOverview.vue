@@ -29,7 +29,7 @@
 import { NButton, NButtonGroup, NCard, NDataTable, NInput, NSkeleton, NSpace,
 NTag } from 'naive-ui';
 import { Options, Vue } from 'vue-class-component';
-import { h } from 'vue';
+import { h, VNode } from 'vue';
 
 import FilterText, { IFilterOption } from '@/components/Filter.vue';
 import FilterElement from '@/components/FilterElement.vue';
@@ -37,7 +37,7 @@ import ItemIcon from '@/components/ItemIcon.vue';
 import NameById from '@/components/NameById.vue';
 import Owner from '@/components/Owner.vue';
 
-import { AssetService, IBlueprint } from '@/services/asset';
+import { AssetService, IAccountBlueprint } from '@/services/asset';
 import { CharacterService } from '@/services/character';
 
 @Options({
@@ -60,7 +60,7 @@ import { CharacterService } from '@/services/character';
 })
 export default class CharacterBlueprint extends Vue {
   public busy: boolean = false;
-  public entries: IBlueprint[] = [];
+  public entries: IAccountBlueprint[] = [];
 
   public filters = {};
   public filterName: string = '';
@@ -76,20 +76,34 @@ export default class CharacterBlueprint extends Vue {
     this.busy = true;
     this.columns = createColumns(this.openDetails, this.newProject);
 
-    this.entries = await AssetService.blueprints();
+    this.entries = await AssetService.all_blueprints(this.filters);
 
     let character_opts = (await CharacterService.ids()).map(x => x.toString());
     this.filterOptions = {
       name: {
         label: 'Name',
-        element: 'TEXT'
       },
       owner: {
         label: 'Owner',
-        element: 'OWNER',
-        options: character_opts
+        options: character_opts,
+        template: (val: string): VNode => {
+          return h(
+            Owner,
+            { id: Number(val), withText: true }
+           )
+        }
+      },
+      material_eff: {
+        label: 'Material Efficiency',
+      },
+      time_eff: {
+        label: 'Time Efficiency',
       }
     };
+
+    this.$watch(() => this.filters, async () => {
+      this.entries = await AssetService.all_blueprints(this.filters);
+    }, { deep: true });
 
     this.busy = false;
   }
@@ -117,10 +131,10 @@ export default class CharacterBlueprint extends Vue {
     })
   }
 
-  public openDetails(bid: number, iid: number) {
+  public openDetails(tid: number, iid: number[]) {
     this.$router.push({
       name: 'blueprint',
-      params: { bid, iid }
+      params: { tid, iid: iid[0] }
     });
   }
 
@@ -137,7 +151,7 @@ const createColumns = (openDetails: any, newProject: any) => {
     title: '',
     key:   'type_id',
     width: 48,
-    render(row: IBlueprint) {
+    render(row: IAccountBlueprint) {
       return h(
         ItemIcon,
         {
@@ -151,14 +165,14 @@ const createColumns = (openDetails: any, newProject: any) => {
     title: 'Name',
     key:   'name',
     width: 450,
-    filter(value: string, row: IBlueprint) {
+    filter(value: string, row: IAccountBlueprint) {
       return ~row.name.toLowerCase().indexOf(value.toLowerCase());
     },
   }, {
     title: 'Type',
     key:   'type',
     width: 100,
-    render(row: IBlueprint) {
+    render(row: IAccountBlueprint) {
       return h(
         NTag,
         { type: row.quantity === -2 ? 'warning' : 'info' },
@@ -169,7 +183,7 @@ const createColumns = (openDetails: any, newProject: any) => {
     title: 'Count',
     key:   'count',
     sortOrder: false,
-    sorter(a: IBlueprint, b: IBlueprint) {
+    sorter(a: IAccountBlueprint, b: IAccountBlueprint) {
       return a.count - b.count;
     }
   }, {
@@ -185,7 +199,7 @@ const createColumns = (openDetails: any, newProject: any) => {
     title: 'Owners',
     key:   'owner',
     width: 200,
-    render(row: IBlueprint) {
+    render(row: IAccountBlueprint) {
       return h(
         NSpace,
         {},
@@ -200,7 +214,7 @@ const createColumns = (openDetails: any, newProject: any) => {
   }, {
     title: '',
     key:   'btn',
-    render(row: IBlueprint) {
+    render(row: IAccountBlueprint) {
       return h(
         NButtonGroup,
         {  },
@@ -209,12 +223,12 @@ const createColumns = (openDetails: any, newProject: any) => {
             return [
               h(
                 NButton,
-                { onClick: () => openDetails(row.type_id, row.item_id) },
+                { onClick: () => openDetails(row.type_id, row.item_ids) },
                 { default: () => 'Details' }
               ),
               h(
                 NButton,
-                { onClick: () => newProject(row.type_id, row.item_id) },
+                { onClick: () => newProject(row.type_id, row.item_ids) },
                 { default: () => 'New Project' }
               )]
           }

@@ -1,5 +1,5 @@
 {
-  "name": "web_new",
+  "name": "Caph",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -13,7 +13,7 @@
     "vue-router": "^4.0.0-0"
   },
   "devDependencies": {
-    "@vicons/fa": "^0.8.0",
+    "@vicons/fa": "^0.11.0",
     "@vue/cli-plugin-router": "~4.5.0",
     "@vue/cli-plugin-typescript": "~4.5.0",
     "@vue/cli-service": "~4.5.0",

@@ -22,6 +22,8 @@
 
 #### Collector ENV variables
 
+* `COLLECTOR_BIND_ADDR` -> Address the server should bind to.
+                           Default: `127.0.0.1:9090`
 * `DATABASE_URL` -> Database connection string
 * `EVE_USER_AGENT` -> User agent that is set with every request to the EVE-API
 * `EVE_CLIENT_ID` -> Client ID provided by EVE when creating the application
@@ -29,15 +31,15 @@
 
 #### Server ENV variables
 
-* `BIND`           -> Address the server should bind to.
-                      Default: `0.0.0.0:8080`
-* `DATABASE_URL`   -> Database connection string
-* `EVE_USER_AGENT` -> User agent that is set with every request to the EVE-API
-* `EVE_CALLBACK`   -> Callback after login, set when creating the application
-* `EVE_CLIENT_ID`  -> Client ID provided by EVE when creating the application
-* `EVE_SECRET_KEY` -> Client ID provided by EVE when creating the application
-* `REDIRECT`       -> Redirect after the user logged in.
-                      Default: `http://localhost:8080`
+* `SERVER_BIND_ADDR` -> Address the server should bind to.
+                        Default: `127.0.0.1:8080`
+* `DATABASE_URL`     -> Database connection string
+* `EVE_USER_AGENT`   -> User agent that is set with every request to the EVE-API
+* `EVE_CALLBACK`     -> Callback after login, set when creating the application
+* `EVE_CLIENT_ID`    -> Client ID provided by EVE when creating the application
+* `EVE_SECRET_KEY`   -> Client ID provided by EVE when creating the application
+* `REDIRECT`         -> Redirect after the user logged in.
+                        Default: `http://localhost:8080`
 
 ### Web
 

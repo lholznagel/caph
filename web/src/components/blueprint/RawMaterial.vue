@@ -1,9 +1,7 @@
 <template>
   <div>
-    <n-skeleton text :repeat="5" v-if="busy" />
-
     <n-collapse>
-      <n-collapse-item title="Asteroid" v-if="materials_asteroid.length > 0">
+      <n-collapse-item title="Asteroid">
         <blueprint-raw-material-table :materials="materials_asteroid" />
       </n-collapse-item>
 
@@ -31,7 +29,7 @@
 </template>
 
 <script lang="ts">
-import { BlueprintService, IBlueprintMaterial } from '@/services/blueprint';
+import { IBlueprintMaterial } from '@/services/blueprint';
 import { NAlert, NCard, NCollapse, NCollapseItem, NSkeleton, NTable } from 'naive-ui';
 import { Options, Vue, prop } from 'vue-class-component';
 import { ProjectService } from '@/services/project';

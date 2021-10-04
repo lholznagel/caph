@@ -1,10 +1,13 @@
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 
 const KV_NAME = 'resolve_locations';
 
 export class CharacterService {
+  private static character_name_req: any = null;
+  private static character_names: { [key: number]: string } = {};
+
   public static async info(): Promise<ICharacter> {
-    return (await axios.get('/api/whoami')).data;
+    return (await axios.get('/api/auth/whoami')).data;
   }
 
   public static async alts(): Promise<ICharacter[]> {
@@ -15,8 +18,17 @@ export class CharacterService {
     return (await axios.get('/api/character/ids')).data;
   }
 
-  public static async char_name(id: number): Promise<string> {
-    return (await axios.get(`/api/character/${id}/name`)).data;
+  public static async character_name(cid: number): Promise<string> {
+    if (this.character_names[cid]) {
+      return this.character_names[cid];
+    } else if (this.character_name_req) {
+      return this.character_name_req;
+    } else {
+      this.character_name_req = axios.get(`/api/character/${cid}/name`);
+      this.character_names[cid] = (await this.character_name_req).data;
+      this.character_name_req = null;
+      return this.character_names[cid];
+    }
   }
 
 

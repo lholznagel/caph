@@ -41,6 +41,8 @@ mod macros;
 mod reprocess;
 /// Module for handling schematics
 mod schematic;
+/// Module for handling stations
+mod station;
 /// Module contains the wrapper for managing the SDE.zip
 mod zip;
 
@@ -51,6 +53,7 @@ pub use self::client::*;
 pub use self::error::*;
 pub use self::reprocess::*;
 pub use self::schematic::*;
+pub use self::station::*;
 pub use self::zip::*;
 
 use serde::{Deserialize, Serialize};

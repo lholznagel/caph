@@ -3,11 +3,19 @@ import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
-    redirect: '/settings'
+    redirect: '/characters'
   },
   {
     path: '/assets',
     name: 'assets',
+    component: () => import(
+      /* webpackChunkName: "assets" */
+      '@/views/Assets.vue'
+    )
+  },
+  {
+    path: '/assets/:tid/:iid?',
+    name: 'asset_details',
     component: () => import(
       /* webpackChunkName: "assets" */
       '@/views/Assets.vue'
@@ -22,7 +30,7 @@ const routes: Array<RouteRecordRaw> = [
     )
   },
   {
-    path: '/blueprint/:bid/:iid?',
+    path: '/blueprint/:tid/:iid?',
     name: 'blueprint',
     component: () => import(
       /* webpackChunkName: "blueprintInfo" */
@@ -62,11 +70,11 @@ const routes: Array<RouteRecordRaw> = [
     )
   },
   {
-    path: '/settings',
-    name: 'settings',
+    path: '/characters',
+    name: 'characters',
     component: () => import(
-      /* webpackChunkName: "settings" */
-      '@/views/Settings.vue'
+      /* webpackChunkName: "settings_characters" */
+      '@/views/SettingCharacters.vue'
     )
   },
   {

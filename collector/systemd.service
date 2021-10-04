@@ -2,14 +2,14 @@
 Description=Caph data collector
 
 [Service]
-Type=simple
-
 Environment=RUST_BACKTRACE=1
+Environment=COLLECTOR_BIND_ADDR=
 Environment=DATABASE_URL=
 Environment=EVE_USER_AGENT=
 Environment=EVE_CLIENT_ID=
 Environment=EVE_SECRET_KEY=
 
+Type=simple
 ExecStart=/opt/caph/collector
 Restart=always
 

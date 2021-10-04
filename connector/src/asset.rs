@@ -4,7 +4,7 @@ use crate::zip::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Wrapper for reprocessing material
+/// Wrapper for all type and group ids
 pub struct ConnectAssetService {
     /// All type id entries that are in the file
     type_ids:  HashMap<TypeId, TypeIdEntry>,

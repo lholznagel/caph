@@ -54,6 +54,28 @@ impl ConnectCharacterService {
             .map_err(Into::into)
     }
 
+    /// Fetches all item names of an character
+    ///
+    /// # Errors
+    ///
+    /// Fails when the server returns an error or parsing the response fails
+    ///
+    /// # Returns
+    ///
+    /// List of all assets
+    ///
+    pub async fn asset_name(
+        &self,
+        iids: Vec<ItemId>
+    ) -> Result<Vec<CharacterAssetName>, ConnectError> {
+        let path = format!("characters/{}/assets/names", self.cid);
+        self
+            .client
+            .post::<_, Vec<CharacterAssetName>>(iids, &path)
+            .await
+            .map_err(Into::into)
+    }
+
     /// Gets a list of all player owned bluepritns
     ///
     /// # Errors
@@ -172,13 +194,24 @@ pub struct CharacterInfo {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CharacterAssetEntry {
     /// Unique ID of the asset
-    pub item_id:     ItemId,
+    pub item_id:       ItemId,
     /// Id of the location the asset is located in
-    pub location_id: LocationId,
+    pub location_id:   LocationId,
+    /// Location of the item
+    pub location_flag: String,
     /// Number of assets
-    pub quantity:    i32,
+    pub quantity:      i32,
     /// Type id of the asset
-    pub type_id:     TypeId,
+    pub type_id:       TypeId,
+}
+
+/// Name of an asset that belongs to an character
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct CharacterAssetName {
+    /// Id of the asset
+    pub item_id: ItemId,
+    /// Name of the asset
+    pub name:    String,
 }
 
 /// Represents a single character blueprint

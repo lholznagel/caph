@@ -3,50 +3,43 @@
     <tbody>
       <tr>
         <td>Blueprint Location</td>
-        <td><location v-if="cbp.location_id" :lid="cbp.location_id" /></td>
+        <td><!--location v-if="cbp.location_id" :lid="cbp.location_id" /--></td>
       </tr>
-      <tr>
+      <tr v-if="bp_product && bp_product[0]">
         <td>Produces</td>
-        <td>
-          <name-by-id
-            v-if="bp.manufacture.products"
-            :id="bp.manufacture.products[0].mid"
-          />
-        </td>
+        <td>{{ bp_product[0].name }}</td>
       </tr>
-      <tr>
+      <tr v-if="bp_product && bp_product[0]">
         <td>Production quantity</td>
-        <td v-if="bp.manufacture.products">
-          {{ bp.manufacture.products[0].quantity }}
+        <td>
+          {{ bp_product[0].quantity }}
         </td>
       </tr>
       <tr>
         <td>Material Efficiency</td>
-        <td>{{ cbp.material_efficiency }}</td>
+        <td>{{ bp.material_efficiency }}</td>
       </tr>
       <tr>
         <td>Time efficiency</td>
-        <td>{{ cbp.time_efficiency }}</td>
+        <td>{{ bp.time_efficiency }}</td>
       </tr>
       <tr>
         <td>Runs</td>
-        <td>{{ cbp.runs === -1 ? '∞' : cbp.runs }}</td>
+        <td>{{ bp.runs === -1 ? '∞' : bp.runs }}</td>
       </tr>
       <tr>
         <td>Type</td>
         <td>
           <n-tag
-            :type="cbp.quantity === -2 ? 'warning' : 'info'"
+            :type="bp.quantity === -2 ? 'warning' : 'info'"
           >
-            {{ cbp.quantity === -2 ? 'Copy' : 'Original' }}
+            {{ bp.quantity === -2 ? 'Copy' : 'Original' }}
           </n-tag>
         </td>
       </tr>
-      <tr>
-        <td>Owner</td>
-        <td><owner v-if="cbp.user_id" :ids="[cbp.user_id]" /></td>
-      </tr>
     </tbody>
+
+    {{ bp_product[0] }}
   </n-table>
 </template>
 
@@ -59,16 +52,17 @@ import ItemIcon from '@/components/ItemIcon.vue';
 import Location from '@/components/Location.vue';
 import NameById from '@/components/NameById.vue';
 import Owner from '@/components/Owner.vue';
+import { AssetService, IBlueprintMaterial } from '@/services/asset';
 
 class Props {
   // IBlueprint object
   bp = prop({
-    type: Object,
+    type:     Object,
     required: true,
   });
-  // ICharacterBlueprint object
-  cbp = prop({
-    type: Object,
+
+  bp_product = prop({
+    type:     Object,
     required: true,
   });
 }
@@ -89,5 +83,9 @@ class Props {
     Owner,
   }
 })
-export default class BlueprintItemInfo extends Vue.with(Props) {  }
+export default class BlueprintItemInfo extends Vue.with(Props) {
+  public mounted() {
+    console.log(this.bp_product)
+  }
+}
 </script>

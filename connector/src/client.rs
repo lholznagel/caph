@@ -3,8 +3,9 @@ use crate::CharacterId;
 use async_trait::*;
 use reqwest::{Client, Response, StatusCode};
 use serde::de::DeserializeOwned;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 use url::Url;
 
@@ -57,6 +58,32 @@ pub trait RequestClient {
         path: &str
     ) -> Result<Vec<T>, ConnectError>
     where T: DeserializeOwned + Send;
+
+    /// Makes a post request to the given path and returns parses the result
+    /// the given struct.
+    ///
+    /// # Params
+    ///
+    /// * `T`    -> Model that represents the resulting json
+    /// * `data` -> Request model
+    /// * `path` -> Path of the request
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if eiher the request failed or the parsing failed
+    ///
+    /// # Returns
+    ///
+    /// Parsed json data
+    ///
+    async fn post<R, T>(
+        &self,
+        data: R,
+        path: &str
+    ) -> Result<T, ConnectError>
+    where
+        R: Debug + Serialize + Send + Sync,
+        T: DeserializeOwned;
 }
 
 /// Client for communicating with the EVE-API.
@@ -242,6 +269,18 @@ impl RequestClient for EveClient {
         }
 
         Ok(fetched_data)
+    }
+
+    async fn post<R, T>(
+        &self,
+        _data: R,
+        _path: &str
+    ) -> Result<T, ConnectError>
+    where
+        R: Debug + Serialize + Send + Sync,
+        T: DeserializeOwned {
+
+        unimplemented!()
     }
 }
 
@@ -523,7 +562,7 @@ impl EveAuthClient {
         Ok(())
     }
 
-    /// Sends a request to the given path setting the current `access_token`
+    /// Sends a GET request to the given path setting the current `access_token`
     /// as `bearer_auth`.
     ///
     /// If a request failes with a non successfull status, it will retry the
@@ -573,6 +612,88 @@ impl EveAuthClient {
             let response = self
                 .client
                 .get(path)
+                .bearer_auth(token)
+                .send()
+                .await
+                .map_err(ConnectError::ReqwestError)?;
+
+            if response.status() == StatusCode::UNAUTHORIZED {
+                self.refresh_token().await?;
+                continue;
+            }
+
+            if !response.status().is_success() {
+                retry_counter += 1;
+                tracing::error!(
+                    { retry = retry_counter, status = response.status().as_u16() },
+                    "Fetch resulted in non successful status code.",
+                );
+                continue;
+            }
+
+            return Ok(response)
+        }
+    }
+
+    /// Sends a POST request to the given path setting the current
+    /// `access_token` as `bearer_auth`.
+    ///
+    /// If a request failes with a non successfull status, it will retry the
+    /// request again, up to 3 times.
+    ///
+    /// # Params
+    ///
+    /// * `data` -> Data to send in the body
+    /// * `path` -> Path for the request
+    ///
+    /// # Errors
+    ///
+    /// The function errors if too many request failed, or if there is a general
+    /// error with the requesting library.
+    ///
+    /// If the EVE-API returns [StatusCode::UNAUTHORIZED] it will attempt to
+    /// retriev a new `access_token`. If that fails an error is returned.
+    ///
+    /// # Returns
+    ///
+    /// Response of the request, ready to work with
+    ///
+    #[tracing::instrument(level = "debug")]
+    async fn send_post<R>(
+        &self,
+        data: R,
+        path: &str
+    ) -> Result<Response, ConnectError>
+    where
+        R: Debug + Serialize + Send + Sync {
+
+        let access_token = {
+            #[allow(clippy::unwrap_used)]
+            self.access_token.lock().unwrap().clone()
+        };
+        let access_token = if access_token.is_none() {
+            self.refresh_token().await?;
+            #[allow(clippy::unwrap_used)]
+            self.access_token.lock().unwrap().clone()
+        } else {
+            access_token
+        };
+
+        let mut retry_counter = 0usize;
+
+        loop {
+            if retry_counter == 3 {
+                tracing::error!("Too many retries requesting {}.", path);
+                return Err(ConnectError::TooManyRetries(path.into()));
+            }
+
+            let token = access_token
+                .as_ref()
+                .expect("We check but somehow the access_token is still None");
+            let response = self
+                .client
+                .post(path)
+                .json(&data)
                 .bearer_auth(token)
                 .send()
                 .await
@@ -682,6 +803,25 @@ impl RequestClient for EveAuthClient {
         }
 
         Ok(fetched_data)
+    }
+
+    #[tracing::instrument(level = "debug")]
+    async fn post<R, T>(
+        &self,
+        data: R,
+        path: &str
+    ) -> Result<T, ConnectError>
+    where
+        R: Debug + Serialize + Send + Sync,
+        T: DeserializeOwned {
+
+        let path = format!("{}/{}", Self::EVE_API_URL, path);
+        let json = self.send_post(data, &path)
+            .await?
+            .json::<T>()
+            .await
+            .map_err(ConnectError::ReqwestError)?;
+        Ok(json)
     }
 }
 

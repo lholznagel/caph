@@ -1,14 +1,16 @@
 <template>
   <n-card>
     <template #header>
-      <name-by-id :id="Number($route.params.bid)" />
+      {{ bp.name }}
     </template>
 
     <n-tabs type="line">
-      <n-tab-pane name="Item info" :disabled="!cbp.item_id">
-        <blueprint-info :bp="bp" :cbp="cbp" v-if="cbp.item_id" />
+      <!--n-tab-pane name="Item info" :disabled="!bp.item_id"-->
+      <n-tab-pane name="Item info">
+        <!--blueprint-info :bp="bp" v-if="cbp.item_id" /-->
+        <blueprint-info :bp="bp" :bp_product="bp_product" />
       </n-tab-pane>
-      <n-tab-pane name="Copy" :disabled="!bp.copy">
+      <!--n-tab-pane name="Copy" :disabled="!bp.copy">
         <blueprint-action :action="bp.copy" v-if="bp.copy" />
       </n-tab-pane>
       <n-tab-pane name="Invention" :disabled="!bp.invention">
@@ -25,7 +27,7 @@
       </n-tab-pane>
       <n-tab-pane name="Research Time" :disabled="!bp.research_time">
         <blueprint-action :action="bp.research_time" />
-      </n-tab-pane>
+      </n-tab-pane-->
     </n-tabs>
   </n-card>
 </template>
@@ -33,9 +35,7 @@
 <script lang="ts">
 import { Options, Vue } from 'vue-class-component';
 import { NCard, NTabs, NTabPane } from 'naive-ui';
-import { BlueprintService, IBlueprint } from '@/services/blueprint';
-import { AssetService, IBlueprint as ICharacterBlueprint } from
-'@/services/asset';
+import { AssetService, IBlueprint, IBlueprintMaterial } from '@/services/asset';
 
 import BlueprintAction from '@/components/blueprint/Action.vue';
 import BlueprintInfo from '@/components/blueprint/Info.vue';
@@ -53,23 +53,24 @@ import NameById from '@/components/NameById.vue';
   }
 })
 export default class Blueprint extends Vue {
-  public bid: any = undefined;
+  public tid: any = undefined;
   public iid: any = undefined;
 
-  public bp:  {} | IBlueprint          = {};
-  public cbp: {} | ICharacterBlueprint = {};
+  public bp: {} | IBlueprint = {};
+  public bp_product: IBlueprintMaterial[] = [];
 
   // Requires a bid -> BlueprintId
   // Optional a iid -> ItemId
   public async created() {
-    this.bid = Number(this.$route.params.bid);
+    this.tid = Number(this.$route.params.tid);
     this.iid = Number(this.$route.params.iid);
 
-    this.bp = await BlueprintService.blueprint(this.bid);
-    if (this.iid) {
-      this.cbp = (await AssetService.blueprints())
-        .find((x: ICharacterBlueprint) => x.item_id === Number(this.iid)) || {};
-    }
+    console.log(this.iid)
+    this.bp = await AssetService.blueprint(
+      this.tid,
+      this.iid === 0 ? null : this.iid
+    );
+    this.bp_product = await AssetService.blueprint_product(this.tid);
   }
 }
 </script>

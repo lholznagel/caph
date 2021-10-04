@@ -1,5 +1,5 @@
 <template>
-  <n-table v-if="materials.length > 0">
+  <n-table>
     <thead>
       <tr>
         <th width="48px"></th>

@@ -5,7 +5,7 @@ Description=Caph server
 Type=simple
 
 Environment=RUST_BACKTRACE=1
-Environment=BIND=
+Environment=SERVER_BIND_ADDR=
 Environment=DATABASE_URL=
 Environment=EVE_USER_AGENT=
 Environment=EVE_CALLBACK=
