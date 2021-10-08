@@ -1,46 +1,45 @@
-use crate::error::EveServerError;
+use std::str::FromStr;
 
-use cachem::ConnectionPool;
-use caph_db::{CacheName, UserEntry};
-use caph_eve_data_wrapper::{AllianceId, CharacterId, CorporationId, EveDataWrapper, EveOAuthUser};
-use caph_eve_data_wrapper::{EveClient, Url};
-use rand::prelude::*;
-use rand_chacha::ChaCha20Rng;
+use crate::error::{ServerError, internal_error};
+
+use async_trait::async_trait;
+use axum::extract::{Extension, FromRequest, RequestParts, TypedHeader};
+use axum::http::{StatusCode, Uri};
+use caph_connector::{CharacterId, EveAuthClient, EveOAuthToken};
+use headers::Cookie;
+use serde::Deserialize;
+use sqlx::PgPool;
 use uuid::Uuid;
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
-/// Describes different type of session logins
-#[derive(Debug, PartialEq)]
-enum SessionType {
-    /// Login process with the main account
-    Main,
-    /// Login process with an alt
-    /// Contains the user id of the main
-    Alt(CharacterId),
-    /// Logged in user
-    /// Contains the user id of the main
-    Logged(CharacterId)
-}
+const EVE_SCOPE: &[&'static str] = &[
+    "publicData",
+    "esi-assets.read_assets.v1",
+    "esi-characters.read_agents_research.v1",
+    "esi-characters.read_blueprints.v1",
+    "esi-characterstats.read.v1",
+    "esi-fittings.read_fittings.v1",
+    "esi-fittings.write_fittings.v1",
+    "esi-industry.read_character_jobs.v1",
+    "esi-industry.read_character_mining.v1",
+    "esi-markets.read_character_orders.v1",
+    "esi-markets.structure_markets.v1",
+    "esi-planets.manage_planets.v1",
+    "esi-search.search_structures.v1",
+    "esi-skills.read_skillqueue.v1",
+    "esi-skills.read_skills.v1",
+    "esi-universe.read_structures.v1",
+    "esi-wallet.read_character_wallet.v1",
+];
 
 #[derive(Clone)]
-pub struct EveAuthService {
-    pool:      ConnectionPool,
-    eve_data:  EveDataWrapper,
-    sessions:  Arc<Mutex<HashMap<Uuid, SessionType>>>,
+pub struct EveService {
+    pool: PgPool
 }
 
-impl EveAuthService {
-    /// Creates a new instance
-    pub fn new(
-        pool:      ConnectionPool,
-        eve_data:  EveDataWrapper,
-    ) -> Self {
+impl EveService {
+    pub fn new(pool: PgPool) -> Self {
         Self {
-            pool,
-            eve_data,
-            sessions: Arc::new(Mutex::new(HashMap::new()))
+            pool
         }
     }
 
@@ -49,62 +48,25 @@ impl EveAuthService {
     /// # Params
     ///
     /// `code`  -> Code that was send when starting the auth process
-    /// `state` -> Our unique identifier
+    /// `token` -> Our unique identifier
     ///
     /// # Returns
     ///
-    /// Returns an optional ChaCha20 64 chars generated token which should be
-    /// used as cookie.
-    /// This token is only returned when the logged in character is a main.
+    /// Returns a token that should be used as a cookie and should be send
+    /// with every request as value in the header with the key `token`.
     ///
     pub async fn auth(
         &self,
-        code:  String,
-        state: Uuid
-    ) -> Result<Option<Uuid>, EveServerError> {
-        let session_entry = {
-            // Make sure that the code is valid
-            // If the code is valid, remove it from the map
-            //
-            // Also keep the session as short as possible
-            let mut session = self.sessions
-                .lock()
-                .await;
-            if session.contains_key(&state) {
-                // Unwrap is save here, because we made sure the entry exists
-                session.remove(&state).unwrap()
-            } else {
-                return Err(EveServerError::InvalidUser);
-            }
-        };
+        code:  &str,
+        token: Uuid
+    ) -> Result<Option<Uuid>, ServerError> {
+        let character = EveAuthClient::access_token(&code).await?;
+        self.save_login(&token, character).await?;
 
-        let user = EveClient::retrieve_authorization_token(&code).await?;
-
-        if session_entry == SessionType::Main {
-            let user_token = self.generate_key();
-            self.sessions
-                .lock()
-                .await
-                .insert(user_token.clone(), SessionType::Logged(user.user_id));
-
-            self.save_login(&user_token, user).await?;
-            Ok(Some(user_token))
-        } else if let SessionType::Alt(uid) = session_entry {
-            let main = self
-                .pool
-                .acquire()
-                .await?
-                .get::<_, _, UserEntry>(CacheName::User, uid)
-                .await?;
-
-            if let Some(main) = main {
-                self.add_alt(main, user).await?;
-                Ok(None)
-            } else {
-                Err(EveServerError::InvalidUser)
-            }
+        if self.is_alt(&token).await? {
+            Ok(None)
         } else {
-            Err(EveServerError::InvalidUser)
+            Ok(Some(token))
         }
     }
 
@@ -115,288 +77,293 @@ impl EveAuthService {
     ///
     /// Uri to the eve auth server
     ///
-    pub async fn login(&self) -> Result<Url, EveServerError> {
-        let key = self.generate_key();
-        self.sessions.lock().await.insert(key.clone(), SessionType::Main);
+    pub async fn login(&self) -> Result<Uri, ServerError> {
+        let token = sqlx::query!(
+            "INSERT INTO login DEFAULT VALUES RETURNING token"
+        )
+        .fetch_one(&self.pool)
+        .await?
+        .token;
 
-        EveClient::eve_auth_url(&key.to_string())
-            .map_err(Into::into)
+        let uri = EveAuthClient::auth_uri(
+                &token.to_string(),
+                Some(&EVE_SCOPE.join(" "))
+            )?
+            .to_string()
+            .parse::<Uri>()
+            .unwrap();
+        Ok(uri)
     }
 
-    /// Creates a new unique code and returns a eve login auth uri
-    /// This function is only for alt accounts
+    /// Creates a new unqiue code for logging in an alt character
     ///
     /// # Params
     ///
-    /// `token` -> Token of the cookie from the main user
+    /// `token` -> Unique token provided by the cookie
     ///
     /// # Returns
     ///
     /// Uri to the eve auth server
     ///
-    pub async fn login_alt(&self, token: &Uuid) -> Result<Url, EveServerError> {
-        let user = self.lookup(token).await?;
+    pub async fn login_alt(
+        &self,
+        token: Uuid
+    ) -> Result<Uri, ServerError> {
+        let character = sqlx::query!("
+                SELECT character_id
+                FROM login
+                WHERE token = $1
+            ",
+            token
+        )
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or(ServerError::InvalidUser)?
+        .character_id;
 
-        if let Some(x) = user {
-            let key = self.generate_key();
-            self.sessions.lock().await.insert(key.clone(), SessionType::Alt(x.user_id));
+        let token = sqlx::query!("
+            INSERT INTO login (character_main)
+            VALUES ($1)
+            RETURNING token
+        ", character)
+        .fetch_one(&self.pool)
+        .await?
+        .token;
 
-            EveClient::eve_auth_url(&key.to_string())
-                .map_err(Into::into)
-        } else {
-            Err(EveServerError::InvalidUser)
-        }
+        let uri = EveAuthClient::auth_uri(
+                &token.to_string(),
+                Some(&EVE_SCOPE.join(" "))
+            )?
+            .to_string()
+            .parse::<Uri>()
+            .unwrap();
+        Ok(uri)
     }
 
-    /// Looksup a user by its id
+    /// Gets a list of alts for the given [CharacterId]
     ///
     /// # Params
     ///
-    /// `token` -> Token of the user to lookup
+    /// * `cid` -> [CharacterId] of the requesting character
     ///
-    pub async fn lookup(
+    /// # Returns
+    ///
+    /// List of [CharacterId] inculding the main and all alts
+    ///
+    pub async fn alts(
         &self,
-        token: &Uuid,
-    ) -> Result<Option<UserEntry>, EveServerError> {
-        let uid = self
-            .sessions
-            .lock()
-            .await;
-        let uid = uid.get(token);
+        cid: CharacterId
+    ) -> Result<Vec<CharacterId>, ServerError> {
+        let mut alts = sqlx::query!("
+                SELECT DISTINCT character_id
+                FROM login
+                WHERE character_main = $1 AND character_id IS NOT NULL
+            ", *cid as i32)
+            .fetch_all(&self.pool)
+            .await?
+            .into_iter()
+            .map(|x| x.character_id)
+            .map(|x| x.unwrap().into())
+            .collect::<Vec<CharacterId>>();
+        alts.push(cid);
+        Ok(alts)
+    }
 
-        if let Some(SessionType::Logged(x)) = uid {
-            self
-                .pool
-                .acquire()
-                .await?
-                .get::<_, _, UserEntry>(CacheName::User, *x)
-                .await
-                .map_err(Into::into)
+    pub async fn refresh_token(
+        &self,
+        cid:   &CharacterId,
+        token: &Uuid,
+    ) -> Result<String, ServerError> {
+        let refresh_token = sqlx::query!("
+                SELECT refresh_token
+                FROM login
+                WHERE character_id = $1
+                  AND token        = $2
+            ", **cid, token)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|_| ServerError::InvalidUser)?
+            .refresh_token
+            .ok_or(ServerError::InvalidUser)?;
+        Ok(refresh_token)
+    }
+
+    /// Gets the character id from the database
+    ///
+    /// # Parameters
+    ///
+    /// * `token` -> Token provided by the cookie
+    ///
+    /// # Returns
+    ///
+    /// Character id of the logged in character
+    ///
+    async fn character_id(
+        &self,
+        token: &Uuid
+    ) -> Result<CharacterId, ServerError> {
+        let character = sqlx::query!("
+                SELECT character_id
+                FROM login
+                WHERE token = $1
+            ",
+            token
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        if let Some(x) = character {
+            if let Some(id) = x.character_id {
+                Ok(id.into())
+            } else {
+                Err(ServerError::InvalidUser)
+            }
         } else {
-            Ok(None)
+            Err(ServerError::InvalidUser)
         }
-    }
-
-    /// Requests a new refresh token from the eve auth server
-    ///
-    /// # Param
-    ///
-    /// `token` -> Token of the user
-    ///
-    /// # Returns
-    ///
-    /// New oauth user
-    ///
-    pub async fn refresh_token(&self, token: &Uuid) -> Result<EveOAuthUser, EveServerError> {
-        let oauth = self
-            .lookup(&token)
-            .await?
-            .ok_or(EveServerError::InvalidUser)?;
-        let oauth = EveClient::retrieve_refresh_token(&oauth.refresh_token)
-            .await
-            .map_err(EveServerError::from)?;
-
-        self.save_login(token, oauth.clone()).await?;
-
-        Ok(oauth)
-    }
-
-    /// Requests a new refresh token for an alt from the eve auth server
-    ///
-    /// # Param
-    ///
-    /// `token` -> Token of the user
-    /// `uid`   -> Userid of the alt
-    ///
-    /// # Returns
-    ///
-    /// New oauth user
-    ///
-    pub async fn refresh_token_alt(
-        &self,
-        token: &Uuid,
-        uid:   CharacterId,
-    ) -> Result<EveOAuthUser, EveServerError> {
-        let oauth = self
-            .lookup(&token)
-            .await?
-            .ok_or(EveServerError::InvalidUser)?;
-        let oauth = oauth
-            .aliase
-            .iter()
-            .find(|x| x.user_id == uid)
-            .ok_or(EveServerError::InvalidUser)?;
-        let oauth = EveClient::retrieve_refresh_token(&oauth.refresh_token)
-            .await
-            .map_err(EveServerError::from)?;
-
-        self.save_login_alt(token, oauth.clone()).await?;
-
-        Ok(oauth)
     }
 
     /// Saves the main character in the database
     ///
     /// # Params
     ///
+    /// `token`     -> Token for identifying the character
     /// `character` -> Character with access_token and refresh_token
     ///
     async fn save_login(
         &self,
         token:     &Uuid,
-        character: EveOAuthUser
-    ) -> Result<(), EveServerError> {
-        if let Some(x) = self.lookup(&token).await? {
-            let user = UserEntry {
-                access_token: character.access_token,
-                refresh_token: character.refresh_token,
-                ..x
-            };
-            self.save_user(user).await?;
-        } else {
-            let character_service = self.eve_data.character().await?;
-            let character_info = character_service
-                .character(character.user_id)
-                .await?;
-            let alliance_name = self.alliance_name(character.alliance_id).await?;
-            let corp_name = self.corp_name(character.corp_id).await?;
+        character: EveOAuthToken
+    ) -> Result<(), ServerError> {
+        let character_id = character.character_id()?;
 
-            let user = UserEntry {
-                access_token: character.access_token,
-                refresh_token: character.refresh_token,
-                alliance_id: character.alliance_id,
-                alliance_name,
-                user_id: character.user_id,
-                user_name: character_info.name,
-                corp_id: character.corp_id,
-                corp_name,
-                aliase: Vec::new(),
-            };
-            self.save_user(user).await?;
-        }
+        sqlx::query!("
+            DELETE FROM login WHERE character_id = $1
+        ", *character_id)
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query!("
+                UPDATE login
+                SET
+                    character_id = $1,
+                    access_token = $2,
+                    refresh_token = $3,
+                    expire_date = NOW() + interval '1199' second
+                WHERE token = $4
+            ",
+            *character_id,
+            character.access_token,
+            character.refresh_token,
+            token
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|_| ServerError::InvalidUser)?;
 
         Ok(())
     }
 
-    /// Updates an alt of a main char
+    /// Checks if a new login is an alt or not
     ///
     /// # Params
     ///
-    /// `character` -> Character with access_token and refresh_token
+    /// `token` -> Unique token to identify the character
     ///
-    async fn save_login_alt(
+    /// # Returns
+    ///
+    /// * `true`  -> The character is an alt
+    /// * `false` -> The character is not an alt
+    ///
+    async fn is_alt(
         &self,
-        token:     &Uuid,
-        character: EveOAuthUser
-    ) -> Result<(), EveServerError> {
-        let character_service = self.eve_data.character().await?;
-        let mut main = self
-            .lookup(&token)
+        token: &Uuid
+    ) -> Result<bool, ServerError> {
+        let is_alt = sqlx::query!("
+                SELECT character_main
+                FROM login
+                WHERE token = $1
+            ", token)
+            .fetch_one(&self.pool)
             .await?
-            .ok_or(EveServerError::InvalidUser)?;
-
-        for alias in main
-                        .aliase
-                        .iter_mut()
-                        .find(|x| x.user_id == character.user_id) {
-
-            let character_info = character_service
-                .character(character.user_id)
-                .await?;
-            let alliance_name = self.alliance_name(character.alliance_id).await?;
-            let corp_name = self.corp_name(character.corp_id).await?;
-
-            *alias = UserEntry {
-                access_token: character.access_token.clone(),
-                refresh_token: character.refresh_token.clone(),
-                alliance_id: character.alliance_id,
-                alliance_name,
-                user_id: character.user_id,
-                user_name: character_info.name,
-                corp_id: character.corp_id,
-                corp_name,
-                aliase: Vec::new(),
-            };
-        }
-
-        self.save_user(main).await?;
-        Ok(())
-    }
-
-    /// Saves the given user entry in the database
-    ///
-    /// # Params
-    ///
-    /// `user` -> User to save
-    ///
-    async fn save_user(
-        &self,
-        user: UserEntry
-    ) -> Result<(), EveServerError> {
-        self
-            .pool
-            .acquire()
-            .await?
-            .set(CacheName::User, user.user_id, user)
-            .await
-            .map_err(Into::into)
-    }
-
-    /// Adds a new alt to a main
-    ///
-    /// # Params
-    ///
-    /// `main` -> User entry of the main account
-    /// `alt`  -> User entry of the alt account
-    ///
-    async fn add_alt(
-        &self,
-        main: UserEntry,
-        alt:  EveOAuthUser,
-    ) -> Result<(), EveServerError> {
-        let character_service = self.eve_data.character().await?;
-        let character_info = character_service
-            .character(alt.user_id)
-            .await?;
-        let alliance_name = self.alliance_name(alt.alliance_id).await?;
-        let corp_name = self.corp_name(alt.corp_id).await?;
-        let alt = UserEntry {
-            access_token: alt.access_token,
-            refresh_token: alt.refresh_token,
-            alliance_id: alt.alliance_id,
-            alliance_name,
-            user_id: alt.user_id,
-            user_name: character_info.name,
-            corp_id: alt.corp_id,
-            corp_name,
-            aliase: Vec::new(),
-        };
-
-        let mut main = main;
-        main.aliase.push(alt);
-        self.save_user(main).await
-    }
-
-    async fn alliance_name(
-        &self,
-        aid: AllianceId
-    ) -> Result<String, EveServerError> {
-        let character_service = self.eve_data.character().await?;
-        Ok(character_service.alliance_name(aid).await?)
-    }
-
-    async fn corp_name(
-        &self,
-        cid: CorporationId
-    ) -> Result<String, EveServerError> {
-        let character_service = self.eve_data.character().await?;
-        Ok(character_service.corporation_name(cid).await?)
-    }
-
-    /// Could be safer, but its good enough for out use case
-    fn generate_key(&self) -> Uuid {
-        let val: u128 = ChaCha20Rng::from_entropy().gen();
-        Uuid::from_u128(val)
+            .character_main
+            .is_some();
+        Ok(is_alt)
     }
 }
 
+/// Login query that is send by the eve auth servers
+#[derive(Debug, Deserialize)]
+pub struct EveAuthQuery {
+    pub code:  String,
+    pub state: Uuid,
+}
+
+pub struct LoggedInCharacter {
+    token:         Uuid,
+    eve_service:   EveService,
+}
+
+impl LoggedInCharacter {
+    pub fn new(token: Uuid, eve_service: EveService) -> Self {
+        Self {
+            token,
+            eve_service
+        }
+    }
+
+    pub async fn eve_auth_client(&self) -> Result<EveAuthClient, ServerError> {
+        let refresh_token = self.eve_service.refresh_token(
+            &self.character_id().await?,
+            &self.token
+        )
+        .await?;
+
+        let client = EveAuthClient::new(refresh_token)?;
+        Ok(client)
+    }
+
+    /// Gets the character id of requesting character
+    ///
+    /// # Returns
+    ///
+    /// Character id of the logged in character
+    ///
+    pub async fn character_id(&self) -> Result<CharacterId, ServerError> {
+        self.eve_service.character_id(&self.token).await
+    }
+
+    /// Gets all logged in alts for a character
+    ///
+    /// # Returns
+    ///
+    /// Character id of the logged in character
+    ///
+    pub async fn character_alts(&self) -> Result<Vec<CharacterId>, ServerError> {
+        let character_id = self.character_id().await?;
+        self.eve_service.alts(character_id).await
+    }
+}
+
+#[async_trait]
+impl<B> FromRequest<B> for LoggedInCharacter
+where
+    B: Send,
+{
+    type Rejection = (StatusCode, String);
+
+    async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
+        let token = TypedHeader::<Cookie>::from_request(req)
+            .await
+            .map_err(internal_error)?
+            .get("token")
+            .map(Uuid::from_str)
+            .ok_or((StatusCode::BAD_REQUEST, "".into()))?
+            .map_err(|_| (StatusCode::BAD_REQUEST, "".into()))?;
+        let Extension(eve_service) = Extension::<EveService>::from_request(req)
+            .await
+            .map_err(internal_error)?;
+
+        Ok(Self::new(token, eve_service))
+    }
+}

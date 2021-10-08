@@ -42,5 +42,5 @@ stop:
 	sudo systemctl stop caph_collector
 
 sqlx:
-	cd collector; cargo sqlx prepare
-	cd server_v2; cargo sqlx prepare
+	cd collector; cargo sqlx prepare -- --lib
+	cd server; cargo sqlx prepare -- --lib

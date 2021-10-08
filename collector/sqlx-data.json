@@ -10,18 +10,6 @@
       "nullable": []
     }
   },
-  "07c75840b5d840cadb675e2388f9745707f61b4176bcc427edcae80142126647": {
-    "query": "\n                DELETE FROM asset WHERE character_id = ANY($1)\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4Array"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "13442451afe34fc379cd1f0d64d3964be5a6451320d31260ae9327fb1d816a09": {
     "query": "\n                INSERT INTO blueprint_skill\n                (\n                    blueprint,\n\n                    activity,\n\n                    type_id,\n                    level\n                )\n                SELECT * FROM UNNEST(\n                    $1::UUID[],\n                    $2::SMALLINT[],\n                    $3::INTEGER[],\n                    $4::INTEGER[]\n                )\n                ON CONFLICT DO NOTHING\n            ",
     "describe": {
@@ -37,6 +25,37 @@
       "nullable": []
     }
   },
+  "154ae59c6f194682d8fb850a346c2c9b011a6a918a1f842ccf7a9478f945733d": {
+    "query": "\n                INSERT INTO asset\n                (\n                    character_id,\n\n                    type_id,\n                    item_id,\n                    location_id,\n                    reference_id,\n                    quantity,\n                    location_flag\n                )\n                SELECT $1, * FROM UNNEST(\n                    $2::INTEGER[],\n                    $3::BIGINT[],\n                    $4::BIGINT[],\n                    $5::BIGINT[],\n                    $6::INTEGER[],\n                    $7::VARCHAR[]\n                )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4Array",
+          "Int8Array",
+          "Int8Array",
+          "Int8Array",
+          "Int4Array",
+          "VarcharArray"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "1ba2382509164948e7d8a996ec0cd2198d7a411f8afd5c66e4b07a44e9b8188e": {
+    "query": "\n                INSERT INTO station\n                (\n                    id,\n                    name\n                )\n                SELECT * FROM UNNEST(\n                    $1::BIGINT[],\n                    $2::VARCHAR[]\n                )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8Array",
+          "VarcharArray"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "2adcc6cc95bb4c817c723c16b2d335712a59174dc2797b9b87b293c1380f2315": {
     "query": "\n                INSERT INTO asset_blueprint\n                (\n                    item_id,\n\n                    quantity,\n                    material_efficiency,\n                    time_efficiency,\n                    runs\n                )\n                SELECT * FROM UNNEST(\n                    $1::BIGINT[],\n                    $2::INTEGER[],\n                    $3::INTEGER[],\n                    $4::INTEGER[],\n                    $5::INTEGER[]\n                )\n            ",
     "describe": {
@@ -46,22 +65,6 @@
           "Int8Array",
           "Int4Array",
           "Int4Array",
-          "Int4Array",
-          "Int4Array"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "4d6c6e8be92b9e9c89c06c36ad3bf63270457f823721069f1fdf732e218d3a07": {
-    "query": "\n                INSERT INTO asset\n                (\n                    character_id,\n\n                    item_id,\n                    location_id,\n                    quantity,\n                    type_id\n                )\n                SELECT $1, * FROM UNNEST(\n                    $2::BIGINT[],\n                    $3::BIGINT[],\n                    $4::INTEGER[],\n                    $5::INTEGER[]\n                )\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int8Array",
-          "Int8Array",
           "Int4Array",
           "Int4Array"
         ]
@@ -165,6 +168,28 @@
       "nullable": []
     }
   },
+  "ba06751fcbc5f8404673ef8743da144505003f546f886c83387367381d0141ed": {
+    "query": "\n                DELETE FROM station CASCADE\n                WHERE pos IS FALSE\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": []
+    }
+  },
+  "bb3aaa6e8e4360ce305d9d4f6551d1664498495ee339b0a3212a00970bb8c9d4": {
+    "query": "\n                DELETE FROM asset CASCADE WHERE character_id = ANY($1)\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4Array"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "bfed0a24ca4beb5c51ee9122ec9a87fd5b7917cf9460b55ff924eb3cde108852": {
     "query": "\n                SELECT character_id, refresh_token\n                FROM login\n                WHERE character_id IS NOT NULL AND refresh_token IS NOT NULL\n            ",
     "describe": {
@@ -199,12 +224,46 @@
       "nullable": []
     }
   },
+  "e001455b279afc33b8a4582f55026b9591b62fd86506ef8d5e62ea4e391f5c2e": {
+    "query": "\n                SELECT item_id\n                FROM asset\n                WHERE character_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "item_id",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "e88049b1c4ee0210a459fa200ffa99109c0c7abb17229fe0441030493f0f000d": {
     "query": "DELETE FROM blueprint CASCADE",
     "describe": {
       "columns": [],
       "parameters": {
         "Left": []
+      },
+      "nullable": []
+    }
+  },
+  "fb38b7adc8036279ca4812dac27b1952956cc9e1eaf4fe103b518994013671e2": {
+    "query": "\n                INSERT INTO asset_name\n                (\n                    character_id,\n\n                    item_id,\n                    name\n                )\n                SELECT $1, * FROM UNNEST(\n                    $2::BIGINT[],\n                    $3::VARCHAR[]\n                )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int8Array",
+          "VarcharArray"
+        ]
       },
       "nullable": []
     }

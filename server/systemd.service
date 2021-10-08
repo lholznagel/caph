@@ -1,15 +1,18 @@
 [Unit]
 Description=Caph server
-After=caph_db.service
 
 [Service]
 Type=simple
-Environment=MORGAN_COLOR=false
+
 Environment=RUST_BACKTRACE=1
-Environment=EVE_REDIRECT_URL=
+Environment=SERVER_BIND_ADDR=
+Environment=DATABASE_URL=
+Environment=EVE_USER_AGENT=
+Environment=EVE_CALLBACK=
 Environment=EVE_CLIENT_ID=
 Environment=EVE_SECRET_KEY=
-ExecStartPre=/bin/sleep 2
+Environment=REDIRECT=
+
 ExecStart=/opt/caph/caph_server
 Restart=always
 

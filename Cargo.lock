@@ -185,6 +185,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "caph_server"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "caph_connector",
+ "chrono",
+ "dotenv",
+ "headers",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.70"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1303,25 +1322,6 @@ dependencies = [
  "indexmap",
  "serde",
  "yaml-rust",
-]
-
-[[package]]
-name = "server_v2"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "axum",
- "caph_connector",
- "chrono",
- "dotenv",
- "headers",
- "serde",
- "serde_json",
- "sqlx",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]
