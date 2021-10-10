@@ -1,8 +1,12 @@
 mod asset;
 mod auth;
 mod character;
+mod industry;
+mod item;
+mod project;
+mod universe;
 
-use crate::asset::AssetService;
+use crate::{ItemService, ProjectService, UniverseService, AssetService, IndustryService};
 use crate::character::CharacterService;
 use crate::error::ServerError;
 use crate::eve::EveService;
@@ -33,7 +37,11 @@ const SERVER_BIND_ADDR: &str = "SERVER_BIND_ADDR";
 pub async fn start(
     asset_service:     AssetService,
     character_service: CharacterService,
-    eve_service:       EveService
+    eve_service:       EveService,
+    industry_service:  IndustryService,
+    item_service:      ItemService,
+    project_service:   ProjectService,
+    universe_service:  UniverseService,
 ) -> Result<(), ServerError> {
     let app = Router::new()
         .nest("/api",
@@ -41,10 +49,18 @@ pub async fn start(
                     .nest("/asset", asset::router())
                     .nest("/auth", auth::router())
                     .nest("/character", character::router())
+                    .nest("/industry", universe::router())
+                    .nest("/item", item::router())
+                    .nest("/project", project::router())
+                    .nest("/universe", universe::router())
         )
         .layer(AddExtensionLayer::new(asset_service))
         .layer(AddExtensionLayer::new(character_service))
         .layer(AddExtensionLayer::new(eve_service))
+        .layer(AddExtensionLayer::new(industry_service))
+        .layer(AddExtensionLayer::new(item_service))
+        .layer(AddExtensionLayer::new(project_service))
+        .layer(AddExtensionLayer::new(universe_service))
         .into_make_service();
 
     let bind = std::env::var(SERVER_BIND_ADDR)

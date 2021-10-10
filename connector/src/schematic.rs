@@ -65,6 +65,41 @@ pub struct SchematicEntry {
     pub types:      HashMap<TypeId, SchematicType>,
 }
 
+impl SchematicEntry {
+    /// Gets the product of the scheamtic
+    ///
+    /// # Returns
+    ///
+    /// TypeId of the product
+    ///
+    pub fn product(&self) -> (TypeId, SchematicType) {
+        // FIXME: clone and into_iter
+        self
+            .types
+            .clone()
+            .into_iter()
+            .find(|(_, x)| !x.is_input)
+            .map(|(x, y)| (x, y))
+            .unwrap()
+    }
+
+    /// Gets all required materials of the scheamtic
+    ///
+    /// # Returns
+    ///
+    /// TypeIds of all required materials
+    ///
+    pub fn materials(&self) -> HashMap<TypeId, SchematicType> {
+        // FIXME: clone and into_iter
+        self
+            .types
+            .clone()
+            .into_iter()
+            .filter(|(_, x)| x.is_input)
+            .collect::<HashMap<_, _>>()
+    }
+}
+
 /// Represents a single input or output item
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

@@ -2,50 +2,35 @@
   <div>
     <n-skeleton text :repeat="5" v-if="busy" />
 
-    <n-table v-if="!busy && blueprints.length > 0">
+    <n-table v-if="!busy">
       <thead>
         <tr>
-          <th width="48px"></th>
-          <th>Resource</th>
-          <th></th>
-          <th>Material Efficiency</th>
-          <th>Time Efficiency</th>
+          <th width="34"></th>
+          <th width="500">Name</th>
+          <th width="200">Status</th>
+          <th>Location</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="blueprint in blueprints" :key="blueprint.bpid">
-          <td><item-icon :id="blueprint.bpid" type="bp" /></td>
-          <td><name-by-id :id="blueprint.bpid" /></td>
+        <tr v-for="entry in entries" :key="entry.type_id">
           <td>
-            <n-tag v-if="blueprint.stored">Stored</n-tag>
-            <n-tag v-if="blueprint.invention">Invention stored</n-tag>
-
-            <n-tag
-              v-if="blueprint.product"
-              type="success"
-            >
-              Product stored
-            </n-tag>
-            <n-tag
-              v-if="blueprint.product_invention"
-              type="success"
-            >
-              Invention product stored
-            </n-tag>
-            <n-tag
-              v-if="
-              blueprint.stored &&
-                (blueprint.mat_eff === unknown ||
-                 blueprint.mat_eff !== 10 ||
-                 blueprint.time_eff === unknown ||
-                 blueprint.time_eff !== 20)"
-              type="warning"
-            >
-              Not fully researched
-            </n-tag>
+            <item-icon
+              type="bp"
+              :id="entry.type_id"
+              :width="32"
+            />
           </td>
-          <td>{{ blueprint.mat_eff  ? blueprint.mat_eff  : '' }}</td>
-          <td>{{ blueprint.time_eff ? blueprint.time_eff : '' }}</td>
+          <td>{{ entry.name }}</td>
+          <td>
+            <n-tag v-if="entry.status === 'STORED'" type="success">Stored</n-tag>
+            <n-tag v-if="entry.status === 'MISSING'" type="error">Missing</n-tag>
+          </td>
+          <td v-if="entry.container_id">
+            <asset-name :id="entry.container_id" />
+            (<station-name :id="entry.location_id" />)
+          </td>
+          <td v-if="!entry.container_id">
+          </td>
         </tr>
       </tbody>
     </n-table>
@@ -53,41 +38,57 @@
 </template>
 
 <script lang="ts">
-import { NAlert, NCard, NSkeleton, NTable, NTag } from 'naive-ui';
 import { Options, Vue, prop } from 'vue-class-component';
-import { IProjectBlueprint, ProjectService } from '@/services/project';
+import { NSkeleton, NTable, NTag } from 'naive-ui';
+import { ProjectService, IProjectRequiredBlueprint } from '@/services/project';
 
+import AssetName from '@/components/AssetName.vue';
 import ItemIcon from '@/components/ItemIcon.vue';
-import NameById from '@/components/NameById.vue';
+import StationName from '@/components/StationName.vue';
 
 class Props {
-  // Project id
+  // Project uuid
   pid = prop({
-    type: String,
+    type:     String,
     required: true,
   });
 }
 
 @Options({
   components: {
-    NAlert,
-    NCard,
     NSkeleton,
     NTable,
     NTag,
 
+    AssetName,
     ItemIcon,
-    NameById,
+    StationName,
   }
 })
 export default class ProjectRequiredBlueprints extends Vue.with(Props) {
   public busy: boolean = false;
 
-  public blueprints: IProjectBlueprint[] = [];
+  public entries: IProjectRequiredBlueprint[] = [];
 
   public async created() {
     this.busy = true;
-    this.blueprints = (await ProjectService.blueprints(this.pid));
+
+    this.entries = await ProjectService.required_blueprints(this.pid);
+    let stored_materials = await ProjectService.stored_materials(this.pid);
+
+    for (let entry of this.entries) {
+      let material = stored_materials
+        .find(x => x.type_id === entry.type_id);
+
+      if (material) {
+        entry.status       = 'STORED';
+        entry.container_id = material.container_id;
+        entry.location_id  = <number>material.location_id;
+      } else {
+        entry.status = 'MISSING';
+      }
+    }
+
     this.busy = false;
   }
 }

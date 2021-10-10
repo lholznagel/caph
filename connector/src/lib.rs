@@ -43,8 +43,24 @@ mod reprocess;
 mod schematic;
 /// Module for handling stations
 mod station;
+/// Module for handling systems
+mod system;
+/// Module for handling unique names
+mod unique_name;
 /// Module contains the wrapper for managing the SDE.zip
 mod zip;
+
+/// Collects all services under one import
+pub mod services {
+    pub use crate::asset::ConnectAssetService;
+    pub use crate::blueprint::ConnectBlueprintService;
+    pub use crate::character::ConnectCharacterService;
+    pub use crate::reprocess::ConnectReprocessService;
+    pub use crate::schematic::ConnectSchematicService;
+    pub use crate::station::ConnectStationService;
+    pub use crate::system::ConnectSystemService;
+    pub use crate::unique_name::ConnectUniqueNameService;
+}
 
 pub use self::asset::*;
 pub use self::blueprint::*;
@@ -54,6 +70,8 @@ pub use self::error::*;
 pub use self::reprocess::*;
 pub use self::schematic::*;
 pub use self::station::*;
+pub use self::system::*;
+pub use self::unique_name::*;
 pub use self::zip::*;
 
 use serde::{Deserialize, Serialize};
@@ -64,5 +82,8 @@ eve_id!(CharacterId, i32);
 eve_id!(CorporationId, i32);
 eve_id!(GroupId, i32);
 eve_id!(ItemId, i64);
+eve_id!(JobId, i32);
 eve_id!(LocationId, i64);
+eve_id!(StationId, i64);
+eve_id!(SystemId, i64);
 eve_id!(TypeId, i32);

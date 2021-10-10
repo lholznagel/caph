@@ -1,5 +1,5 @@
 use crate::{ConnectError, EveAuthClient, RequestClient};
-use crate::{AllianceId, CharacterId, CorporationId, LocationId, ItemId, TypeId};
+use crate::{AllianceId, CharacterId, CorporationId, LocationId, ItemId, TypeId, StationId, JobId};
 use serde::{Deserialize, Serialize};
 
 /// Wrapper for character
@@ -177,6 +177,46 @@ impl ConnectCharacterService {
             .map(|x| x.name)
             .map_err(Into::into)
     }
+
+    /// Gets a list of all jobs that an character started
+    ///
+    /// # Errors
+    ///
+    /// Fails when the server returns an error or parsing the response fails
+    ///
+    /// # Returns
+    ///
+    /// List of all industry jobs including those made with corporation
+    /// blueprints.
+    ///
+    pub async fn industry_jobs(
+        &self,
+        cid: CorporationId
+    ) -> Result<Vec<IndustryJob>, ConnectError> {
+        let path = format!("characters/{}/industry/jobs", self.cid);
+        let mut character = self
+            .client
+            .fetch::<Vec<IndustryJob>>(&path)
+            .await
+            .map_err(Into::into)?;
+
+        let path = format!("corporations/{}/industry/jobs", cid);
+        let corporation = self
+            .client
+            .fetch::<Vec<IndustryJob>>(&path)
+            .await;
+        // The character may not have the permission
+        let corporation = if let Ok(x) = corporation {
+            x
+                .into_iter()
+                .filter(|x| x.character_id == self.cid)
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
+        character.extend(corporation);
+        Ok(character)
+    }
 }
 
 /// General information about the character
@@ -234,4 +274,30 @@ pub struct CharacterBlueprintEntry {
     pub runs:                i32,
     /// Type id of the asset
     pub type_id:             TypeId,
+}
+
+/// Represents a single industry job
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct IndustryJob {
+    /// Activity of the job
+    #[serde(rename = "activity_id")]
+    pub activity:    i32,
+    /// TypeId of the blueprint that is used
+    #[serde(rename = "blueprint_type_id")]
+    pub type_id:      TypeId,
+    /// Date the character started the job
+    #[serde(rename = "start_date")]
+    pub start_date:   String,
+    /// Date when the job is done
+    #[serde(rename = "end_date")]
+    pub end_date:     String,
+    /// Character id of the character that installed the job
+    #[serde(rename = "installer_id")]
+    pub character_id: CharacterId,
+    /// Id of the station the job was started
+    #[serde(rename = "station_id")]
+    pub station_id:   StationId,
+    /// Unique id of the job
+    #[serde(rename = "job_id")]
+    pub job_id:       JobId,
 }

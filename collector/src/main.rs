@@ -33,7 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv::dotenv().ok();
 
     tracing_subscriber::fmt()
-        .pretty()
+        //.pretty()
         .with_max_level(Level::INFO)
         .init();
 
@@ -140,6 +140,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 error.clone()
             );
 
+            error = None;
             last_ts = next_ts;
             last_iso = next_iso.to_string();
             {

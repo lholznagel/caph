@@ -1,8 +1,7 @@
 import axios from 'axios';
 
 export class AssetService {
-  private static station_name_req: { [key: number]: any } = {};
-  private static station_names: { [key: number]: string } = {};
+  public static name_cache: { [key: number]: string } = {};
 
   public static async by_id(
     iid: number
@@ -10,64 +9,46 @@ export class AssetService {
       return (await axios.get(`/api/asset/${iid}`)).data;
   }
 
-  public static async asset_name(
-    iid: number
-  ): Promise<string> {
-      return (await axios.get(`/api/asset/${iid}/name`)).data;
-  }
-
   public static async assets(
     params: { [key: string]: any }
-  ): Promise<ICharacterAsset[]> {
+  ): Promise<IGenericAsset[]> {
     return (
       await axios.get('/api/asset', { params })
     ).data;
   }
 
-  public static async all_blueprints(
-    params: { [key: string]: any }
-  ): Promise<IAccountBlueprint[]> {
-    return (
-      await axios.get('/api/asset/blueprints', { params })
-    ).data;
-  }
-
-  public static async blueprint(
-    tid: number,
-    iid: number | null | undefined
-  ): Promise<IAccountBlueprint[]> {
-    let path = iid
-      ? `/api/asset/blueprints/${tid}/${iid}`
-      : `/api/asset/blueprints/${tid}`;
-
-    return (await axios.get(path)).data;
+  public static async asset_name(
+    iid: number
+  ): Promise<string> {
+    return (await axios.get(`/api/asset/${iid}/name`)).data;
   }
 
   public static async blueprint_material(
-    tid: number,
-  ): Promise<IBlueprintMaterial[]> {
-    return (await axios.get(`/api/asset/blueprints/${tid}/material`)).data;
+    tid: number
+  ): Promise<IAssetBlueprintMaterial> {
+      return (await axios.get(`/api/asset/${tid}/blueprint/material`)).data;
   }
 
-  public static async blueprint_product(
-    tid: number,
-  ): Promise<IBlueprintMaterial[]> {
-    return (await axios.get(`/api/asset/blueprints/${tid}/product`)).data;
+  public static async blueprint_tree(
+    tid: number
+  ): Promise<any> {
+      return (await axios.get(`/api/asset/${tid}/blueprint/tree`)).data;
   }
 
-  public static async location_name(
-    sid: number
-  ): Promise<string> {
-    if (this.station_names[sid]) {
-      return this.station_names[sid];
-    } else if (this.station_name_req[sid]) {
-      return this.station_name_req[sid];
-    } else {
-      this.station_name_req[sid] = axios.get(`/api/asset/location/${sid}/name`);
-      this.station_names[sid] = (await this.station_name_req[sid]).data;
-      this.station_name_req[sid] = null;
-      return this.station_names[sid];
-    }
+  public static async blueprint_flat(
+    tid: number
+  ): Promise<IAssetBlueprintFlat[]> {
+    return (await axios.get(`/api/asset/${tid}/blueprint/flat`)).data;
+  }
+
+  public static async buildable_items(): Promise<IAssetBuildable[]> {
+    return (
+      await axios.get('/api/asset/all/buildable')
+    ).data;
+  }
+
+  public static async resolve_id_from_name_bulk(names: string[], params: { [key: string]: any }): Promise<number[]> {
+    return (await axios.post('/api/asset/resolve/id', names, { params })).data;
   }
 }
 
@@ -78,52 +59,62 @@ export interface IAsset {
   location_id:   number;
   quantity:      number;
   count:         number;
+  category_id:   number;
+  group_id:      number;
   location_flag: string;
   name:          string;
 
   reference_id?: number;
+
+  original:      boolean;
+  material_eff:  number;
+  time_eff:      number;
+  runs:          number;
 }
 
-export interface ICharacterAsset {
+export interface IGenericAsset {
   type_id:             number;
   item_ids:            number[];
   owners:              number[];
   location_ids:        number[];
   quantity:            number;
   count:               number;
+  category_id:         number;
+  group_id:            number;
   location_flag:       string;
   name:                string;
 
+  original:            boolean;
+  material_eff:        number;
+  time_eff:            number;
+  runs:                number;
+
   // added by us
   key?:                number;
+  open?:               boolean;
 }
 
-export interface IAccountBlueprint {
-  type_id:             number;
-  item_ids:            number[];
-  owners:              number[];
-  material_efficiency: number;
-  time_efficiency:     number;
-  quantity:            number;
-  runs:                number;
-  count:               number;
-  name:                string;
+export interface IAssetBuildable {
+  type_id: number;
+  name:    string;
 }
 
-export interface IBlueprint {
-  type_id:             number;
-  item_id:             number;
-  material_efficiency: number;
-  time_efficiency:     number;
-  quantity:            number;
-  runs:                number;
-  name:                string;
+export interface IAssetBlueprintRaw {
+  type_id:  number;
+  group_id: number;
+  quantity: number;
+  name:     string;
+  stored:   number;
 }
 
-export interface IBlueprintMaterial {
+export interface IAssetBlueprintFlat {
+  type_id:  number;
+  mtype_id: number;
+  name:     string;
+}
+
+export interface IAssetBlueprintMaterial {
   type_id:    number;
-  activity:   number;
   quantity:   number;
   is_product: boolean;
-  name:       string;
 }

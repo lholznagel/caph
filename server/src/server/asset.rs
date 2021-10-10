@@ -1,26 +1,27 @@
-use crate::{AssetFilter, BlueprintFilter};
+use crate::{AssetFilter, ResolveIdNameFilter};
 use crate::asset::AssetService;
 use crate::error::ServerError;
 use crate::eve::LoggedInCharacter;
 
 use axum::{Json, Router};
 use axum::extract::{Extension, Path, Query};
-use axum::handler::get;
+use axum::handler::{get, post};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::BoxRoute;
-use caph_connector::{ItemId, LocationId, TypeId};
+use caph_connector::{ItemId, TypeId};
 
 pub fn router() -> Router<BoxRoute> {
     Router::new()
         .route("/", get(assets)).boxed()
         .route("/:iid", get(asset_by_id)).boxed()
         .route("/:iid/name", get(asset_name)).boxed()
-        .route("/blueprints", get(blueprints)).boxed()
-        .route("/blueprints/:tid/:iid", get(character_blueprint)).boxed()
-        .route("/blueprints/:tid/material", get(blueprint_material)).boxed()
-        .route("/blueprints/:tid/product", get(blueprint_product)).boxed()
-        .route("/location/:sid/name", get(location_name)).boxed()
+        .route("/:tid/blueprint/material", get(asset_blueprint_material)).boxed()
+        .route("/:tid/blueprint/flat", get(asset_blueprint_flat)).boxed()
+        .route("/:tid/blueprint/tree", get(asset_blueprint_tree)).boxed()
+        .route("/:tid/blueprint/raw", get(asset_blueprint_raw)).boxed()
+        .route("/all/buildable", get(general_assets_buildable)).boxed()
+        .route("/resolve/id", post(resolve_id_from_name_bulk)).boxed()
 }
 
 async fn asset_by_id(
@@ -33,14 +34,36 @@ async fn asset_by_id(
     Ok((StatusCode::OK, Json(res)))
 }
 
-async fn asset_name(
+async fn asset_blueprint_material(
     asset_service: Extension<AssetService>,
-    character:     LoggedInCharacter,
-    Path(iid):     Path<ItemId>
+    Path(tid):     Path<TypeId>
 ) -> Result<impl IntoResponse, ServerError> {
-    let cid = character.character_id().await?;
-    let res = asset_service.asset_name(cid, iid).await?;
-    Ok((StatusCode::OK, Json(res)))
+    let entries = asset_service.blueprint_material(tid).await?;
+    Ok((StatusCode::OK, Json(entries)))
+}
+
+async fn asset_blueprint_tree(
+    asset_service: Extension<AssetService>,
+    Path(tid):     Path<TypeId>
+) -> Result<impl IntoResponse, ServerError> {
+    let tree = asset_service.blueprint_tree(tid).await?;
+    Ok((StatusCode::OK, Json(tree)))
+}
+
+async fn asset_blueprint_raw(
+    asset_service: Extension<AssetService>,
+    Path(tid):     Path<TypeId>
+) -> Result<impl IntoResponse, ServerError> {
+    let tree = asset_service.blueprint_raw(tid).await?;
+    Ok((StatusCode::OK, Json(tree)))
+}
+
+async fn asset_blueprint_flat(
+    asset_service: Extension<AssetService>,
+    Path(tid):     Path<TypeId>
+) -> Result<impl IntoResponse, ServerError> {
+    let flat = asset_service.blueprint_flat(tid).await?;
+    Ok((StatusCode::OK, Json(flat)))
 }
 
 async fn assets(
@@ -53,49 +76,28 @@ async fn assets(
     Ok((StatusCode::OK, Json(alts)))
 }
 
-async fn blueprint_material(
-    asset_service: Extension<AssetService>,
-    Path(tid):     Path<TypeId>
-) -> Result<impl IntoResponse, ServerError> {
-    let bp = asset_service.blueprint_material(tid).await?;
-    Ok((StatusCode::OK, Json(bp)))
-}
-
-async fn blueprint_product(
-    asset_service: Extension<AssetService>,
-    Path(tid):     Path<TypeId>
-) -> Result<impl IntoResponse, ServerError> {
-    let bp = asset_service.blueprint_product(tid).await?;
-    Ok((StatusCode::OK, Json(bp)))
-}
-
-async fn character_blueprint(
-    asset_service:    Extension<AssetService>,
-    character:        LoggedInCharacter,
-    Path((tid, iid)): Path<(TypeId, ItemId)>,
-) -> Result<impl IntoResponse, ServerError> {
-    let cids = character.character_alts().await?;
-    let bp = asset_service.character_blueprint(cids, tid, iid).await?;
-    Ok((StatusCode::OK, Json(bp)))
-}
-
-async fn blueprints(
+async fn asset_name(
     asset_service: Extension<AssetService>,
     character:     LoggedInCharacter,
-    Query(filter): Query<BlueprintFilter>
+    Path(iid):     Path<ItemId>
 ) -> Result<impl IntoResponse, ServerError> {
-    let cids = character.character_alts().await?;
-    let alts = asset_service.blueprints(cids, filter).await?;
-    Ok((StatusCode::OK, Json(alts)))
+    let cid = character.character_id().await?;
+    let name = asset_service.asset_name(cid, iid).await?;
+    Ok((StatusCode::OK, Json(name)))
 }
 
-async fn location_name(
+async fn general_assets_buildable(
     asset_service: Extension<AssetService>,
-    Path(sid):     Path<LocationId>
 ) -> Result<impl IntoResponse, ServerError> {
-    if let Some(name) = asset_service.station_name(sid).await? {
-        Ok((StatusCode::OK, Json(name)))
-    } else {
-        Ok((StatusCode::NOT_FOUND, Json("Not found".into())))
-    }
+    let res = asset_service.general_assets_buildable().await?;
+    Ok((StatusCode::OK, Json(res)))
+}
+
+async fn resolve_id_from_name_bulk(
+    asset_service: Extension<AssetService>,
+    Query(filter): Query<ResolveIdNameFilter>,
+    Json(body):    Json<Vec<String>>
+) -> Result<impl IntoResponse, ServerError> {
+    let res = asset_service.resolve_id_from_name_bulk(body, filter).await?;
+    Ok((StatusCode::OK, Json(res)))
 }

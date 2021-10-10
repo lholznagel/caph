@@ -1,84 +1,91 @@
 <template>
   <n-card>
     <template #header>
-      Project "{{ project.name }}"
+      Project "{{ (project && project.name) || '' }}"
     </template>
 
-    <n-tabs line>
-      <n-tab-pane name="Stored Materials">
-        <project-stored-materials :pid="$route.params.id" />
+    <n-skeleton text :repeat="5" v-if="busy" />
+
+    <n-tabs line v-if="!busy">
+      <n-tab-pane name="Overview">
+        <project-overview :pid="$route.params.pid" />
       </n-tab-pane>
 
-      <n-tab-pane name="Blueprints">
-        <project-blueprints :pid="$route.params.id" />
-      </n-tab-pane>
-
-      <n-tab-pane name="Manufacture">
-        <project-manufacture :pid="$route.params.id" />
-      </n-tab-pane>
-
-      <n-tab-pane name="Planetary Interaction">
-        <label>A</label>
-      </n-tab-pane>
-
-      <n-tab-pane name="Invention">
-        <label>A</label>
-      </n-tab-pane>
-
-      <n-tab-pane name="Cost">
-        <project-cost :pid="$route.params.id" />
+      <n-tab-pane name="Required Blueprints">
+        <project-required-blueprints :pid="$route.params.pid" />
       </n-tab-pane>
 
       <n-tab-pane name="Raw Materials">
-        <blueprint-raw-material :bpids="project.blueprints" />
+        <project-raw :pid="$route.params.pid" :pids="pids" />
+      </n-tab-pane>
+
+      <n-tab-pane name="Buildsteps">
+        <project-buildstep :pid="$route.params.pid" />
+      </n-tab-pane>
+
+      <n-tab-pane name="Cost">
+        TODO
+      </n-tab-pane>
+
+      <n-tab-pane name="Invention">
+        TODO
       </n-tab-pane>
 
       <n-tab-pane name="Tree">
-        <project-tree :pid="$route.params.id" />
+        <project-tree :pid="$route.params.pid" />
+      </n-tab-pane>
+
+      <n-tab-pane name="Settings">
+        <project-option />
       </n-tab-pane>
     </n-tabs>
   </n-card>
 </template>
 
 <script lang="ts">
-import { NButton, NCard, NDataTable, NInput, NSkeleton, NTabs, NTabPane } from 'naive-ui';
 import { Options, Vue } from 'vue-class-component';
+import { NCard, NSkeleton, NTabs, NTabPane, NTimeline, NTimelineItem } from 'naive-ui';
+import { ProjectService, IProject } from '@/services/project';
 
-import { IProject, ProjectService } from '@/services/project';
-
-import BlueprintRawMaterial from '@/components/blueprint/RawMaterial.vue';
-import ProjectCost from '@/components/project/Cost.vue';
-import ProjectMaterial from '@/components/project/Material.vue';
-import ProjectBlueprints from '@/components/project/Blueprints.vue';
-import ProjectStoredMaterials from '@/components/project/Stored.vue';
+import ProjectBuildstep from '@/components/project/Buildstep.vue';
+import ProjectOption from '@/views/ProjectOption.vue';
+import ProjectOverview from '@/components/project/Overview.vue';
+import ProjectRaw from '@/components/project/Raw.vue';
+import ProjectRequiredBlueprints from '@/components/project/Blueprints.vue';
 import ProjectTree from '@/components/project/Tree.vue';
-import ProjectManufacture from '@/components/project/Manufacture.vue';
 
 @Options({
   components: {
-    NButton,
     NCard,
-    NDataTable,
-    NInput,
     NSkeleton,
     NTabs,
     NTabPane,
 
-    BlueprintRawMaterial,
-    ProjectBlueprints,
-    ProjectCost,
-    ProjectManufacture,
-    ProjectMaterial,
-    ProjectStoredMaterials,
+    NTimeline,
+    NTimelineItem,
+
+    ProjectBuildstep,
+    ProjectOption,
+    ProjectOverview,
+    ProjectRaw,
+    ProjectRequiredBlueprints,
     ProjectTree,
   }
 })
-export default class ProjectOverview extends Vue {
-  public project: IProject | {  } = {  };
+export default class Project extends Vue {
+  public busy: boolean = false;
+  public project: IProject | null = null;
+
+  public pids: number[] = [];
 
   public async created() {
-    const id: string = <string>this.$route.params.id;
-    this.project = await ProjectService.project(id);
+    this.busy = true;
+
+    const pid: string = <string>this.$route.params.pid;
+    this.project = await ProjectService.project(pid);
+    this.pids = (await ProjectService.products(pid)).map(x => <number>x.type_id);
+
+    this.busy = false;
   }
 }
 </script>

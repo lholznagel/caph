@@ -1,4 +1,4 @@
-use crate::{ConnectError, LocationId};
+use crate::{ConnectError, StationId, SystemId};
 use crate::zip::*;
 use serde::{Deserialize, Serialize};
 
@@ -50,8 +50,11 @@ impl ConnectStationService {
 pub struct StationEntry {
     /// Id of the station
     #[serde(rename = "stationID")]
-    pub id:  LocationId,
+    pub id:              StationId,
     /// Name of the station
     #[serde(rename = "stationName")]
-    pub name: String,
+    pub name:            String,
+    /// Solar system this station is located in
+    #[serde(rename = "solarSystemID")]
+    pub solar_system_id: SystemId
 }

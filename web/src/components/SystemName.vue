@@ -1,11 +1,14 @@
 <template>
-  <n-text>{{ name || 'Unknown ' + id }}</n-text>
+  <span>
+    <span v-if="name">{{ name }}</span>
+    <span v-if="!name">Unknown {{ id }}</span>
+  </span>
 </template>
 
 <script lang="ts">
 import { NText } from 'naive-ui';
 import { Options, Vue, prop } from 'vue-class-component';
-import { AssetService } from '@/services/asset';
+import { UniverseService } from '@/services/universe';
 
 class Props {
   id = prop({
@@ -19,11 +22,15 @@ class Props {
     NText
   }
 })
-export default class AssetName extends Vue.with(Props) {
+export default class SystemName extends Vue.with(Props) {
   public name: string = '';
 
   public async created() {
-    this.name = await AssetService.asset_name(this.id);
+    await UniverseService
+      .system(this.id)
+      .then(x => {
+        this.name = x.name;
+      });
   }
 }
 </script>

@@ -3,6 +3,7 @@
     <n-skeleton text :repeat="5" v-if="busy" />
 
     <n-tree
+      v-if="!busy"
       block-line
       :data="trees"
     />
@@ -10,10 +11,10 @@
 </template>
 
 <script lang="ts">
-import { IBlueprintTree } from '@/services/blueprint';
-import { ProjectService } from '@/services/project';
-import { NSkeleton, NTree } from 'naive-ui';
 import { Options, Vue, prop } from 'vue-class-component';
+import { NSkeleton, NTree } from 'naive-ui';
+import { AssetService } from '@/services/asset';
+import { ProjectService } from '@/services/project';
 
 class Props {
   // Project id
@@ -29,16 +30,19 @@ class Props {
     NTree,
   }
 })
-export default class BlueprintTree extends Vue.with(Props) {
+export default class ProjectTree extends Vue.with(Props) {
   public busy: boolean = false;
-
-  public trees: IBlueprintTree[] = [];
+  public trees: any[] = [];
 
   public async created() {
     this.busy = true;
-    this.trees = await ProjectService.tree(this.pid);
+
+    let products: any[] = await ProjectService.products(this.pid);
+    for (let product of products) {
+      this.trees.push(await AssetService.blueprint_tree(product.type_id));
+    }
+
     this.busy = false;
   }
 }
 </script>
-

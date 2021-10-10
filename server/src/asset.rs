@@ -1,8 +1,10 @@
 use crate::ServerError;
 
-use caph_connector::{CharacterId, ItemId, LocationId, TypeId};
+use caph_connector::{CategoryId, CharacterId, GroupId, ItemId, LocationId, TypeId};
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::postgres::PgRow;
+use sqlx::{PgPool, Row};
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct AssetService {
@@ -21,37 +23,65 @@ impl AssetService {
         cid: CharacterId,
         iid: ItemId
     ) -> Result<Asset, ServerError> {
-        let entry = sqlx::query!("
-                SELECT a.*, i.name
+        // https://github.com/launchbadge/sqlx/issues/367
+        let entry = sqlx::query("
+                SELECT
+                    a.*,
+                    ab.material_efficiency,
+                    ab.time_efficiency,
+                    ab.quantity > -1 AS original,
+                    ab.runs,
+                    i.name,
+                    i.category_id,
+                    i.group_id
                 FROM asset a
-                JOIN item i
-                ON a.type_id = i.type_id
-                WHERE character_id = ANY(
+                LEFT JOIN asset_blueprint ab
+                    ON ab.item_id = a.item_id
+                LEFT JOIN item i
+                    ON a.type_id = i.type_id
+                WHERE a.character_id = ANY(
                     SELECT DISTINCT character_id
                     FROM login
                     WHERE character_id = $1 OR character_main = $1
                     AND character_id IS NOT NULL
                 )
-                  AND item_id = $2
-            ",
-                *cid,
-                *iid
-            )
+                  AND a.item_id = $2
+            ")
+            .bind(*cid)
+            .bind(*iid)
+            .map(|x: PgRow| {
+                let type_id: i32      = x.get("type_id");
+                let category_id: i32  = x.get("category_id");
+                let group_id: i32     = x.get("group_id");
+                let character_id: i32 = x.get("character_id");
+
+                let item_id: i64      = x.get("item_id");
+                let location_id: i64  = x.get("location_id");
+
+                let reference_id: Option<i64> = x.get("reference_id");
+
+                Asset {
+                    type_id:       type_id.into(),
+                    item_id:       item_id.into(),
+                    location_id:   location_id.into(),
+                    reference_id:  reference_id.map(|x| x.into()),
+                    quantity:      x.get("quantity"),
+                    owner:         character_id.into(),
+                    category_id:   category_id.into(),
+                    group_id:      group_id.into(),
+                    location_flag: x.get("location_flag"),
+                    name:          x.get("name"),
+                    material_eff:  x.get("material_efficiency"),
+                    time_eff:      x.get("time_efficiency"),
+                    original:      x.get("original"),
+                    runs:          x.get("runs")
+                }
+            })
             .fetch_optional(&self.pool)
             .await?;
 
         if let Some(e) = entry {
-            let asset = Asset {
-                type_id:       e.type_id.into(),
-                item_id:       e.item_id.into(),
-                location_id:   e.location_id.into(),
-                reference_id:  e.reference_id.map(|x| x.into()),
-                quantity:      e.quantity,
-                owner:         e.character_id.into(),
-                location_flag: e.location_flag,
-                name:          e.name
-            };
-            Ok(asset)
+            Ok(e)
         } else {
             Err(ServerError::NotFound)
         }
@@ -107,261 +137,327 @@ impl AssetService {
             cids.into_iter().map(|x| *x).collect::<Vec<_>>()
         };
 
-        let assets = sqlx::query!("
+        // https://github.com/launchbadge/sqlx/issues/367
+        let assets = sqlx::query("
                 SELECT
                     DISTINCT(a.type_id),
                     ARRAY_AGG(DISTINCT a.character_id) AS owners,
                     ARRAY_AGG(DISTINCT a.item_id) AS item_ids,
                     ARRAY_AGG(DISTINCT a.location_id) AS location_ids,
                     SUM(a.quantity) AS quantity,
+                    ab.material_efficiency,
+                    ab.time_efficiency,
+                    ab.quantity > -1 AS original,
+                    ab.runs,
                     i.name,
                     i.category_id,
                     i.group_id
                 FROM asset a
-                LEFT JOIN item i
-                    ON i.type_id = a.type_id
+                LEFT JOIN asset_blueprint ab
+                    ON ab.item_id = a.item_id
                 LEFT JOIN asset_name an
                     ON an.item_id = a.item_id
+                LEFT JOIN item i
+                    ON i.type_id = a.type_id
                 WHERE a.character_id = ANY($1)
                   AND (
-                       $2::VARCHAR IS NULL
-                    OR i.name ILIKE '%' || $2::VARCHAR || '%'
+                       $2::BIGINT IS NULL
+                    OR a.item_id = $2::BIGINT
                   )
                   AND (
                        $3::VARCHAR IS NULL
-                    OR an.name ILIKE '%' || $3::VARCHAR || '%'
+                    OR i.name ILIKE '%' || $3::VARCHAR || '%'
                   )
                   AND (
-                       $4::INTEGER IS NULL
-                    OR i.category_id = $4::INTEGER
+                       $4::VARCHAR IS NULL
+                    OR an.name ILIKE '%' || $4::VARCHAR || '%'
+                  )
+                  AND (
+                       $5::INTEGER IS NULL
+                    OR i.category_id = $5::INTEGER
+                  )
+                  AND (
+                       $6::INTEGER IS NULL
+                    OR i.group_id = $6::INTEGER
                   )
                 GROUP BY
                     a.type_id,
+                    ab.quantity,
+                    ab.material_efficiency,
+                    ab.time_efficiency,
+                    ab.runs,
                     i.name,
                     i.category_id,
                     i.group_id
                 ORDER BY i.name
-            ",
-                &cids,
-                filter.name,
-                filter.asset_name,
-                filter.category,
-            )
-            .fetch_all(&self.pool)
-            .await?
-            .into_iter()
-            .map(|x| {
+            ")
+            .bind(&cids)
+            .bind(filter.item_id)
+            .bind(filter.name)
+            .bind(filter.asset_name)
+            .bind(filter.category)
+            .bind(filter.group)
+            .map(|x: PgRow| {
+                let type_id: i32     = x.get("type_id");
+                let category_id: i32 = x.get("category_id");
+                let group_id: i32    = x.get("group_id");
+
                 CharacterAsset {
-                    type_id: x.type_id.into(),
-                    owners: x.owners.unwrap_or_default(),
-                    item_ids: x.item_ids.unwrap_or_default(),
-                    location_ids: x.location_ids.unwrap_or_default(),
-                    quantity: x.quantity.unwrap_or_default(),
-                    name: x.name.clone(),
-                    category_id: x.category_id.into(),
-                    group_id: x.group_id.into()
+                    type_id:      type_id.into(),
+                    owners:       x.get("owners"),
+                    item_ids:     x.get("item_ids"),
+                    location_ids: x.get("location_ids"),
+                    quantity:     x.get("quantity"),
+                    name:         x.get("name"),
+                    category_id:  category_id.into(),
+                    group_id:     group_id.into(),
+
+                    material_eff: x.get("material_efficiency"),
+                    time_eff:     x.get("time_efficiency"),
+                    original:     x.get("original"),
+                    runs:         x.get("runs")
                 }
             })
-            .collect::<Vec<_>>();
-        Ok(assets)
-    }
-
-    /// Gets a list of all blueprints for the given [CharacterId]s
-    ///
-    /// # Params
-    ///
-    /// `cids` -> List of [CharacterId]s
-    ///
-    /// # Returns
-    ///
-    /// All blueprints that are owned by any of the given characters
-    ///
-    pub async fn blueprints(
-        &self,
-        cids:   Vec<CharacterId>,
-        filter: BlueprintFilter
-    ) -> Result<Vec<AccountBlueprint>, ServerError> {
-        let cids = if let Some(x) = filter.owner {
-            vec![*x]
-        } else {
-            cids.into_iter().map(|x| *x).collect::<Vec<_>>()
-        };
-
-        let blueprints = sqlx::query!("
-                SELECT
-                    DISTINCT(a.type_id),
-                    ARRAY_AGG(DISTINCT a.character_id) AS owners,
-                    ARRAY_AGG(DISTINCT a.item_id) AS item_ids,
-                    ab.material_efficiency,
-                    ab.time_efficiency,
-                    ab.quantity,
-                    ab.runs,
-                    COUNT(1) AS count,
-                    i.name
-                FROM asset_blueprint ab
-                JOIN asset a
-                    ON a.item_id = ab.item_id
-                JOIN item i
-                    ON a.type_id = i.type_id
-                WHERE character_id = ANY($1)
-                  AND (
-                       $2::VARCHAR IS NULL
-                    OR i.name LIKE '%' || $2::VARCHAR || '%'
-                  )
-                  AND (
-                       $3::INTEGER IS NULL
-                    OR ab.material_efficiency = $3
-                  )
-                  AND (
-                       $4::INTEGER IS NULL
-                    OR ab.time_efficiency = $4
-                  )
-                GROUP BY
-                    a.type_id,
-                    ab.quantity,
-                    ab.material_efficiency,
-                    ab.time_efficiency,
-                    ab.runs,
-                    i.name
-                ORDER BY i.name
-            ",
-                &cids,
-                filter.name,
-                filter.material_eff,
-                filter.time_eff
-            )
             .fetch_all(&self.pool)
-            .await?
-            .into_iter()
-            .map(|x| {
-                AccountBlueprint {
-                    type_id:             x.type_id,
-                    owners:              x.owners.unwrap_or_default(),
-                    item_ids:            x.item_ids.unwrap_or_default(),
-                    material_efficiency: x.material_efficiency,
-                    time_efficiency:     x.time_efficiency,
-                    quantity:            x.quantity,
-                    count:               x.count.unwrap_or_default(),
-                    runs:                x.runs,
-                    name:                x.name
-                }
-            })
-            .collect::<Vec<_>>();
-        Ok(blueprints)
+            .await?;
+        Ok(assets)
     }
 
     pub async fn blueprint_material(
         &self,
-        tid: TypeId,
+        tid: TypeId
     ) -> Result<Vec<BlueprintMaterial>, ServerError> {
-        let bps = sqlx::query!("
+        let entries = sqlx::query!(r#"
                 SELECT
-                    i.name,
-                    bm.*
+                    bm.type_id    AS "type_id!",
+                    bm.quantity   AS "quantity!",
+                    bm.is_product AS "is_product!"
                 FROM blueprint b
-                JOIN blueprint_material bm ON b.id = bm.blueprint
-                JOIN item i ON bm.type_id = i.type_id
-                WHERE b.type_id   = $1
-                  AND bm.activity = 2
-            ",
-                *tid,
+                JOIN blueprint_material bm
+                  ON b.id = bm.blueprint
+                WHERE b.type_id = $1
+                  AND (bm.activity = 2 OR bm.activity = 3)
+            "#,
+                *tid
             )
             .fetch_all(&self.pool)
             .await?
             .into_iter()
             .map(|x| {
                 BlueprintMaterial {
-                    type_id:    x.type_id,
-                    activity:   x.activity,
+                    type_id:    x.type_id.into(),
                     quantity:   x.quantity,
-                    is_product: x.is_product,
-                    name:       x.name,
+                    is_product: x.is_product
                 }
             })
             .collect::<Vec<_>>();
-        Ok(bps)
+        Ok(entries)
     }
 
-    pub async fn blueprint_product(
+    pub async fn blueprint_material_bulk(
         &self,
-        tid: TypeId,
-    ) -> Result<Vec<BlueprintMaterial>, ServerError> {
-        let bps = sqlx::query!("
+        tids:       Vec<TypeId>,
+        is_product: Option<bool>
+    ) -> Result<HashMap<TypeId, BlueprintMaterial>, ServerError> {
+        let tids = tids.into_iter().map(|x| *x).collect::<Vec<_>>();
+
+        let entries = sqlx::query!(r#"
                 SELECT
-                    i.name,
-                    bm.*
+                    bm.type_id    AS "type_id!",
+                    bm.quantity   AS "quantity!",
+                    bm.is_product AS "is_product!"
                 FROM blueprint b
-                JOIN blueprint_material bm ON b.id = bm.blueprint
-                JOIN item i ON bm.type_id = i.type_id
-                WHERE b.type_id     = $1
-                  AND bm.activity   = 2
-                  AND bm.is_product = TRUE
-            ",
-                *tid,
+                JOIN blueprint_material bm
+                  ON b.id = bm.blueprint
+                WHERE b.type_id = ANY($1)
+                  AND (bm.activity = 2 OR bm.activity = 3)
+                  AND (
+                    $2::BOOLEAN IS NULL OR bm.is_product = $2::BOOLEAN
+                  )
+            "#,
+                &tids,
+                is_product
             )
             .fetch_all(&self.pool)
             .await?
             .into_iter()
             .map(|x| {
-                BlueprintMaterial {
-                    type_id:    x.type_id,
-                    activity:   x.activity,
+                (x.type_id.into(), BlueprintMaterial {
+                    type_id:    x.type_id.into(),
                     quantity:   x.quantity,
-                    is_product: x.is_product,
-                    name:       x.name,
-                }
+                    is_product: x.is_product
+                })
             })
-            .collect::<Vec<_>>();
-        Ok(bps)
+            .collect::<HashMap<_, _>>();
+        Ok(entries)
     }
 
-    pub async fn character_blueprint(
+    pub async fn blueprint_tree(
         &self,
-        cids: Vec<CharacterId>,
-        tid:  TypeId,
-        iid:  ItemId,
-    ) -> Result<CharacterBlueprint, ServerError> {
-        let cids = cids.into_iter().map(|x| *x).collect::<Vec<_>>();
-
-        let bp = sqlx::query!("
-                SELECT
-                    a.type_id,
-                    a.item_id,
-                    ab.material_efficiency,
-                    ab.time_efficiency,
-                    ab.quantity,
-                    ab.runs,
-                    i.name
-                FROM asset_blueprint ab
-                JOIN asset a
-                    ON a.item_id = ab.item_id
-                JOIN item i
-                    ON a.type_id = i.type_id
-                WHERE character_id = ANY($1)
-                  AND a.type_id = $2
-                  AND a.item_id = $3
-                ORDER BY i.name
+        tid: TypeId
+    ) -> Result<serde_json::Value, ServerError> {
+        let entry = sqlx::query!("
+                SELECT tree
+                FROM blueprint_tree
+                WHERE type_id = $1
             ",
-                &cids,
-                *tid,
-                *iid
+                *tid
             )
             .fetch_optional(&self.pool)
             .await?;
-        if let Some(bp) = bp {
-            let bp = CharacterBlueprint {
-                type_id:             bp.type_id,
-                item_id:             bp.item_id,
-                material_efficiency: bp.material_efficiency,
-                time_efficiency:     bp.time_efficiency,
-                quantity:            bp.quantity,
-                runs:                bp.runs,
-                name:                bp.name
-            };
-            Ok(bp)
+
+        if let Some(e) = entry {
+            Ok(e.tree)
         } else {
             Err(ServerError::NotFound)
         }
+    }
+
+    pub async fn blueprint_raw(
+        &self,
+        tid: TypeId
+    ) -> Result<Vec<BlueprintRaw>, ServerError> {
+        let entries = sqlx::query!("
+                SELECT br.mtype_id, br.quantity, i.name, i.group_id
+                FROM blueprint_raw br
+                JOIN item i
+                  ON i.type_id = mtype_id
+                WHERE br.type_id = $1
+            ",
+                *tid
+            )
+            .fetch_all(&self.pool)
+            .await?
+            .into_iter()
+            .map(|x| {
+                BlueprintRaw {
+                    type_id:  x.mtype_id.into(),
+                    group_id: x.group_id.into(),
+                    quantity: x.quantity,
+                    name:     x.name,
+                }
+            })
+            .collect::<Vec<_>>();
+        Ok(entries)
+    }
+
+    pub async fn blueprint_raw_bulk(
+        &self,
+        tids: Vec<TypeId>
+    ) -> Result<HashMap<TypeId, Vec<BlueprintRaw>>, ServerError> {
+        let tids = tids.into_iter().map(|x| *x).collect::<Vec<_>>();
+
+        let mut entries = HashMap::new();
+        sqlx::query!(r#"
+                SELECT
+                    br.type_id  AS "type_id!",
+                    br.mtype_id AS "mtype_id!",
+                    br.quantity AS "quantity!",
+                    i.name      AS "name!",
+                    i.group_id  AS "group_id!"
+                FROM blueprint_raw br
+                JOIN item i
+                  ON i.type_id = mtype_id
+                WHERE br.type_id = ANY($1)
+            "#,
+                &tids
+            )
+            .fetch_all(&self.pool)
+            .await?
+            .into_iter()
+            .for_each(|x| {
+                entries
+                    .entry(x.type_id.into())
+                    .and_modify(|e: &mut Vec<BlueprintRaw>| {
+                        e.push(BlueprintRaw {
+                            type_id:  x.mtype_id.into(),
+                            group_id: x.group_id.into(),
+                            quantity: x.quantity,
+                            name:     x.name.clone(),
+                        })
+                    })
+                    .or_insert({
+                        vec![BlueprintRaw {
+                            type_id:  x.mtype_id.into(),
+                            group_id: x.group_id.into(),
+                            quantity: x.quantity,
+                            name:     x.name,
+                        }]
+                    });
+            });
+        Ok(entries)
+    }
+
+    pub async fn blueprint_flat(
+        &self,
+        tid: TypeId
+    ) -> Result<Vec<BlueprintFlat>, ServerError> {
+        let entries = sqlx::query!("
+                SELECT bf.type_id, bf.mtype_id, i.name
+                FROM blueprint_flat bf
+                JOIN item i
+                  ON i.type_id = mtype_id
+                WHERE bf.type_id = $1
+            ",
+                *tid
+            )
+            .fetch_all(&self.pool)
+            .await?
+            .into_iter()
+            .map(|x| {
+                BlueprintFlat {
+                    type_id:  x.type_id.into(),
+                    mtype_id: x.mtype_id.into(),
+                    name:     x.name,
+                }
+            })
+            .collect::<Vec<_>>();
+        Ok(entries)
+    }
+
+    pub async fn general_assets_buildable(
+        &self,
+    ) -> Result<Vec<AssetBuildable>, ServerError> {
+        let mut blueprints = sqlx::query!("
+                SELECT i.type_id, i.name
+                FROM blueprint_material bm
+                JOIN item i
+                  ON i.type_id = bm.type_id
+                WHERE bm.is_product = TRUE
+                  AND (bm.activity = 2 OR bm.activity = 3)
+                ORDER BY i.name
+            ")
+            .fetch_all(&self.pool)
+            .await?
+            .into_iter()
+            .map(|x| {
+                AssetBuildable {
+                    type_id: x.type_id.into(),
+                    name:    x.name
+                }
+            })
+            .collect::<Vec<_>>();
+        let schematics = sqlx::query!("
+                SELECT DISTINCT(i.type_id), i.name
+                FROM schematic_material sm
+                JOIN item i
+                  ON i.type_id = sm.type_id
+                WHERE sm.is_input = FALSE
+                ORDER BY i.name
+            ")
+            .fetch_all(&self.pool)
+            .await?
+            .into_iter()
+            .map(|x| {
+                AssetBuildable {
+                    type_id: x.type_id.into(),
+                    name:    x.name
+                }
+            })
+            .collect::<Vec<_>>();
+
+        blueprints.extend(schematics);
+        Ok(blueprints)
     }
 
     pub async fn item_location(
@@ -389,24 +485,37 @@ impl AssetService {
         }
     }
 
-    pub async fn station_name(
+    pub async fn resolve_id_from_name_bulk(
         &self,
-        sid: LocationId
-    ) -> Result<Option<String>, ServerError> {
-        let entry = sqlx::query!("
-                SELECT name
-                FROM station
-                WHERE id = $1
+        names:  Vec<String>,
+        filter: ResolveIdNameFilter
+    ) -> Result<Vec<ResolveIdName>, ServerError> {
+        let entries = sqlx::query!("
+                SELECT name, type_id
+                FROM item
+                WHERE name = ANY($1)
+                  AND (
+                       $2::BOOLEAN IS NULL
+                    OR (
+                        SELECT type_id
+                        FROM blueprint_material bm
+                        WHERE bm.type_id = item.type_id
+                          AND is_product = TRUE
+                    ) IS NOT NULL
+                  )
             ",
-                *sid
+                &names,
+                filter.has_blueprint
             )
-            .fetch_optional(&self.pool)
-            .await?;
-        if let Some(e) = entry {
-            Ok(Some(e.name))
-        } else {
-            Ok(None)
-        }
+            .fetch_all(&self.pool)
+            .await?
+            .into_iter()
+            .map(|x| ResolveIdName {
+                name:    x.name,
+                type_id: x.type_id.into()
+            })
+            .collect::<Vec<_>>();
+        Ok(entries)
     }
 }
 
@@ -417,71 +526,82 @@ pub struct Asset {
     pub location_id:   LocationId,
     pub owner:         CharacterId,
     pub quantity:      i32,
+    pub category_id:   CategoryId,
+    pub group_id:      GroupId,
+
     pub location_flag: String,
     pub name:          String,
 
     pub reference_id:  Option<ItemId>,
+    pub material_eff:  Option<i32>,
+    pub time_eff:      Option<i32>,
+    pub original:      Option<bool>,
+    pub runs:          Option<i32>,
 }
 
 /// Assets including all characters -> multiple owners
 #[derive(Debug, Serialize)]
 pub struct CharacterAsset {
-    pub type_id:       i32,
+    pub type_id:       TypeId,
     pub owners:        Vec<i32>,
     pub item_ids:      Vec<i64>,
     pub location_ids:  Vec<i64>,
     pub quantity:      i64,
+    pub category_id:   CategoryId,
+    pub group_id:      GroupId,
     pub name:          String,
 
-    pub category_id: caph_connector::CategoryId,
-    pub group_id:    caph_connector::GroupId,
-}
-
-#[derive(Debug, Serialize)]
-pub struct AccountBlueprint {
-    pub type_id:             i32,
-    pub owners:              Vec<i32>,
-    pub item_ids:            Vec<i64>,
-    pub material_efficiency: i32,
-    pub time_efficiency:     i32,
-    pub quantity:            i32,
-    pub count:               i64,
-    pub runs:                i32,
-    pub name:                String
-}
-
-#[derive(Debug, Serialize)]
-pub struct BlueprintMaterial {
-    pub type_id:             i32,
-    pub activity:            i16,
-    pub quantity:            i32,
-    pub is_product:          bool,
-    pub name:                String
-}
-
-#[derive(Debug, Serialize)]
-pub struct CharacterBlueprint {
-    pub type_id:             i32,
-    pub item_id:             i64,
-    pub material_efficiency: i32,
-    pub time_efficiency:     i32,
-    pub quantity:            i32,
-    pub runs:                i32,
-    pub name:                String
+    pub material_eff:  Option<i32>,
+    pub time_eff:      Option<i32>,
+    pub original:      Option<bool>,
+    pub runs:          Option<i32>,
 }
 
 #[derive(Debug, Default, Deserialize)]
 pub struct AssetFilter {
+    pub item_id:    Option<i64>,
     pub name:       Option<String>,
     pub asset_name: Option<String>,
     pub category:   Option<i32>,
+    pub group:      Option<i32>,
     pub owner:      Option<CharacterId>,
 }
 
-#[derive(Debug, Default, Deserialize)]
-pub struct BlueprintFilter {
-    pub name:         Option<String>,
-    pub owner:        Option<CharacterId>,
-    pub material_eff: Option<i32>,
-    pub time_eff:     Option<i32>,
+#[derive(Debug, Serialize)]
+pub struct AssetBuildable {
+    pub type_id: TypeId,
+    pub name:    String
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ResolveIdName {
+    pub name:    String,
+    pub type_id: TypeId,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ResolveIdNameFilter {
+    pub has_blueprint: Option<bool>
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct BlueprintRaw {
+    pub type_id:  TypeId,
+    pub group_id: GroupId,
+    pub quantity: i32,
+    pub name:     String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BlueprintFlat {
+    pub type_id:  TypeId,
+    pub mtype_id: GroupId,
+    pub name:     String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BlueprintMaterial {
+    pub type_id:    TypeId,
+    pub quantity:   i32,
+    pub is_product: bool
 }

@@ -40,71 +40,6 @@
       ]
     }
   },
-  "329a0e1e8323d0258a592214e3a173308eadf0c14e9acc89cc3184618fd67f64": {
-    "query": "\n                SELECT\n                    DISTINCT(a.type_id),\n                    ARRAY_AGG(DISTINCT a.character_id) AS owners,\n                    ARRAY_AGG(DISTINCT a.item_id) AS item_ids,\n                    ARRAY_AGG(DISTINCT a.location_id) AS location_ids,\n                    SUM(a.quantity) AS quantity,\n                    i.name,\n                    i.category_id,\n                    i.group_id\n                FROM asset a\n                LEFT JOIN item i\n                    ON i.type_id = a.type_id\n                LEFT JOIN asset_name an\n                    ON an.item_id = a.item_id\n                WHERE a.character_id = ANY($1)\n                  AND (\n                       $2::VARCHAR IS NULL\n                    OR i.name ILIKE '%' || $2::VARCHAR || '%'\n                  )\n                  AND (\n                       $3::VARCHAR IS NULL\n                    OR an.name ILIKE '%' || $3::VARCHAR || '%'\n                  )\n                  AND (\n                       $4::INTEGER IS NULL\n                    OR i.category_id = $4::INTEGER\n                  )\n                GROUP BY\n                    a.type_id,\n                    i.name,\n                    i.category_id,\n                    i.group_id\n                ORDER BY i.name\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "type_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "owners",
-          "type_info": "Int4Array"
-        },
-        {
-          "ordinal": 2,
-          "name": "item_ids",
-          "type_info": "Int8Array"
-        },
-        {
-          "ordinal": 3,
-          "name": "location_ids",
-          "type_info": "Int8Array"
-        },
-        {
-          "ordinal": 4,
-          "name": "quantity",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 5,
-          "name": "name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 6,
-          "name": "category_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 7,
-          "name": "group_id",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4Array",
-          "Varchar",
-          "Varchar",
-          "Int4"
-        ]
-      },
-      "nullable": [
-        false,
-        null,
-        null,
-        null,
-        null,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "37dc88dd1d54b9cf9a46d1753332b12614f474659eb4a7389bf9d10763ba643f": {
     "query": "INSERT INTO login DEFAULT VALUES RETURNING token",
     "describe": {
@@ -144,12 +79,17 @@
       ]
     }
   },
-  "45de146a04c559053d0cb2faca13c32d78f9eafc3de9e41b9a30c7cc7abf102e": {
-    "query": "\n                SELECT name\n                FROM station\n                WHERE id = $1\n            ",
+  "3b3c5106ab07bc39caba21e6944d11333735df820186d032d1e927571b912c6c": {
+    "query": "\n                SELECT id, name\n                FROM system\n                WHERE id = $1\n            ",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
           "name": "name",
           "type_info": "Varchar"
         }
@@ -157,6 +97,27 @@
       "parameters": {
         "Left": [
           "Int8"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "52649d883ef7fcd38e4412d12364775837fb5927ca46692935967a8ad7653715": {
+    "query": "\n                SELECT tree\n                FROM blueprint_tree\n                WHERE type_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "tree",
+          "type_info": "Json"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
         ]
       },
       "nullable": [
@@ -164,59 +125,25 @@
       ]
     }
   },
-  "54856b99b15bbe86e3d744a940bb96b3f585d383d1baaeb96d1a20751b72e8d2": {
-    "query": "\n                SELECT\n                    a.type_id,\n                    a.item_id,\n                    ab.material_efficiency,\n                    ab.time_efficiency,\n                    ab.quantity,\n                    ab.runs,\n                    i.name\n                FROM asset_blueprint ab\n                JOIN asset a\n                    ON a.item_id = ab.item_id\n                JOIN item i\n                    ON a.type_id = i.type_id\n                WHERE character_id = ANY($1)\n                  AND a.type_id = $2\n                  AND a.item_id = $3\n                ORDER BY i.name\n            ",
+  "600103ab1a0cd469f09d9cac97f2d369f1b99d9d99238b54f70f0599f6583ddf": {
+    "query": "\n                SELECT id, name\n                FROM system\n            ",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "type_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "item_id",
+          "name": "id",
           "type_info": "Int8"
         },
         {
-          "ordinal": 2,
-          "name": "material_efficiency",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 3,
-          "name": "time_efficiency",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "quantity",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "runs",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
+          "ordinal": 1,
           "name": "name",
           "type_info": "Varchar"
         }
       ],
       "parameters": {
-        "Left": [
-          "Int4Array",
-          "Int4",
-          "Int8"
-        ]
+        "Left": []
       },
       "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
         false,
         false
       ]
@@ -239,77 +166,6 @@
       },
       "nullable": [
         true
-      ]
-    }
-  },
-  "6910d56666e7a395cd79c060564437b17b910f2a3dcbfb5b6e64a3470191beec": {
-    "query": "\n                SELECT\n                    DISTINCT(a.type_id),\n                    ARRAY_AGG(DISTINCT a.character_id) AS owners,\n                    ARRAY_AGG(DISTINCT a.item_id) AS item_ids,\n                    ab.material_efficiency,\n                    ab.time_efficiency,\n                    ab.quantity,\n                    ab.runs,\n                    COUNT(1) AS count,\n                    i.name\n                FROM asset_blueprint ab\n                JOIN asset a\n                    ON a.item_id = ab.item_id\n                JOIN item i\n                    ON a.type_id = i.type_id\n                WHERE character_id = ANY($1)\n                  AND (\n                       $2::VARCHAR IS NULL\n                    OR i.name LIKE '%' || $2::VARCHAR || '%'\n                  )\n                  AND (\n                       $3::INTEGER IS NULL\n                    OR ab.material_efficiency = $3\n                  )\n                  AND (\n                       $4::INTEGER IS NULL\n                    OR ab.time_efficiency = $4\n                  )\n                GROUP BY\n                    a.type_id,\n                    ab.quantity,\n                    ab.material_efficiency,\n                    ab.time_efficiency,\n                    ab.runs,\n                    i.name\n                ORDER BY i.name\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "type_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "owners",
-          "type_info": "Int4Array"
-        },
-        {
-          "ordinal": 2,
-          "name": "item_ids",
-          "type_info": "Int8Array"
-        },
-        {
-          "ordinal": 3,
-          "name": "material_efficiency",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "time_efficiency",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "quantity",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "runs",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 7,
-          "name": "count",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 8,
-          "name": "name",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4Array",
-          "Varchar",
-          "Int4",
-          "Int4"
-        ]
-      },
-      "nullable": [
-        false,
-        null,
-        null,
-        false,
-        false,
-        false,
-        false,
-        null,
-        false
       ]
     }
   },
@@ -345,6 +201,50 @@
       "nullable": []
     }
   },
+  "6c52eb85ca91735f9ea0e1e4730eb6756aad8b7d774e55c62756024478e5c007": {
+    "query": "\n                SELECT id, system_id, name, pos, structure\n                FROM station\n                WHERE character_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "system_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "pos",
+          "type_info": "Bool"
+        },
+        {
+          "ordinal": 4,
+          "name": "structure",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "6e5b3476f33cccaedeee4145b048c42bff5c1ba029a8d15d0b935b75726378ae": {
     "query": "\n                UPDATE login\n                SET\n                    character_id = $1,\n                    access_token = $2,\n                    refresh_token = $3,\n                    expire_date = NOW() + interval '1199' second\n                WHERE token = $4\n            ",
     "describe": {
@@ -358,62 +258,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "8d2af0881d10020b0e1f0af89dafecd65094ab92c20ed48d1cb4daf6e6dc44d4": {
-    "query": "\n                SELECT\n                    i.name,\n                    bm.*\n                FROM blueprint b\n                JOIN blueprint_material bm ON b.id = bm.blueprint\n                JOIN item i ON bm.type_id = i.type_id\n                WHERE b.type_id   = $1\n                  AND bm.activity = 2\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "blueprint",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 2,
-          "name": "activity",
-          "type_info": "Int2"
-        },
-        {
-          "ordinal": 3,
-          "name": "type_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "quantity",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "is_product",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 6,
-          "name": "probability",
-          "type_info": "Float4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true
-      ]
     }
   },
   "932702a8a8fff826ce419b2b1898bf7e131d2472334bde34d8bbaa7305fd6190": {
@@ -528,69 +372,6 @@
       ]
     }
   },
-  "ace399956fde1b340e1e6895bb16c4bc097bb4ff1e1dd3ff332d437757928902": {
-    "query": "\n                SELECT a.*, i.name\n                FROM asset a\n                JOIN item i\n                ON a.type_id = i.type_id\n                WHERE character_id = ANY(\n                    SELECT DISTINCT character_id\n                    FROM login\n                    WHERE character_id = $1 OR character_main = $1\n                    AND character_id IS NOT NULL\n                )\n                  AND item_id = $2\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "item_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 1,
-          "name": "location_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 2,
-          "name": "reference_id",
-          "type_info": "Int8"
-        },
-        {
-          "ordinal": 3,
-          "name": "character_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 4,
-          "name": "type_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 5,
-          "name": "quantity",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 6,
-          "name": "location_flag",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 7,
-          "name": "name",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int8"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "b2e17eb6b7fbebf68473a6610bf7d13daf695635ac5fe8956ec2d9e49705521d": {
     "query": "\n                INSERT INTO character\n                (\n                    alliance_id, alliance_name,\n                    character_id, character_name,\n                    corporation_id, corporation_name,\n                    character_main\n                )\n                VALUES ($1, $2, $3, $4, $5, $6, $7)\n            ",
     "describe": {
@@ -665,49 +446,68 @@
       ]
     }
   },
-  "fa359413449ec2eb36020432e001130510953adbe8152fe71a2e1793ed3eaf58": {
-    "query": "\n                SELECT\n                    i.name,\n                    bm.*\n                FROM blueprint b\n                JOIN blueprint_material bm ON b.id = bm.blueprint\n                JOIN item i ON bm.type_id = i.type_id\n                WHERE b.type_id     = $1\n                  AND bm.activity   = 2\n                  AND bm.is_product = TRUE\n            ",
+  "b7eeefbb3f05be3a9219cc03008654820cba27e7515ddd9035fafa2beb0b86e1": {
+    "query": "\n                SELECT i.type_id, i.name\n                FROM item i\n                WHERE i.category_id = 9\n                ORDER BY name\n            ",
     "describe": {
       "columns": [
         {
           "ordinal": 0,
-          "name": "name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "blueprint",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 2,
-          "name": "activity",
-          "type_info": "Int2"
-        },
-        {
-          "ordinal": 3,
           "name": "type_id",
           "type_info": "Int4"
         },
         {
+          "ordinal": 1,
+          "name": "name",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
+  "b932585b64f2550da598eb7200e746304003132c1f97780be27f1cc036caa3e0": {
+    "query": "\n                SELECT id, system_id, name, pos, character_id, structure\n                FROM station\n                WHERE id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 1,
+          "name": "system_id",
+          "type_info": "Int8"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "pos",
+          "type_info": "Bool"
+        },
+        {
           "ordinal": 4,
-          "name": "quantity",
+          "name": "character_id",
           "type_info": "Int4"
         },
         {
           "ordinal": 5,
-          "name": "is_product",
-          "type_info": "Bool"
-        },
-        {
-          "ordinal": 6,
-          "name": "probability",
-          "type_info": "Float4"
+          "name": "structure",
+          "type_info": "Varchar"
         }
       ],
       "parameters": {
         "Left": [
-          "Int4"
+          "Int8"
         ]
       },
       "nullable": [
@@ -715,10 +515,37 @@
         false,
         false,
         false,
-        false,
-        false,
-        true
+        true,
+        false
       ]
+    }
+  },
+  "e3fe9a3639f59d0ec0a8627455b048d368e4b85c71fb77a6cafde50097a1b9cc": {
+    "query": "\n                DELETE FROM station\n                WHERE character_id = $1\n                  AND id = $2\n                  AND pos = TRUE\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "f18a519d7525f564dd2dac3e5e7c6b8410f11e1bef5e4a17efcf6ebd1fb16fb0": {
+    "query": "\n                INSERT INTO station (character_id, id, system_id, name, pos)\n                VALUES ($1, $2, $3, $4, TRUE)\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int8",
+          "Int8",
+          "Varchar"
+        ]
+      },
+      "nullable": []
     }
   }
 }

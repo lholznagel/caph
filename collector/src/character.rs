@@ -1,6 +1,6 @@
 use crate::error::CollectorError;
 
-use caph_connector::{CharacterId, ConnectCharacterService, EveAuthClient};
+use caph_connector::{CharacterId, CorporationId, ConnectCharacterService, EveAuthClient};
 use sqlx::PgPool;
 use std::collections::HashMap;
 use std::fmt;
@@ -50,58 +50,58 @@ impl Character {
         /// Represents a character entry with its character id and refresh token
         struct CharacterEntry {
             /// Character ID of the character
-            character_id:  CharacterId,
+            character_id:   CharacterId,
+            /// Id of the corporation the character is in
+            corporation_id: CorporationId,
             /// Refresh token for the EVE-API
             refresh_token: String
         }
 
-        let tokens = sqlx::query!("
-                SELECT character_id, refresh_token
-                FROM login
-                WHERE character_id IS NOT NULL AND refresh_token IS NOT NULL
-            ")
+        let tokens = sqlx::query!(r#"
+                SELECT
+                    c.character_id   AS "character_id!",
+                    c.corporation_id AS "corporation_id!",
+                    l.refresh_token  AS "refresh_token!"
+                FROM login l
+                JOIN character c
+                  ON l.character_id = c.character_id
+                WHERE l.character_id IS NOT NULL
+                  AND refresh_token IS NOT NULL
+            "#)
             .fetch_all(&self.pool)
             .await
             .map_err(CollectorError::SelectCharacterEntries)?
             .into_iter()
             .map(|x| {
                 CharacterEntry {
-                    character_id:  x.character_id
-                        .expect("The character id should be set.")
-                        .into(),
-                    refresh_token: x.refresh_token
-                        .expect("The refresh token should be set.")
+                    character_id:   x.character_id.into(),
+                    corporation_id: x.corporation_id.into(),
+                    refresh_token:  x.refresh_token
                 }
             })
             .collect::<Vec<_>>();
-
-        let cids = tokens
-            .iter()
-            .map(|x| *x.character_id)
-            .collect::<Vec<_>>();
-        sqlx::query!("
-                DELETE FROM asset CASCADE WHERE character_id = ANY($1)
-            ", &cids)
-            .execute(&self.pool)
-            .await
-            .map_err(CollectorError::DeletingCharacterAssets)?;
 
         for token in tokens {
             let client = EveAuthClient::new(token.refresh_token)
                 .map_err(CollectorError::CouldNotCreateEveClient)?;
 
-            self.assets(
+            let _ = self.assets(
                 client.clone(),
                 token.character_id,
-            ).await?;
-            self.asset_names(
+            ).await;
+            let _ = self.asset_names(
                 client.clone(),
                 token.character_id,
-            ).await?;
-            self.blueprints(
+            ).await;
+            let _ = self.blueprints(
+                client.clone(),
+                token.character_id,
+            ).await;
+            let _ = self.industry_jobs(
                 client,
                 token.character_id,
-            ).await?;
+                token.corporation_id
+            ).await;
         }
 
         Ok(())
@@ -144,12 +144,24 @@ impl Character {
                 let reference_id = asset.location_id;
                 let location_id = asset_location
                     .get(&(*asset.location_id).into())
-                    .unwrap()
-                    .location_id;
+                    .map(|x| x.location_id)
+                    .unwrap_or(asset.location_id);
                 location_ids.push(*location_id);
                 reference_ids.push(Some(*reference_id));
             }
         }
+
+        let mut trans = self.pool
+            .begin()
+            .await
+            .map_err(CollectorError::TransactionBeginNotSuccessfull)?;
+
+        sqlx::query!("
+                DELETE FROM asset CASCADE WHERE character_id = $1
+            ", *cid)
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::DeletingCharacterAssets)?;
 
         sqlx::query!("
                 INSERT INTO asset
@@ -180,9 +192,13 @@ impl Character {
                 &quantities,
                 &location_flags,
             )
-            .execute(&self.pool)
+            .execute(&mut trans)
             .await
             .map_err(CollectorError::InsertingCharacterAssets)?;
+
+        trans.commit()
+            .await
+            .map_err(CollectorError::TransactionCommitNotSuccessfull)?;
 
         Ok(())
     }
@@ -225,6 +241,18 @@ impl Character {
             names.push(asset.name.clone());
         }
 
+        let mut trans = self.pool
+            .begin()
+            .await
+            .map_err(CollectorError::TransactionBeginNotSuccessfull)?;
+
+        sqlx::query!("
+                DELETE FROM asset_name CASCADE WHERE character_id = $1
+            ", *cid)
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::DeletingCharacterAssets)?;
+
         sqlx::query!("
                 INSERT INTO asset_name
                 (
@@ -242,9 +270,13 @@ impl Character {
                 &item_ids,
                 &names,
             )
-            .execute(&self.pool)
+            .execute(&mut trans)
             .await
             .map_err(CollectorError::InsertingCharacterAssetNames)?;
+
+        trans.commit()
+            .await
+            .map_err(CollectorError::TransactionCommitNotSuccessfull)?;
 
         Ok(())
     }
@@ -266,9 +298,23 @@ impl Character {
         let t_eff = bps.iter().map(|x| x.time_efficiency).collect::<Vec<_>>();
         let runs = bps.iter().map(|x| x.runs).collect::<Vec<_>>();
 
+        let mut trans = self.pool
+            .begin()
+            .await
+            .map_err(CollectorError::TransactionBeginNotSuccessfull)?;
+
+        sqlx::query!("
+                DELETE FROM asset_blueprint CASCADE WHERE character_id = $1
+            ", *cid)
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::DeletingCharacterAssets)?;
+
         sqlx::query!("
                 INSERT INTO asset_blueprint
                 (
+                    character_id,
+
                     item_id,
 
                     quantity,
@@ -276,23 +322,101 @@ impl Character {
                     time_efficiency,
                     runs
                 )
-                SELECT * FROM UNNEST(
-                    $1::BIGINT[],
-                    $2::INTEGER[],
+                SELECT $1, * FROM UNNEST(
+                    $2::BIGINT[],
                     $3::INTEGER[],
                     $4::INTEGER[],
-                    $5::INTEGER[]
+                    $5::INTEGER[],
+                    $6::INTEGER[]
                 )
             ",
+                *cid,
                 &item_id,
                 &quantity,
                 &m_eff,
                 &t_eff,
                 &runs,
             )
-            .execute(&self.pool)
+            .execute(&mut trans)
             .await
             .map_err(CollectorError::InsertingCharacterBlueprints)?;
+
+        trans.commit()
+            .await
+            .map_err(CollectorError::TransactionCommitNotSuccessfull)?;
+
+        Ok(())
+    }
+
+    #[instrument]
+    async fn industry_jobs(
+        &self,
+        client:  EveAuthClient,
+        char_id: CharacterId,
+        corp_id: CorporationId
+    ) -> Result<(), CollectorError> {
+        let jobs = ConnectCharacterService::new(client, char_id)
+            .industry_jobs(corp_id)
+            .await
+            .map_err(CollectorError::CouldNotGetCharacterIndustryJobs)?;
+
+        let job_ids = jobs.iter().map(|x| *x.job_id).collect::<Vec<_>>();
+        let type_ids = jobs.iter().map(|x| *x.type_id).collect::<Vec<_>>();
+        let activities = jobs.iter().map(|x| x.activity).collect::<Vec<_>>();
+        let station_ids = jobs.iter().map(|x| *x.station_id).collect::<Vec<_>>();
+        let end_dates = jobs.iter().map(|x| x.end_date.clone()).collect::<Vec<_>>();
+        let start_dates = jobs.iter().map(|x| x.start_date.clone()).collect::<Vec<_>>();
+
+        let mut trans = self.pool
+            .begin()
+            .await
+            .map_err(CollectorError::TransactionBeginNotSuccessfull)?;
+
+        sqlx::query!("
+                DELETE FROM industry_job CASCADE WHERE character_id = $1
+            ", *char_id)
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::DeletingCharacterIndustryJobs)?;
+
+        sqlx::query!("
+                INSERT INTO industry_job
+                (
+                    character_id,
+                    job_id,
+                    type_id,
+
+                    activity,
+
+                    station_id,
+
+                    end_date,
+                    start_date
+                )
+                SELECT $1, * FROM UNNEST(
+                    $2::INTEGER[],
+                    $3::INTEGER[],
+                    $4::INTEGER[],
+                    $5::BIGINT[],
+                    $6::VARCHAR[],
+                    $7::VARCHAR[]
+                )
+            ",
+                *char_id,
+                &job_ids,
+                &type_ids,
+                &activities,
+                &station_ids,
+                &end_dates,
+                &start_dates
+            )
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::InsertingCharacterBlueprints)?;
+
+        trans.commit()
+            .await
+            .map_err(CollectorError::TransactionCommitNotSuccessfull)?;
 
         Ok(())
     }

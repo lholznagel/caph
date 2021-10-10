@@ -1,8 +1,10 @@
 use crate::error::CollectorError;
 
-use caph_connector::{BlueprintMaterial, BlueprintSkill, ConnectAssetService, ConnectBlueprintService, ConnectReprocessService, ConnectSchematicService, ConnectStationService, SdeService};
+use caph_connector::{BlueprintMaterial, BlueprintSkill, SdeService, TypeId};
+use caph_connector::services::*;
+use serde::Serialize;
 use sqlx::{PgPool, Type};
-use std::fmt;
+use std::{collections::{HashMap, VecDeque}, fmt};
 use uuid::Uuid;
 
 /// Responsible for processing EVE-SDE files
@@ -50,12 +52,23 @@ impl Sde {
             .map_err(CollectorError::LoadSdeFile)?;
         let station_service = ConnectStationService::new(&mut zip)
             .map_err(CollectorError::LoadSdeFile)?;
+        let system_service = ConnectSystemService::new(&mut zip)
+            .map_err(CollectorError::LoadSdeFile)?;
+        let unique_name_service = ConnectUniqueNameService::new(&mut zip)
+            .map_err(CollectorError::LoadSdeFile)?;
 
-        self.save_blueprints(&blueprint_service).await?;
         self.save_assets(&asset_service).await?;
+        self.save_blueprints(&blueprint_service).await?;
         self.save_reprocessing_info(&reprocess_service).await?;
         self.save_schematics(&schematic_service).await?;
         self.save_stations(&station_service).await?;
+        self.save_systems(&system_service, &unique_name_service).await?;
+
+        self.blueprint_tree(
+            &asset_service,
+            &blueprint_service,
+            &schematic_service
+        ).await?;
 
         Ok(())
     }
@@ -605,13 +618,15 @@ impl Sde {
     ///
     async fn save_stations(
         &self,
-        station_service: &ConnectStationService
+        station_service:     &ConnectStationService,
     ) -> Result<(), CollectorError> {
         let mut ids = Vec::new();
+        let mut systems = Vec::new();
         let mut names = Vec::new();
 
         for entry in station_service.entries() {
             ids.push(*entry.id);
+            systems.push(*entry.solar_system_id);
             names.push(entry.name.clone());
         }
 
@@ -631,14 +646,17 @@ impl Sde {
                 INSERT INTO station
                 (
                     id,
+                    system_id,
                     name
                 )
                 SELECT * FROM UNNEST(
                     $1::BIGINT[],
-                    $2::VARCHAR[]
+                    $2::BIGINT[],
+                    $3::VARCHAR[]
                 )
             ",
                 &ids,
+                &systems,
                 &names,
             )
             .execute(&mut trans)
@@ -651,6 +669,397 @@ impl Sde {
 
         Ok(())
     }
+
+    async fn save_systems(
+        &self,
+        system_service:      &ConnectSystemService,
+        unique_name_service: &ConnectUniqueNameService,
+    ) -> Result<(), CollectorError> {
+        let mut ids = Vec::new();
+        let mut names = Vec::new();
+
+        let unique_names = unique_name_service.entries();
+        for entry in system_service.entries() {
+            ids.push(*entry.id);
+            names
+                .push(
+                    unique_names
+                        .get(&(*entry.id).into())
+                        .unwrap_or(&String::new())
+                        .clone()
+                );
+        }
+
+        let mut trans = self.pool
+            .begin()
+            .await
+            .map_err(CollectorError::TransactionBeginNotSuccessfull)?;
+
+        sqlx::query!("DELETE FROM system CASCADE")
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::DeletingSdeSystem)?;
+        sqlx::query!("
+                INSERT INTO system
+                (
+                    id,
+                    name
+                )
+                SELECT * FROM UNNEST(
+                    $1::BIGINT[],
+                    $2::VARCHAR[]
+                )
+            ",
+                &ids,
+                &names,
+            )
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::InsertingSdeSystem)?;
+
+        trans.commit()
+            .await
+            .map_err(CollectorError::TransactionCommitNotSuccessfull)?;
+
+        Ok(())
+    }
+
+    async fn blueprint_tree(
+        &self,
+        asset_service:     &ConnectAssetService,
+        blueprint_service: &ConnectBlueprintService,
+        schematic_service: &ConnectSchematicService
+    ) -> Result<(), CollectorError> {
+        let assets = asset_service.type_ids().clone();
+
+        let productions = blueprint_service
+            .entries()
+            .clone()
+            .iter()
+            .filter(|(_, x)| x.activities.manufacturing.is_some())
+            .filter(|(_, x)| x.activities.manufacturing.clone().unwrap().products.len() > 0)
+            .map(|(_, e)| {
+                let activity = e.activities.clone().manufacturing.unwrap();
+                let product = activity.products[0].clone();
+                let materials = activity
+                    .materials
+                    .into_iter()
+                    .map(|x| {
+                        ProductMaterial {
+                            type_id:  x.type_id,
+                            quantity: x.quantity
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                BlueprintProduct {
+                    type_id:  product.type_id,
+                    quantity: product.quantity,
+                    materials
+                }
+            })
+            .map(|x| (x.type_id, x))
+            .collect::<HashMap<_, _>>();
+        let reactions = blueprint_service
+            .entries()
+            .clone()
+            .iter()
+            .filter(|(_, x)| x.activities.reaction.is_some())
+            .map(|(_, e)| {
+                let activity = e.activities.clone().reaction.unwrap();
+                let product = activity.products[0].clone();
+                let materials = activity
+                    .materials
+                    .into_iter()
+                    .map(|x| {
+                        ProductMaterial {
+                            type_id:  x.type_id,
+                            quantity: x.quantity
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                BlueprintProduct {
+                    type_id:  product.type_id,
+                    quantity: product.quantity,
+                    materials
+                }
+            })
+            .map(|x| (x.type_id, x))
+            .collect::<HashMap<_, _>>();
+        let schematics = schematic_service
+            .entries()
+            .clone()
+            .iter()
+            .map(|(_, e)| {
+                let materials = e.materials()
+                    .into_iter()
+                    .map(|(type_id, x)| {
+                        ProductMaterial {
+                            type_id:  type_id,
+                            quantity: x.quantity
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                BlueprintProduct {
+                    type_id:  e.product().0,
+                    quantity: e.product().1.quantity,
+                    materials
+                }
+            })
+            .map(|x| (x.type_id, x))
+            .collect::<HashMap<_, _>>();
+
+        let mut resolved: HashMap<TypeId, BlueprintTree> = HashMap::new();
+
+        let mut queue_bps = productions
+            .iter()
+            .map(|(_, x)| x)
+            .cloned()
+            .collect::<VecDeque<_>>();
+        let queue_reactions = reactions
+            .iter()
+            .map(|(_, x)| x)
+            .cloned()
+            .collect::<VecDeque<_>>();
+        let queue_schematics = schematics
+            .iter()
+            .map(|(_, x)| x)
+            .cloned()
+            .collect::<VecDeque<_>>();
+        queue_bps.extend(queue_reactions);
+        queue_bps.extend(queue_schematics);
+
+        while let Some(x) = queue_bps.pop_front() {
+            let mut all_resolved = true;
+            let mut ignore = false;
+            for pmaterial in x.materials.iter() {
+                // Some blueprints require the same item they produce
+                if x.type_id == pmaterial.type_id {
+                    ignore = true;
+                    continue;
+                }
+
+                if resolved.contains_key(&pmaterial.type_id) {
+                    continue;
+                } else if productions.contains_key(&pmaterial.type_id) {
+                    all_resolved = false;
+                } else if reactions.contains_key(&pmaterial.type_id) {
+                    all_resolved = false;
+                } else if schematics.contains_key(&pmaterial.type_id) {
+                    all_resolved = false;
+                } else {
+                    continue;
+                }
+            }
+
+            if all_resolved && !ignore {
+                let mut children = Vec::new();
+                for pmaterial in x.materials {
+                    if let Some(x) = resolved.get(&pmaterial.type_id) {
+                        let x: BlueprintTree = x.clone();
+                        children.push(x);
+                    } else {
+                        let name = if let Some(x) = assets.get(&pmaterial.type_id) {
+                            x.name().unwrap_or_default()
+                        } else {
+                            format!("Unknown {}", *x.type_id)
+                        };
+
+                        children.push(BlueprintTree {
+                            key:      pmaterial.type_id,
+                            label:    name,
+                            quantity: pmaterial.quantity,
+                            children: None
+                        });
+                    }
+                }
+
+                let name = if let Some(x) = assets.get(&x.type_id) {
+                    x.name().unwrap_or_default()
+                } else {
+                    format!("Unknown {}", *x.type_id)
+                };
+                resolved.insert(x.type_id, BlueprintTree {
+                    key:      x.type_id,
+                    label:    name,
+                    quantity: x.quantity,
+                    children: Some(children)
+                });
+            } else {
+                // At least one material is unknown, so we put this entry back
+                // and try it later again
+                if !ignore {
+                    queue_bps.push_back(x);
+                }
+            }
+        }
+
+        let mut flat_map = Vec::new();
+        let mut resolved_raw_ressources = HashMap::new();
+        for (type_id, entry) in resolved.iter() {
+            let mut raw_resources = HashMap::new();
+            let mut resources = VecDeque::new();
+            resources.extend(entry.clone().children.unwrap_or_default());
+
+            while let Some(x) = resources.pop_front() {
+                let children = x.children.clone().unwrap_or_default();
+                if children.is_empty() {
+                    raw_resources
+                        .entry(x.key)
+                        .and_modify(|e| *e += x.quantity)
+                        .or_insert(x.quantity);
+                } else {
+                    resources.extend(children);
+
+                    flat_map.push(BlueprintFlat {
+                        type_id:  type_id.clone(),
+                        mtype_id: x.key,
+                        quantity: x.quantity,
+                    });
+                }
+            }
+
+            resolved_raw_ressources.insert(type_id, raw_resources);
+        }
+
+        let type_ids = resolved.iter().map(|(x, _)| **x).collect::<Vec<_>>();
+        let trees = resolved
+            .iter()
+            .map(|(_, x)| serde_json::to_value(x).unwrap())
+            .collect::<Vec<_>>();
+
+        tracing::debug!(task = "blueprint_tree", "Start inserting tree in DB");
+        let mut trans = self.pool
+            .begin()
+            .await
+            .map_err(CollectorError::TransactionBeginNotSuccessfull)?;
+
+        sqlx::query!("DELETE FROM blueprint_tree CASCADE")
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::DeletingSdeBlueprintTree)?;
+        sqlx::query!("
+                INSERT INTO blueprint_tree
+                (
+                    type_id,
+                    tree
+                )
+                SELECT * FROM UNNEST(
+                    $1::INTEGER[],
+                    $2::JSON[]
+                )
+            ",
+                &type_ids,
+                &trees
+            )
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::InsertingSdeBlueprintTree)?;
+
+        let mut item_type_ids = Vec::new();
+        let mut material_type_ids = Vec::new();
+        let mut material_quantities = Vec::new();
+        for (type_id, entries) in resolved_raw_ressources {
+            for (mtype_id, quantity) in entries {
+                item_type_ids.push(**type_id);
+                material_type_ids.push(*mtype_id);
+                material_quantities.push(quantity);
+            }
+        }
+        sqlx::query!("DELETE FROM blueprint_raw CASCADE")
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::DeletingSdeBlueprintRaw)?;
+        sqlx::query!("
+                INSERT INTO blueprint_raw
+                (
+                    type_id,
+                    mtype_id,
+                    quantity
+                )
+                SELECT * FROM UNNEST(
+                    $1::INTEGER[],
+                    $2::INTEGER[],
+                    $3::INTEGER[]
+                )
+            ",
+                &item_type_ids,
+                &material_type_ids,
+                &material_quantities
+            )
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::InsertingSdeBlueprintRaw)?;
+
+        let mut item_type_ids = Vec::new();
+        let mut material_type_ids = Vec::new();
+        let mut material_quantities = Vec::new();
+        for entry in flat_map {
+            item_type_ids.push(*entry.type_id);
+            material_type_ids.push(*entry.mtype_id);
+            material_quantities.push(entry.quantity);
+        }
+        sqlx::query!("DELETE FROM blueprint_flat CASCADE")
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::DeletingSdeBlueprintFlat)?;
+        sqlx::query!("
+                INSERT INTO blueprint_flat
+                (
+                    type_id,
+                    mtype_id,
+                    quantity
+                )
+                SELECT * FROM UNNEST(
+                    $1::INTEGER[],
+                    $2::INTEGER[],
+                    $3::INTEGER[]
+                )
+                ON CONFLICT DO NOTHING
+            ",
+                &item_type_ids,
+                &material_type_ids,
+                &material_quantities
+            )
+            .execute(&mut trans)
+            .await
+            .map_err(CollectorError::InsertingSdeBlueprintFlat)?;
+
+        trans.commit()
+            .await
+            .map_err(CollectorError::TransactionCommitNotSuccessfull)?;
+        tracing::debug!(task = "asset", "Finished inserting assets in DB");
+
+        Ok(())
+    }
+}
+
+
+#[derive(Clone, Debug, Serialize)]
+struct BlueprintTree {
+    key:      TypeId,
+    label:    String,
+    quantity: i32,
+    children: Option<Vec<BlueprintTree>>
+}
+
+#[derive(Clone, Debug)]
+struct BlueprintProduct {
+    type_id:   TypeId,
+    quantity:  i32,
+    materials: Vec<ProductMaterial>
+}
+
+#[derive(Clone, Debug)]
+struct BlueprintFlat {
+    type_id:  TypeId,
+    mtype_id: TypeId,
+    quantity: i32
+}
+
+#[derive(Clone, Debug)]
+struct ProductMaterial {
+    type_id:  TypeId,
+    quantity: i32,
 }
 
 /// All valid activities that a blueprint can have
@@ -660,7 +1069,7 @@ pub enum BlueprintActivity {
     Copy,
     /// Activity of inventing a blueprint, to create an improved one
     Invention,
-    /// Activity of manufactoring an item from a blueprint
+    /// Activity of manufacturing an item from a blueprint
     Manufacture,
     /// Activity of creating an item using reactions
     Reaction,

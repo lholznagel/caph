@@ -20,6 +20,11 @@ pub enum ServerError {
     CouldNotParseServerListenAddr,
     /// Could not start server
     CouldNotStartServer,
+
+    /// A transaction could not be established
+    TransactionBeginNotSuccessfull(sqlx::Error),
+    /// The transactin could not be commited
+    TransactionCommitNotSuccessfull(sqlx::Error),
 }
 
 impl Error for ServerError {}
@@ -56,7 +61,10 @@ impl IntoResponse for ServerError {
         let (status, msg) = match self {
             ServerError::InvalidUser => (StatusCode::FORBIDDEN, "Forbidden"),
             ServerError::NotFound    => (StatusCode::NOT_FOUND, "Requested entry not found"),
-            _ => (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
+            _ => {
+                tracing::error!("Error {:?}", self);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
+            }
         };
 
         let body = Json(json!({

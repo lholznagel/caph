@@ -73,8 +73,8 @@ impl Time {
             0
         );
 
-        if date_time.hour() > 14 ||
-           date_time.hour() == 14 && date_time.minute() > 30 {
+        if date_time.hour() > 13 ||
+           date_time.hour() == 13 && date_time.minute() > 30 {
 
             let _ = date_time
                 .checked_add_signed(chrono::Duration::days(1));
@@ -84,7 +84,7 @@ impl Time {
         // ahead. We take the date and set the hms to 14:30:00.
         NaiveDateTime::new(
             date_time.date(),
-            NaiveTime::from_hms(14, 30, 0)
+            NaiveTime::from_hms(13, 30, 0)
         )
     }
 }

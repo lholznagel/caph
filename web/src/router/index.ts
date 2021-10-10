@@ -3,7 +3,7 @@ import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
-    redirect: '/characters'
+    redirect: '/assets'
   },
   {
     path: '/assets',
@@ -14,63 +14,31 @@ const routes: Array<RouteRecordRaw> = [
     )
   },
   {
-    path: '/assets/:tid/:iid?',
-    name: 'asset_details',
+    path: '/industry/projects',
+    name: 'industry_projects',
     component: () => import(
-      /* webpackChunkName: "assets" */
-      '@/views/Assets.vue'
+      /* webpackChunkName: "industry_projects" */
+      '@/views/Projects.vue'
     )
   },
   {
-    path: '/blueprints',
-    name: 'blueprint_overview',
+    path: '/industry/projects/new',
+    name: 'project_new',
     component: () => import(
-      /* webpackChunkName: "blueprintOverview" */
-      '@/views/BlueprintOverview.vue'
+      /* webpackChunkName: "industry_project_option" */
+      '@/views/ProjectOption.vue'
     )
   },
   {
-    path: '/blueprint/:tid/:iid?',
-    name: 'blueprint',
-    component: () => import(
-      /* webpackChunkName: "blueprintInfo" */
-      '../views/Blueprint.vue'
-    )
-  },
-  {
-    path: '/projects',
-    name: 'projects',
-    component: () => import(
-      /* webpackChunkName: "project_overview" */
-      '@/views/ProjectOverview.vue'
-    )
-  },
-  {
-    path: '/projects/:id',
+    path: '/industry/projects/:pid',
     name: 'project',
     component: () => import(
-      /* webpackChunkName: "project" */
+      /* webpackChunkName: "industry_project" */
       '@/views/Project.vue'
     )
   },
   {
-    path: '/projects/new',
-    name: 'project_new',
-    component: () => import(
-      /* webpackChunkName: "project_new" */
-      '@/views/ProjectNew.vue'
-    )
-  },
-  {
-    path: '/industry',
-    name: 'industry_jobs',
-    component: () => import(
-      /* webpackChunkName: "industry_jobs" */
-      '@/views/Industry.vue'
-    )
-  },
-  {
-    path: '/characters',
+    path: '/settings/characters',
     name: 'characters',
     component: () => import(
       /* webpackChunkName: "settings_characters" */
@@ -78,35 +46,11 @@ const routes: Array<RouteRecordRaw> = [
     )
   },
   {
-    path: '/admin/meta',
-    name: 'meta',
+    path: '/settings/stations',
+    name: 'stations',
     component: () => import(
-      /* webpackChunkName: "meta" */
-      '@/views/Meta.vue'
-    )
-  },
-  {
-    path: '/admin/network',
-    name: 'network',
-    component: () => import(
-      /* webpackChunkName: "network" */
-      '@/views/Network.vue'
-    )
-  },
-  {
-    path: '/admin/corp/blueprints',
-    name: 'corp_blueprints',
-    component: () => import(
-      /* webpackChunkName: "corp_blueprints" */
-      '@/views/CorpBlueprints.vue'
-    )
-  },
-  {
-    path: '/admin/alliance/fittings',
-    name: 'alliance_fittings',
-    component: () => import(
-      /* webpackChunkName: "alliance_fittings" */
-      '@/views/AllianceFittings.vue'
+      /* webpackChunkName: "settings_characters" */
+      '@/views/SettingStations.vue'
     )
   }
 ]

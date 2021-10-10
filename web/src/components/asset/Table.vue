@@ -5,7 +5,7 @@
         <th width="24"></th>
         <th width="34"></th>
         <th>Name</th>
-        <th width="50">Quantity</th>
+        <th width="50">Qty.</th>
         <th width="100">Owners</th>
       </tr>
     </thead>
@@ -29,12 +29,12 @@
           <td width="34">
             <item-icon
               :id="entry.type_id"
-              :type="entry.name.indexOf('Blueprint') === -1 ? 'icon' : 'bp'"
+              :type="icon(entry)"
               :width="32"
             />
           </td>
           <td>{{ entry.name }}</td>
-          <td>{{ entry.quantity }}</td>
+          <td><format-number :value="entry.quantity" /></td>
           <td>
             <n-space>
               <owner
@@ -59,8 +59,10 @@
 import { NButton, NIcon, NPagination, NSkeleton, NSpace, NTable } from 'naive-ui';
 import { AngleDown, AngleRight } from '@vicons/fa';
 import { Options, Vue , prop} from 'vue-class-component';
+import { IGenericAsset } from '@/services/asset';
 
 import AssetInfo from '@/components/asset/Info.vue';
+import FormatNumber from '@/components/FormatNumber.vue';
 import ItemIcon from '@/components/ItemIcon.vue';
 import Owner from '@/components/Owner.vue';
 
@@ -84,9 +86,23 @@ class Props {
     AngleRight,
 
     AssetInfo,
+    FormatNumber,
     ItemIcon,
     Owner,
   }
 })
-export default class CharacterAsset extends Vue.with(Props) {  }
+export default class CharacterAsset extends Vue.with(Props) {
+  public icon(entry: IGenericAsset) {
+    if(
+      entry.original === null ||
+      entry.original === undefined
+    ) {
+      return 'icon';
+    } else if (entry.original) {
+      return 'bp';
+    } else {
+      return 'bpc';
+    }
+  }
+}
 </script>

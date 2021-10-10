@@ -41,6 +41,9 @@ export default class CategoryName extends Vue.with(Props) {
       case 18:
         this.name = 'Drone'
         break;
+      case 20:
+        this.name = 'Implant'
+        break;
       default:
         this.name = 'Unknown ' + this.id
     }

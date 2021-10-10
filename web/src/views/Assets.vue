@@ -24,16 +24,15 @@ NTag } from 'naive-ui';
 import { Options, Vue } from 'vue-class-component';
 import { h, VNode } from 'vue';
 
+import { AssetService, IGenericAsset } from '@/services/asset';
+
 import AssetInfo from '@/components/asset/Info.vue';
 import AssetTable from '@/components/asset/Table.vue';
+import CategoryName from '@/components/CategoryName.vue';
+import FilterElement from '@/components/FilterElement.vue';
+import FilterText, { IFilterOption } from '@/components/Filter.vue';
 import ItemIcon from '@/components/ItemIcon.vue';
 import Owner from '@/components/Owner.vue';
-
-import { AssetService, ICharacterAsset } from '@/services/asset';
-import { CharacterService } from '@/services/character';
-import FilterText, { IFilterOption } from '@/components/Filter.vue';
-import FilterElement from '@/components/FilterElement.vue';
-import CategoryName from '../components/CategoryName.vue';
 
 @Options({
   components: {
@@ -54,20 +53,22 @@ import CategoryName from '../components/CategoryName.vue';
     Owner,
   }
 })
-export default class CharacterAsset extends Vue {
+export default class Assets extends Vue {
   public busy: boolean = false;
 
-  public entries: ICharacterAsset[] = [];
+  public entries: IGenericAsset[] = [];
 
-  public filters = {};
+  public filters: any = {};
   public filterOptions: { [key: string]: IFilterOption } = {};
 
   public async created() {
     this.busy = true;
 
+    this.filters = this.$route.query;
+
     await this.fetch_assets();
 
-    let owner_opts = [];
+    let owner_opts: number[] = [];
     this.entries.map(x => x.owners
         .forEach(x => {
           if (owner_opts.indexOf(x) === -1) {
@@ -76,7 +77,7 @@ export default class CharacterAsset extends Vue {
         })
     );
 
-    let category_opts = [];
+    let category_opts: number[] = [];
     this.entries.map(x => {
       if (category_opts.indexOf(x.category_id) === -1) {
         category_opts.push(x.category_id)

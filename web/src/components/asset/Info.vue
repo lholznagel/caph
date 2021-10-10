@@ -12,23 +12,23 @@
         </tr>
 
         <tr>
+          <th>Category</th>
+          <td><category-name :id="info.category_id" /></td>
+        </tr>
+
+        <tr>
           <th>Quantity</th>
           <td>{{ info.quantity }}</td>
         </tr>
 
         <tr>
-          <th>Flag</th>
-          <td>{{ info.location_flag }}</td>
-        </tr>
-
-        <tr>
-          <th>Locations</th>
+          <th>Location</th>
           <td>
-            <location-name
+            <station-name
               v-if="info.reference_id && references[idx]"
               :id="references[idx].location_id"
             />
-            <location-name
+            <station-name
               v-if="!info.reference_id"
               :id="info.location_id"
             />
@@ -36,8 +36,8 @@
         </tr>
 
         <tr>
-          <th>Owner</th>
-          <td><owner :id="info.owner" :with-text="true" /></td>
+          <th>Flag</th>
+          <td>{{ info.location_flag }}</td>
         </tr>
 
         <tr v-if="info.reference_id && references[idx]">
@@ -47,19 +47,55 @@
             (<asset-name :id="references[idx].item_id" />)
           </td>
         </tr>
+
+        <tr v-if="info.category_id === 6">
+          <th>Ship Name</th>
+          <td>
+            <asset-name :id="info.item_id" />
+          </td>
+        </tr>
+
+        <tr v-if="info.original !== null">
+          <th>BP-Type</th>
+          <td>
+            <n-tag v-if="info.original" type="info">Original</n-tag>
+            <n-tag v-if="!info.original" type="warning">Copy</n-tag>
+          </td>
+        </tr>
+
+        <tr v-if="info.original !== null">
+          <th>Material Efficiency</th>
+          <td>{{ info.material_eff }}</td>
+        </tr>
+
+        <tr v-if="info.original !== null">
+          <th>Time Efficiency</th>
+          <td>{{ info.time_eff }}</td>
+        </tr>
+
+        <tr v-if="info.original !== null">
+          <th>Remaining runs</th>
+          <td>{{ info.runs }}</td>
+        </tr>
+
+        <tr>
+          <th>Owner</th>
+          <td><owner :id="info.owner" :with-text="true" /></td>
+        </tr>
       </tbody>
     </n-table>
   </div>
 </template>
 
 <script lang="ts">
-import { NTable } from 'naive-ui';
+import { NTable, NTag } from 'naive-ui';
 import { Options, Vue, prop } from 'vue-class-component';
 
 import { AssetService, IAsset } from '@/services/asset';
 
-import AssetName from '@/components/asset/Name.vue';
-import LocationName from '@/components/LocationName.vue';
+import AssetName from '@/components/AssetName.vue';
+import CategoryName from '@/components/CategoryName.vue';
+import StationName from '@/components/StationName.vue';
 import Owner from '@/components/Owner.vue';
 
 class Props {
@@ -72,9 +108,11 @@ class Props {
 @Options({
   components: {
     NTable,
+    NTag,
 
     AssetName,
-    LocationName,
+    CategoryName,
+    StationName,
     Owner
   }
 })

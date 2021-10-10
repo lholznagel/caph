@@ -79,6 +79,16 @@ impl SdeService {
             .map_err(ConnectError::SdeParseError)
     }
 
+    /// List of all filenames in the zip file
+    ///
+    /// # Returns
+    ///
+    /// List of all filenames
+    ///
+    pub fn file_names(&self) -> impl Iterator<Item = &str> {
+        self.0.file_names()
+    }
+
     /// Downloads the SDE.zip file.
     ///
     /// # Errors

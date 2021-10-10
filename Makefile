@@ -17,19 +17,19 @@ docs-open:
 	cargo clippy
 	cargo doc --no-deps --document-private-items --all-features --open
 
-musl:
-	cargo build --target x86_64-unknown-linux-musl --release
+release:
+	cargo build --release
 
-deploy-collector: musl
-	sudo rsync target/x86_64-unknown-linux-musl/release/caph_collector /opt/caph/caph_collector
+deploy-collector: release
+	sudo rsync target/release/caph_collector /opt/caph/collector
 	sudo systemctl restart caph_collector
 
-deploy-server: musl
-	sudo rsync target/x86_64-unknown-linux-musl/release/caph_server /opt/caph/caph_server
+deploy-server: release
+	sudo rsync target/release/caph_server /opt/caph/server
 	sudo systemctl restart caph_server
 
 deploy-web:
-	cd web; npm run build
+	cd web; npm run release
 	sudo rsync --recursive --inplace --delete web/dist/ /opt/caph/web
 
 deploy:

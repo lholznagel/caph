@@ -13,6 +13,7 @@ pub fn router() -> Router<BoxRoute> {
     Router::new()
         .route("/alts", get(alts)).boxed()
         .route("/ids", get(ids)).boxed()
+        .route("/asset/views", get(asset_views)).boxed()
         .route("/:id/name", get(name)).boxed()
 }
 
@@ -42,4 +43,21 @@ async fn name(
     let character_id = character_id.into();
     let name = character_service.by_id(character_id).await?.character;
     Ok((StatusCode::OK, Json(name)))
+}
+
+async fn asset_views(
+    _character_service: Extension<CharacterService>,
+) -> Result<impl IntoResponse, ServerError> {
+    let json = serde_json::json!([{
+        "name": "Blueprints",
+        "query": {
+            "category": 9
+        }
+    }, {
+        "name": "Ships",
+        "query": {
+            "category": 6
+        }
+    }]);
+    Ok((StatusCode::OK, Json(json)))
 }

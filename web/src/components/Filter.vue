@@ -56,12 +56,12 @@ class Props {
   }
 })
 export default class Filter extends Vue.with(Props) {
-  public search: string = '';
+  public search: string      = '';
   public selectedKey: string = '';
 
-  public filterOptions: any = [];
+  public filterOptions: any     = [];
   public filterOptionsOrig: any = [];
-  public showOptions: boolean = false;
+  public showOptions: boolean   = false;
 
   public created() {
     for (let key of Object.keys(this.options)) {
@@ -143,7 +143,7 @@ export default class Filter extends Vue.with(Props) {
 
 export interface IFilterOption {
   label:     string;
-  options?:  string[];
+  options?:  string[] | number[];
   template?: (val: string) => VNode;
 }
 </script>

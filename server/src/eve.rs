@@ -20,6 +20,7 @@ const EVE_SCOPE: &[&'static str] = &[
     "esi-fittings.read_fittings.v1",
     "esi-fittings.write_fittings.v1",
     "esi-industry.read_character_jobs.v1",
+    "esi-industry.read_corporation_jobs.v1",
     "esi-industry.read_character_mining.v1",
     "esi-markets.read_character_orders.v1",
     "esi-markets.structure_markets.v1",

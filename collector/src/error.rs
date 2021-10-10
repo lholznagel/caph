@@ -27,6 +27,10 @@ pub enum CollectorError {
     CouldNotGetCharacterAssetNames(caph_connector::ConnectError),
     /// Error while fetching character asset names
     CouldNotGetCharacterAssetItemIds(sqlx::Error),
+    /// Error while fetching character asset names
+    CouldNotGetCharacterIndustryJobs(caph_connector::ConnectError),
+    /// While deleting all old character industry jobs
+    DeletingCharacterIndustryJobs(sqlx::Error),
 
     /// Error while inserting character blueprints
     InsertingCharacterBlueprints(sqlx::Error),
@@ -57,17 +61,34 @@ pub enum CollectorError {
     InsertingSdeStation(sqlx::Error),
     /// Deleting the current SDE station data failed
     DeletingSdeStation(sqlx::Error),
+    /// Error while inserting SDE system data
+    InsertingSdeSystem(sqlx::Error),
+    /// Deleting the current SDE system data failed
+    DeletingSdeSystem(sqlx::Error),
+    /// Error while inserting SDE blueprint tree data
+    InsertingSdeBlueprintTree(sqlx::Error),
+    /// Deleting the current SDE blueprint tree data failed
+    DeletingSdeBlueprintTree(sqlx::Error),
+    /// Error while inserting SDE blueprint raw data
+    InsertingSdeBlueprintRaw(sqlx::Error),
+    /// Deleting the current SDE blueprint raw data failed
+    DeletingSdeBlueprintRaw(sqlx::Error),
+    /// Error while inserting SDE blueprint flat data
+    InsertingSdeBlueprintFlat(sqlx::Error),
+    /// Deleting the current SDE blueprint flat data failed
+    DeletingSdeBlueprintFlat(sqlx::Error),
     /// Error loading a file from the zip file
     LoadSdeFile(caph_connector::ConnectError),
     /// Error while downloading the SDE zip file
     LoadingSdeZip(caph_connector::ConnectError),
 
-    /// An eve client could not be constructed
-    CouldNotCreateEveClient(caph_connector::ConnectError),
     /// A transaction could not be established
     TransactionBeginNotSuccessfull(sqlx::Error),
     /// The transactin could not be commited
     TransactionCommitNotSuccessfull(sqlx::Error),
+
+    /// An eve client could not be constructed
+    CouldNotCreateEveClient(caph_connector::ConnectError),
 
     /// Error parsing the listener address
     CouldNotParseServerListenAddr,

@@ -1,14 +1,14 @@
 <template>
-  <n-text>{{ name || 'Unknown ' + id }}</n-text>
+  <n-text>{{ name || 'Unknown ' + tid }}</n-text>
 </template>
 
 <script lang="ts">
 import { NText } from 'naive-ui';
 import { Options, Vue, prop } from 'vue-class-component';
-import { AssetService } from '@/services/asset';
+import { ItemService } from '@/services/item';
 
 class Props {
-  id = prop({
+  tid = prop({
     type:     Number,
     required: true
   })
@@ -19,11 +19,11 @@ class Props {
     NText
   }
 })
-export default class LocationName extends Vue.with(Props) {
+export default class ItemName extends Vue.with(Props) {
   public name: string = '';
 
   public async created() {
-    this.name = await AssetService.location_name(this.id);
+    this.name = await ItemService.item_name(this.tid);
   }
 }
 </script>

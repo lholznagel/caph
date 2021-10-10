@@ -34,7 +34,7 @@
         </n-layout-sider>
 
         <n-layout content-style="padding: 24px;" :native-scrollbar="false">
-          <router-view v-if="isLoggedIn()" />
+          <router-view :key="$route.fullPath" v-if="isLoggedIn()" />
 
           <n-result
             status="403"
@@ -59,6 +59,8 @@ import {
   NLayout, NLayoutHeader, NLayoutSider, NMenu, NResult
 } from 'naive-ui';
 import { Options, Vue } from 'vue-class-component';
+import { h } from 'vue';
+import { RouterLink } from 'vue-router';
 
 @Options({
   components: {
@@ -71,6 +73,8 @@ import { Options, Vue } from 'vue-class-component';
     NLayoutSider,
     NMenu,
     NResult,
+
+    RouterLink
   }
 })
 export default class App extends Vue {
@@ -84,29 +88,12 @@ export default class App extends Vue {
     label: 'Assets',
     key:   'assets',
     type:  'group',
-    children: [
-      {
-        label: 'All',
-        key:   'assets',
-      },
-      {
-        label: 'Blueprints',
-        key:   'blueprint_overview',
-      }
-    ]
   }, {
     label: 'Industry',
     key:   'industry',
     type:  'group',
     children: [
-      {
-        label: 'Jobs',
-        key:   'industry_jobs'
-      },
-      {
-        label: 'Projects',
-        key:   'projects'
-      }
+      this.app_link('industry_projects', 'Projects'),
     ]
   }, {
     label: 'Settings',
@@ -116,24 +103,10 @@ export default class App extends Vue {
       {
         label: 'Characters',
         key:   'characters'
-      }
-    ]
-  }, {
-    label: 'Admin stuff',
-    key:   'admin_stuff',
-    type:  'group',
-    children: [
-      {
-        label: 'Metadata',
-        key:   'meta'
       },
       {
-        label: 'Corp Blueprints',
-        key:   'corp_blueprints'
-      },
-      {
-        label: 'Alliance Fittings',
-        key:   'alliance_fittings'
+        label: 'Stations',
+        key:   'stations'
       }
     ]
   }];
@@ -145,10 +118,62 @@ export default class App extends Vue {
       let globalWindow: any = window;
       globalWindow.whoami = res.data;
     }
+
+    this.options[0].children = <any>[
+      {
+        label: () =>
+        h(
+          RouterLink,
+          {
+            to: {
+              name: 'assets',
+            }
+          },
+          { default: () => 'All' }
+        ),
+        key: 'assets',
+      },
+    ];
+
+    const views = (await axios.get<any>('/api/character/asset/views')).data;
+    for (let view of views) {
+      (this.options[0].children || []).push(<any>{
+        label: () =>
+          h(
+            RouterLink,
+            {
+              to: {
+                name: 'assets',
+                query: view.query
+              }
+            },
+            { default: () => view.name }
+          ),
+        key: 'assets_' + view.name,
+      })
+    }
+  }
+
+  public app_link(to: string, name: string) {
+    return {
+      label: () =>
+        h(
+          RouterLink,
+          {
+            to: {
+              name: to,
+            }
+          },
+          { default: () => name }
+        ),
+      key: to,
+    };
   }
 
   public handleUpdateValue(key: string, _: string) {
-    this.$router.push({ name: key });
+    if (!key.startsWith('assets')) {
+      this.$router.push({ name: key });
+    }
   }
 
   public redirectLogin() {
