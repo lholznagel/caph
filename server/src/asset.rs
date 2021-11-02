@@ -22,7 +22,7 @@ impl AssetService {
         &self,
         cid: CharacterId,
         iid: ItemId
-    ) -> Result<Asset, ServerError> {
+    ) -> Result<Option<Asset>, ServerError> {
         // https://github.com/launchbadge/sqlx/issues/367
         let entry = sqlx::query("
                 SELECT
@@ -35,15 +35,14 @@ impl AssetService {
                     i.category_id,
                     i.group_id
                 FROM asset a
-                LEFT JOIN asset_blueprint ab
-                    ON ab.item_id = a.item_id
                 LEFT JOIN item i
                     ON a.type_id = i.type_id
+                LEFT JOIN asset_blueprint ab
+                    ON ab.item_id = a.item_id
                 WHERE a.character_id = ANY(
-                    SELECT DISTINCT character_id
-                    FROM login
+                    SELECT character_id
+                    FROM character
                     WHERE character_id = $1 OR character_main = $1
-                    AND character_id IS NOT NULL
                 )
                   AND a.item_id = $2
             ")
@@ -79,12 +78,7 @@ impl AssetService {
             })
             .fetch_optional(&self.pool)
             .await?;
-
-        if let Some(e) = entry {
-            Ok(e)
-        } else {
-            Err(ServerError::NotFound)
-        }
+        Ok(entry)
     }
 
     pub async fn asset_name(

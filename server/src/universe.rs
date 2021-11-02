@@ -10,12 +10,36 @@ pub struct UniverseService {
 }
 
 impl UniverseService {
+    /// Creates a new service instance
+    ///
+    /// # Params
+    ///
+    /// * `pool` -> Postgres connection pool
+    ///
+    /// # Returns
+    ///
+    /// New instance
+    ///
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool
         }
     }
 
+    /// Gets a list of all stations that where added by the character
+    ///
+    /// # Params
+    ///
+    /// * `cid` -> [CharacterId] of the character that added the station
+    ///
+    /// # Errors
+    ///
+    /// Fails if the postgres is not available
+    ///
+    /// # Returns
+    ///
+    /// List of stations
+    ///
     pub async fn stations(
         &self,
         cid: CharacterId,

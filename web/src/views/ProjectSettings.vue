@@ -107,7 +107,7 @@ import StationSelector from '@/components/StationSelector.vue';
     StationSelector,
   }
 })
-export default class ProjectNew extends Vue {
+export default class ProjectSettings extends Vue {
   public busy: boolean = false;
 
   public production_list: string = '';
@@ -137,7 +137,9 @@ export default class ProjectNew extends Vue {
     this.busy = false;
   }
 
-  public debounce(fnc: any) {
+  // Debounces the user input for 500 milliseconds
+  // After the debounce the given function is executed
+  public debounce(fnc: () => void): void {
     clearTimeout(this.debounce_timeout);
     this.debounce_timeout = setTimeout(() => { fnc() }, 500)
   }
@@ -218,7 +220,7 @@ export default class ProjectNew extends Vue {
 
   public back() {
     this.$router.push({
-      name: 'projects',
+      name: 'industry_projects',
     });
   }
 

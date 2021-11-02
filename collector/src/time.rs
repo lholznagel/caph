@@ -8,13 +8,6 @@ pub struct Time {
 }
 
 impl Time {
-    /// Creates a new instance
-    pub fn new() -> Self {
-        Self {
-            current_ts: Utc::now().timestamp()
-        }
-    }
-
     /// Creates a new duration for the next character task run
     ///
     pub fn duration_next_character(&self) -> Duration {
@@ -86,5 +79,13 @@ impl Time {
             date_time.date(),
             NaiveTime::from_hms(13, 30, 0)
         )
+    }
+}
+
+impl Default for Time {
+    fn default() -> Self {
+        Self {
+            current_ts: Utc::now().timestamp()
+        }
     }
 }

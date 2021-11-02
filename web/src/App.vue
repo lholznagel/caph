@@ -93,6 +93,7 @@ export default class App extends Vue {
     key:   'industry',
     type:  'group',
     children: [
+      this.app_link('industry_jobs', 'Jobs'),
       this.app_link('industry_projects', 'Projects'),
     ]
   }, {
@@ -100,14 +101,8 @@ export default class App extends Vue {
     key:   'settings',
     type:  'group',
     children: [
-      {
-        label: 'Characters',
-        key:   'characters'
-      },
-      {
-        label: 'Stations',
-        key:   'stations'
-      }
+      this.app_link('characters', 'Characters'),
+      this.app_link('stations', 'Stations'),
     ]
   }];
 

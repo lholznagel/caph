@@ -93,6 +93,8 @@ class Props {
 })
 export default class CharacterAsset extends Vue.with(Props) {
   public icon(entry: IGenericAsset) {
+    console.log(entry.original)
+
     if(
       entry.original === null ||
       entry.original === undefined

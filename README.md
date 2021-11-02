@@ -60,3 +60,7 @@ project with the following variables:
 * `EVE_CALLBACK`     -> Callback after login, set when creating the application
 * `REDIRECT`         -> Redirect after the user logged in.
                         Default: `http://localhost:8080`
+
+### Misc-Info
+
+- In this application the difference between assets and items is declared as `An asset belongs to a EVE-Character, an item does not belong to any character`. If a menu shows specific items of a asset / character it should use the `asset` API of the server (using an `ItemId`), if only general information about an item is required, it should use the `item` API

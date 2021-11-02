@@ -4,17 +4,16 @@ use crate::eve::{EveAuthQuery, EveService, LoggedInCharacter};
 
 use axum::{Json, Router};
 use axum::extract::{Extension, Query, TypedHeader};
-use axum::handler::get;
 use axum::http::header::{LOCATION, SET_COOKIE};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Redirect};
-use axum::routing::BoxRoute;
+use axum::routing::get;
 use headers::{Cookie, HeaderMap};
 use std::str::FromStr;
 use uuid::Uuid;
 
 /// Url to redirect after login
-const REDIRECT: &str         = "REDIRECT";
+const REDIRECT: &str = "REDIRECT";
 
 /// Returns the router so that it can be used for a subroute
 ///
@@ -22,12 +21,12 @@ const REDIRECT: &str         = "REDIRECT";
 ///
 /// New router
 ///
-pub fn router() -> Router<BoxRoute> {
+pub fn router() -> Router {
     Router::new()
-        .route("/callback", get(callback)).boxed()
-        .route("/login", get(login)).boxed()
-        .route("/login/alt", get(login_alt)).boxed()
-        .route("/whoami", get(whoami)).boxed()
+        .route("/callback", get(callback))
+        .route("/login", get(login))
+        .route("/login/alt", get(login_alt))
+        .route("/whoami", get(whoami))
 }
 
 /// Route: `/api/auth/callback`

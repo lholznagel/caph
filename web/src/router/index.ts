@@ -14,6 +14,14 @@ const routes: Array<RouteRecordRaw> = [
     )
   },
   {
+    path: '/industry/jobs',
+    name: 'industry_jobs',
+    component: () => import(
+      /* webpackChunkName: "industry_jobs" */
+      '@/views/Jobs.vue'
+    )
+  },
+  {
     path: '/industry/projects',
     name: 'industry_projects',
     component: () => import(
@@ -25,8 +33,8 @@ const routes: Array<RouteRecordRaw> = [
     path: '/industry/projects/new',
     name: 'project_new',
     component: () => import(
-      /* webpackChunkName: "industry_project_option" */
-      '@/views/ProjectOption.vue'
+      /* webpackChunkName: "industry_project_settings" */
+      '@/views/ProjectSettings.vue'
     )
   },
   {
@@ -49,7 +57,7 @@ const routes: Array<RouteRecordRaw> = [
     path: '/settings/stations',
     name: 'stations',
     component: () => import(
-      /* webpackChunkName: "settings_characters" */
+      /* webpackChunkName: "settings_stations" */
       '@/views/SettingStations.vue'
     )
   }

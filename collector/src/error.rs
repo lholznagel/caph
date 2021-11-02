@@ -27,11 +27,14 @@ pub enum CollectorError {
     CouldNotGetCharacterAssetNames(caph_connector::ConnectError),
     /// Error while fetching character asset names
     CouldNotGetCharacterAssetItemIds(sqlx::Error),
-    /// Error while fetching character asset names
-    CouldNotGetCharacterIndustryJobs(caph_connector::ConnectError),
+
     /// While deleting all old character industry jobs
     DeletingCharacterIndustryJobs(sqlx::Error),
+    /// Error while fetching character asset names
+    CouldNotGetCharacterIndustryJobs(caph_connector::ConnectError),
 
+    /// While deleting all old character blueprints and error occured
+    DeletingCharacterBlueprints(sqlx::Error),
     /// Error while inserting character blueprints
     InsertingCharacterBlueprints(sqlx::Error),
     /// Error while fetching character blueprints

@@ -49,7 +49,7 @@ pub async fn start(
                     .nest("/asset", asset::router())
                     .nest("/auth", auth::router())
                     .nest("/character", character::router())
-                    .nest("/industry", universe::router())
+                    .nest("/industry", industry::router())
                     .nest("/item", item::router())
                     .nest("/project", project::router())
                     .nest("/universe", universe::router())

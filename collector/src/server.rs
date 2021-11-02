@@ -2,9 +2,9 @@ use crate::CollectorError;
 
 use axum::extract::Extension;
 use axum::{AddExtensionLayer, Json, Router};
-use axum::handler::get;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
+use axum::routing::get;
 use serde::Serialize;
 use sqlx::{Connection, PgPool};
 use std::sync::{Arc, Mutex};
@@ -35,8 +35,8 @@ pub async fn start_server(
     state: Arc<Mutex<TaskState>>
 ) -> Result<(), CollectorError> {
     let app = Router::new()
-        .route("/health", get(health)).boxed()
-        .route("/status", get(status)).boxed()
+        .route("/health", get(health))
+        .route("/status", get(status))
         .layer(AddExtensionLayer::new(pg))
         .layer(AddExtensionLayer::new(state))
         .into_make_service();
@@ -88,6 +88,7 @@ async fn health(
 async fn status(
     state: Extension<Arc<Mutex<TaskState>>>
 ) -> Result<impl IntoResponse, CollectorError> {
+    #[allow(clippy::unwrap_used)]
     let state = { state.lock().unwrap().clone() };
     Ok((StatusCode::OK, Json(state)))
 }

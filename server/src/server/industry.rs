@@ -4,14 +4,13 @@ use crate::industry::IndustryService;
 
 use axum::{Json, Router};
 use axum::extract::Extension;
-use axum::handler::get;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::BoxRoute;
+use axum::routing::get;
 
-pub fn router() -> Router<BoxRoute> {
+pub fn router() -> Router {
     Router::new()
-        .route("/jobs", get(jobs)).boxed()
+        .route("/jobs", get(jobs))
 }
 
 async fn jobs(

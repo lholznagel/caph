@@ -36,7 +36,7 @@
       </n-tab-pane>
 
       <n-tab-pane name="Settings">
-        <project-option />
+        <project-settings />
       </n-tab-pane>
     </n-tabs>
   </n-card>
@@ -48,7 +48,7 @@ import { NCard, NSkeleton, NTabs, NTabPane, NTimeline, NTimelineItem } from 'nai
 import { ProjectService, IProject } from '@/services/project';
 
 import ProjectBuildstep from '@/components/project/Buildstep.vue';
-import ProjectOption from '@/views/ProjectOption.vue';
+import ProjectSettings from '@/views/ProjectSettings.vue';
 import ProjectOverview from '@/components/project/Overview.vue';
 import ProjectRaw from '@/components/project/Raw.vue';
 import ProjectRequiredBlueprints from '@/components/project/Blueprints.vue';
@@ -65,10 +65,10 @@ import ProjectTree from '@/components/project/Tree.vue';
     NTimelineItem,
 
     ProjectBuildstep,
-    ProjectOption,
     ProjectOverview,
     ProjectRaw,
     ProjectRequiredBlueprints,
+    ProjectSettings,
     ProjectTree,
   }
 })

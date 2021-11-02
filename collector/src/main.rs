@@ -69,7 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 status = ProcessStatus::Ok;
             }
 
-            let time = Time::new();
+            let time = Time::default();
             let next_ts = time.datetime_next_sde().timestamp();
             let next_iso = time.datetime_next_sde();
             let duration = timed.elapsed().as_secs();
@@ -112,7 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         loop {
             let timed = std::time::Instant::now();
-            tracing::info!("Character task started.");
+
             if let Err(e) = character.task().await {
                 tracing::error!("Error running character task {:?}", e);
                 status = ProcessStatus::Error;
@@ -122,7 +122,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 status = ProcessStatus::Ok;
             }
 
-            let time = Time::new();
+            let time = Time::default();
             let next_ts = time.datetime_next_character().timestamp();
             let next_iso = time.datetime_next_character();
             let duration = timed.elapsed().as_secs();

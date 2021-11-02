@@ -14,6 +14,7 @@ export interface IIndustryJob {
   installer_id:      number;
   facility_id:       number;
   job_id:            number;
+  name:              string;
   // Added by us
   remaining?:        number;
 }

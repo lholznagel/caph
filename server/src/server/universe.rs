@@ -5,18 +5,17 @@ use crate::universe::UniverseService;
 
 use axum::{Json, Router};
 use axum::extract::{Extension, Path};
-use axum::handler::get;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::BoxRoute;
+use axum::routing::get;
 use caph_connector::{StationId, SystemId};
 
-pub fn router() -> Router<BoxRoute> {
+pub fn router() -> Router {
     Router::new()
-        .route("/stations", get(stations).post(add_station)).boxed()
-        .route("/stations/:sid", get(station).delete(delete_station)).boxed()
-        .route("/systems", get(systems)).boxed()
-        .route("/systems/:sid", get(system)).boxed()
+        .route("/stations", get(stations).post(add_station))
+        .route("/stations/:sid", get(station).delete(delete_station))
+        .route("/systems", get(systems))
+        .route("/systems/:sid", get(system))
 }
 
 async fn stations(

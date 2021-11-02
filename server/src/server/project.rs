@@ -4,28 +4,27 @@ use crate::eve::LoggedInCharacter;
 
 use axum::{Json, Router};
 use axum::extract::{Extension, Path};
-use axum::handler::get;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::BoxRoute;
+use axum::routing::get;
 use uuid::Uuid;
 
-pub fn router() -> Router<BoxRoute> {
+pub fn router() -> Router {
     Router::new()
         .route("/",
             get(projects)
             .post(create_project)
-        ).boxed()
+        )
         .route("/:pid",
             get(by_id)
             .put(update)
             .delete(delete)
-        ).boxed()
-        .route("/:pid/containers",get(containers)).boxed()
-        .route("/:pid/products",get(products)).boxed()
-        .route("/:pid/blueprints/required",get(required_blueprints)).boxed()
-        .route("/:pid/materials/stored",get(stored_materials)).boxed()
-        .route("/:pid/raw",get(raw_materials)).boxed()
+        )
+        .route("/:pid/containers",get(containers))
+        .route("/:pid/products",get(products))
+        .route("/:pid/blueprints/required",get(required_blueprints))
+        .route("/:pid/materials/stored",get(stored_materials))
+        .route("/:pid/raw",get(raw_materials))
 }
 
 async fn projects(

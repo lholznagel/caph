@@ -223,7 +223,7 @@ impl CharacterService {
         client: EveAuthClient,
         cid:    CharacterId,
     ) -> Result<Character, ServerError> {
-        let character_service = ConnectCharacterService::new(client, cid);
+        let character_service = ConnectCharacterService::new(&client, cid);
 
         let character = character_service.info().await?;
 

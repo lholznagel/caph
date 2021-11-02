@@ -19,7 +19,7 @@
                 <td><item-icon :id="product.type_id" type="icon" /></td>
                 <td>{{ product.count }}</td>
                 <td>{{ stored_material(product.type_id) }}</td>
-                <td><item-name :tid="product.type_id" /></td>
+                <td><asset-name :tid="product.type_id" is-item /></td>
               </tr>
             </tbody>
           </n-table>
@@ -34,8 +34,8 @@ import { Options, Vue, prop } from 'vue-class-component';
 import { NList, NListItem, NSkeleton, NTable, NThing } from 'naive-ui';
 import { ProjectService, IProject, IProjectStoredMaterial } from '@/services/project';
 
+import AssetName from '@/components/AssetName.vue';
 import ItemIcon from '@/components/ItemIcon.vue';
-import ItemName from '@/components/ItemName.vue';
 
 class Props {
   // Project id
@@ -53,8 +53,8 @@ class Props {
     NTable,
     NThing,
 
+    AssetName,
     ItemIcon,
-    ItemName,
   }
 })
 export default class ProjectOverview extends Vue.with(Props) {

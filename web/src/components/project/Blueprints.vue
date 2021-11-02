@@ -26,7 +26,7 @@
             <n-tag v-if="entry.status === 'MISSING'" type="error">Missing</n-tag>
           </td>
           <td v-if="entry.container_id">
-            <asset-name :id="entry.container_id" />
+            <asset-name :tid="entry.container_id" />
             (<station-name :id="entry.location_id" />)
           </td>
           <td v-if="!entry.container_id">

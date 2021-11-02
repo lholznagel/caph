@@ -800,8 +800,8 @@ impl Sde {
                     })
                     .collect::<Vec<_>>();
                 BlueprintProduct {
-                    type_id:  e.product().0,
-                    quantity: e.product().1.quantity,
+                    type_id:  e.product().unwrap().0,
+                    quantity: e.product().unwrap().1.quantity,
                     materials
                 }
             })
@@ -1033,13 +1033,19 @@ impl Sde {
     }
 }
 
-
+/// Represents an resolved tree of a blueprint, containing all
+/// dependencies including reactions and pi
 #[derive(Clone, Debug, Serialize)]
 struct BlueprintTree {
-    key:      TypeId,
-    label:    String,
-    quantity: i32,
-    children: Option<Vec<BlueprintTree>>
+    /// TypeId of the item that is produced by this dependency
+    pub key:      TypeId,
+    /// Name of the item that is produced
+    pub label:    String,
+    /// Quantity of items that is produced per run
+    pub quantity: i32,
+    /// Dependencies of that asset, is [Option::None] if there are
+    /// no dependencies
+    pub children: Option<Vec<BlueprintTree>>
 }
 
 #[derive(Clone, Debug)]

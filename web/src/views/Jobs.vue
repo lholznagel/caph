@@ -18,12 +18,15 @@
       <tbody>
         <tr v-for="job in jobs" :key="job.job_id">
           <td><item-icon :id="job.blueprint_type_id" type="bp" /></td>
-          <td><name-by-id :id="job.blueprint_type_id" /></td>
+          <td>{{ job.name }}</td>
           <td>{{ getActivityName(job.activity_id) }}</td>
-          <td><location :lid="job.facility_id" /></td>
+          <td><station-name :id="job.station_id" /></td>
           <td>{{ job.end_date }}</td>
-          <td><format-number :value="job.remaining || 0" is-time /></td>
-          <td><owner :ids="[job.installer_id]" /></td>
+          <td>
+            <n-tag v-if="job.remaining === 0" type="success">Done</n-tag>
+            <format-number v-if="job.remaining > 0" :value="job.remaining || 0" is-time />
+          </td>
+          <td><owner :id="job.installer_id" /></td>
         </tr>
       </tbody>
     </n-table>
@@ -32,14 +35,13 @@
 
 <script lang="ts">
 import { IIndustryJob, IndustryService } from '@/services/industry';
-import { NButton, NCard, NSkeleton, NTable } from 'naive-ui';
+import { NButton, NCard, NSkeleton, NTable, NTag } from 'naive-ui';
 import { Options, Vue } from 'vue-class-component';
 
 import FormatNumber from '@/components/FormatNumber.vue';
 import ItemIcon from '@/components/ItemIcon.vue';
-import Location from '@/components/Location.vue';
+import StationName from '@/components/StationName.vue';
 import Owner from '@/components/Owner.vue';
-import NameById from '@/components/NameById.vue';
 
 @Options({
   components: {
@@ -47,15 +49,15 @@ import NameById from '@/components/NameById.vue';
     NCard,
     NSkeleton,
     NTable,
+    NTag,
 
     FormatNumber,
     ItemIcon,
-    Location,
-    NameById,
+    StationName,
     Owner,
   }
 })
-export default class Blueprint extends Vue {
+export default class IndustryJobs extends Vue {
   public busy: boolean = false;
 
   public jobs: IIndustryJob[] = [];

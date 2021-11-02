@@ -14,7 +14,7 @@ class Props {
   });
 
   isTime = prop({
-    type: Boolean,
+    type:     Boolean,
     required: false,
   });
 }

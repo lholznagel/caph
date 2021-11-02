@@ -72,15 +72,12 @@ impl SchematicEntry {
     ///
     /// TypeId of the product
     ///
-    pub fn product(&self) -> (TypeId, SchematicType) {
-        // FIXME: clone and into_iter
+    pub fn product(&self) -> Option<(TypeId, SchematicType)> {
         self
             .types
-            .clone()
-            .into_iter()
+            .iter()
             .find(|(_, x)| !x.is_input)
-            .map(|(x, y)| (x, y))
-            .unwrap()
+            .map(|(x, y)| (*x, *y))
     }
 
     /// Gets all required materials of the scheamtic
@@ -90,18 +87,17 @@ impl SchematicEntry {
     /// TypeIds of all required materials
     ///
     pub fn materials(&self) -> HashMap<TypeId, SchematicType> {
-        // FIXME: clone and into_iter
         self
             .types
-            .clone()
-            .into_iter()
+            .iter()
             .filter(|(_, x)| x.is_input)
+            .map(|(x, y)| (*x, *y))
             .collect::<HashMap<_, _>>()
     }
 }
 
 /// Represents a single input or output item
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SchematicType {
     /// Defines if the item is a input or output

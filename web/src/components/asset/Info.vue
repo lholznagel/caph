@@ -44,14 +44,14 @@
           <th>Reference</th>
           <td>
             {{ references[idx].name }}
-            (<asset-name :id="references[idx].item_id" />)
+            (<asset-name :tid="references[idx].item_id" />)
           </td>
         </tr>
 
         <tr v-if="info.category_id === 6">
           <th>Ship Name</th>
           <td>
-            <asset-name :id="info.item_id" />
+            <asset-name :tid="info.item_id" />
           </td>
         </tr>
 

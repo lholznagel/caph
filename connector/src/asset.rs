@@ -31,6 +31,7 @@ impl ConnectAssetService {
     /// # Returns
     ///
     /// New instance
+    ///
     pub fn new(zip: &mut SdeService) -> Result<Self, ConnectError> {
         let type_ids  = zip.get_file(Self::PATH_TYPE)?;
         let group_ids = zip.get_file(Self::PATH_GROUPS)?;

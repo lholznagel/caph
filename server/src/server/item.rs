@@ -3,15 +3,14 @@ use crate::error::ServerError;
 
 use axum::{Json, Router};
 use axum::extract::{Extension, Path};
-use axum::handler::get;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::BoxRoute;
+use axum::routing::get;
 use caph_connector::TypeId;
 
-pub fn router() -> Router<BoxRoute> {
+pub fn router() -> Router {
     Router::new()
-        .route("/:tid/name", get(item_name)).boxed()
+        .route("/:tid/name", get(item_name))
 }
 
 async fn item_name(

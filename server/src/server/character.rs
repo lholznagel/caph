@@ -4,17 +4,16 @@ use crate::eve::LoggedInCharacter;
 
 use axum::{Json, Router};
 use axum::extract::{Extension, Path};
-use axum::handler::get;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::BoxRoute;
+use axum::routing::get;
 
-pub fn router() -> Router<BoxRoute> {
+pub fn router() -> Router {
     Router::new()
-        .route("/alts", get(alts)).boxed()
-        .route("/ids", get(ids)).boxed()
-        .route("/asset/views", get(asset_views)).boxed()
-        .route("/:id/name", get(name)).boxed()
+        .route("/alts", get(alts))
+        .route("/ids", get(ids))
+        .route("/asset/views", get(asset_views))
+        .route("/:id/name", get(name))
 }
 
 async fn alts(

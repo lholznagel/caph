@@ -3,14 +3,14 @@ use crate::{AllianceId, CharacterId, CorporationId, LocationId, ItemId, TypeId, 
 use serde::{Deserialize, Serialize};
 
 /// Wrapper for character
-pub struct ConnectCharacterService {
+pub struct ConnectCharacterService<'a> {
     /// Client for communicating with the EVE-API
-    client: EveAuthClient,
+    client: &'a EveAuthClient,
     /// Character id this client belongs to
     cid:    CharacterId,
 }
 
-impl ConnectCharacterService {
+impl<'a> ConnectCharacterService<'a> {
 
     /// Creates a new instance of the service
     ///
@@ -24,7 +24,7 @@ impl ConnectCharacterService {
     /// New instance
     ///
     pub fn new(
-        client: EveAuthClient,
+        client: &'a EveAuthClient,
         cid:    CharacterId,
     ) -> Self {
         ConnectCharacterService {
