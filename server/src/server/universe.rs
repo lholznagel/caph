@@ -1,6 +1,6 @@
 use crate::Station;
+use crate::auth_user::AuthUser;
 use crate::error::ServerError;
-use crate::eve::LoggedInCharacter;
 use crate::universe::UniverseService;
 
 use axum::{Json, Router};
@@ -20,29 +20,29 @@ pub fn router() -> Router {
 
 async fn stations(
     universe_service: Extension<UniverseService>,
-    character:        LoggedInCharacter,
+    user:             AuthUser,
 ) -> Result<impl IntoResponse, ServerError> {
-    let cid = character.character_id().await?;
+    let cid = user.character_id().await?;
     let res = universe_service.stations(cid).await?;
     Ok((StatusCode::OK, Json(res)))
 }
 
 async fn add_station(
     universe_service: Extension<UniverseService>,
-    character:        LoggedInCharacter,
+    user:             AuthUser,
     Json(body):       Json<Station>
 ) -> Result<impl IntoResponse, ServerError> {
-    let cid = character.character_id().await?;
+    let cid = user.character_id().await?;
     universe_service.add_station(cid, body).await?;
     Ok((StatusCode::CREATED, Json(())))
 }
 
 async fn station(
     universe_service: Extension<UniverseService>,
-    character:        LoggedInCharacter,
+    user:             AuthUser,
     Path(sid):        Path<StationId>
 ) -> Result<impl IntoResponse, ServerError> {
-    let cid = character.character_id().await?;
+    let cid = user.character_id().await?;
     // TODO: handle not found
     let res = universe_service.station(cid, sid).await?;
     Ok((StatusCode::OK, Json(res)))
@@ -56,10 +56,10 @@ async fn station(
 
 async fn delete_station(
     universe_service: Extension<UniverseService>,
-    character:        LoggedInCharacter,
+    user:             AuthUser,
     Path(sid):        Path<StationId>
 ) -> Result<impl IntoResponse, ServerError> {
-    let cid = character.character_id().await?;
+    let cid = user.character_id().await?;
     universe_service.delete_station(cid, sid).await?;
     Ok((StatusCode::OK, Json(())))
 }

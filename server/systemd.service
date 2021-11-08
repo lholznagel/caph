@@ -5,12 +5,19 @@ Description=Caph server
 Type=simple
 
 Environment=RUST_BACKTRACE=1
+# Address the server should bind to
 Environment=SERVER_BIND_ADDR=
+# URI of the database
 Environment=DATABASE_URL=
+# Agent the service should use for communication with the EVE-API
 Environment=EVE_USER_AGENT=
+# Address that is called after login
 Environment=EVE_CALLBACK=
+# API-ClientId-Key provided by EVE
 Environment=EVE_CLIENT_ID=
+# API-Secret-Key provided by EVE
 Environment=EVE_SECRET_KEY=
+# URL to redirect the user after successful login
 Environment=REDIRECT=
 
 ExecStart=/opt/caph/caph_server

@@ -1,26 +1,36 @@
 <template>
-  <n-card title="Assets">
-    <n-skeleton text v-if="busy" :repeat="10" />
+  <div>
+    <n-page-header>
+      <template #title>
+        <h1>
+          Assets
+        </h1>
+      </template>
+    </n-page-header>
 
-    <div v-if="!busy">
-      <filter-text
-        :filters="filters"
-        :options="filterOptions"
-      />
-      <filter-element
-        style="margin-top: 5px"
-        :filters="filters"
-        :options="filterOptions"
-      />
+    <n-card>
+      <n-skeleton text v-if="busy" :repeat="10" />
 
-      <asset-table style="margin-top: 10px" :entries="entries" />
-    </div>
-  </n-card>
+      <div v-if="!busy">
+        <filter-text
+          :filters="filters"
+          :options="filterOptions"
+        />
+        <filter-element
+          style="margin-top: 5px"
+          :filters="filters"
+          :options="filterOptions"
+        />
+
+        <asset-table style="margin-top: 10px" :entries="entries" />
+      </div>
+    </n-card>
+  </div>
 </template>
 
 <script lang="ts">
-import { NButton, NButtonGroup, NCard, NDataTable, NInput, NSkeleton, NSpace,
-NTag } from 'naive-ui';
+import { NButton, NButtonGroup, NCard, NDataTable, NInput, NPageHeader,
+NSkeleton, NSpace, NTag } from 'naive-ui';
 import { Options, Vue } from 'vue-class-component';
 import { h, VNode } from 'vue';
 
@@ -41,6 +51,7 @@ import Owner from '@/components/Owner.vue';
     NCard,
     NDataTable,
     NInput,
+    NPageHeader,
     NSkeleton,
     NSpace,
     NTag,

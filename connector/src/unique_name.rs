@@ -34,7 +34,7 @@ impl ConnectUniqueNameService {
             .map(|x| (x.item_id, x.name))
             .collect::<HashMap<_, _>>();
 
-        Ok(ConnectUniqueNameService {
+        Ok(Self {
             entries
         })
     }

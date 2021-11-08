@@ -36,7 +36,7 @@ impl ConnectAssetService {
         let type_ids  = zip.get_file(Self::PATH_TYPE)?;
         let group_ids = zip.get_file(Self::PATH_GROUPS)?;
 
-        Ok(ConnectAssetService {
+        Ok(Self {
             type_ids,
             group_ids
         })

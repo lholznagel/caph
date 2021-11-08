@@ -58,6 +58,7 @@ export interface IAsset {
   owner:         number;
   location_id:   number;
   quantity:      number;
+  volume:        number
   count:         number;
   category_id:   number;
   group_id:      number;

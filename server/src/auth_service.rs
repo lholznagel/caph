@@ -1,44 +1,59 @@
-use std::str::FromStr;
+use crate::error::ServerError;
 
-use crate::error::{ServerError, internal_error};
-
-use async_trait::async_trait;
-use axum::extract::{Extension, FromRequest, RequestParts, TypedHeader};
-use axum::http::{StatusCode, Uri};
+use async_trait::*;
+use axum::{extract::{FromRequest, Extension, RequestParts}, http::Uri};
 use caph_connector::{CharacterId, EveAuthClient, EveOAuthToken};
-use headers::Cookie;
-use serde::Deserialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+/// Scope for a normal character without any features actived
+/*const EVE_DEFAULT_SCOPE: &[&'static str] = &[
+    "publicData",
+];*/
+
+#[deprecated]
 const EVE_SCOPE: &[&'static str] = &[
     "publicData",
     "esi-assets.read_assets.v1",
-    "esi-characters.read_agents_research.v1",
+    //"esi-characters.read_agents_research.v1",
     "esi-characters.read_blueprints.v1",
     "esi-characterstats.read.v1",
-    "esi-fittings.read_fittings.v1",
-    "esi-fittings.write_fittings.v1",
     "esi-industry.read_character_jobs.v1",
     "esi-industry.read_corporation_jobs.v1",
-    "esi-industry.read_character_mining.v1",
-    "esi-markets.read_character_orders.v1",
-    "esi-markets.structure_markets.v1",
-    "esi-planets.manage_planets.v1",
-    "esi-search.search_structures.v1",
-    "esi-skills.read_skillqueue.v1",
-    "esi-skills.read_skills.v1",
-    "esi-universe.read_structures.v1",
-    "esi-wallet.read_character_wallet.v1",
+    //"esi-industry.read_character_mining.v1",
+    //"esi-markets.read_character_orders.v1",
+    //"esi-markets.structure_markets.v1",
+    //"esi-planets.manage_planets.v1",
+    //"esi-search.search_structures.v1",
+    //"esi-skills.read_skillqueue.v1",
+    //"esi-skills.read_skills.v1",
+    //"esi-universe.read_structures.v1",
+    //"esi-wallet.read_character_wallet.v1",
 ];
 
+/// Handles authentication and authorisation.
+///
+/// The authentication is connected with the official EVE-API.
+/// Authorisation is configured and handled by this application.
 #[derive(Clone)]
-pub struct EveService {
+pub struct AuthService {
     pool: PgPool
 }
 
-impl EveService {
-    pub fn new(pool: PgPool) -> Self {
+impl AuthService {
+    /// Creates a new service instance.
+    ///
+    /// # Params
+    ///
+    /// * `pool` -> Connection pool to postgres
+    ///
+    /// # Returns
+    ///
+    /// New instance of the [AuthService].
+    ///
+    pub fn new(
+        pool: PgPool
+    ) -> Self {
         Self {
             pool
         }
@@ -50,6 +65,10 @@ impl EveService {
     ///
     /// `code`  -> Code that was send when starting the auth process
     /// `token` -> Our unique identifier
+    ///
+    /// # Errors
+    ///
+    /// When no access token can be received from the EVE-API.
     ///
     /// # Returns
     ///
@@ -71,13 +90,21 @@ impl EveService {
         }
     }
 
-    /// Creates a new unique code and returns a eve login auth uri
-    /// This function is only for main accounts
-    ///
+    /// Creates a new login process for the EVE-API.
+    /// This function is for login in a user without any activated features, it
+    /// therefore only requires the most basic permissions.
+    /// 
+    /// For extending a users permissions the function [AuthService::xyz] FIXME:
+    /// must be used.
+    /// 
+    /// # Errors
+    /// 
+    /// When the the uri cannot be parsed.
+    /// 
     /// # Returns
-    ///
-    /// Uri to the eve auth server
-    ///
+    /// 
+    /// Redirect URI to the EVE-Login page.
+    /// 
     pub async fn login(&self) -> Result<Uri, ServerError> {
         let token = sqlx::query!(
             "INSERT INTO login DEFAULT VALUES RETURNING token"
@@ -86,14 +113,13 @@ impl EveService {
         .await?
         .token;
 
-        let uri = EveAuthClient::auth_uri(
+        EveAuthClient::auth_uri(
                 &token.to_string(),
                 Some(&EVE_SCOPE.join(" "))
             )?
             .to_string()
             .parse::<Uri>()
-            .unwrap();
-        Ok(uri)
+            .map_err(|x| ServerError::GenericError(x.to_string()))
     }
 
     /// Creates a new unqiue code for logging in an alt character
@@ -108,37 +134,24 @@ impl EveService {
     ///
     pub async fn login_alt(
         &self,
-        token: Uuid
+        cid: CharacterId
     ) -> Result<Uri, ServerError> {
-        let character = sqlx::query!("
-                SELECT character_id
-                FROM login
-                WHERE token = $1
-            ",
-            token
-        )
-        .fetch_optional(&self.pool)
-        .await?
-        .ok_or(ServerError::InvalidUser)?
-        .character_id;
-
         let token = sqlx::query!("
-            INSERT INTO login (character_main)
-            VALUES ($1)
-            RETURNING token
-        ", character)
-        .fetch_one(&self.pool)
-        .await?
-        .token;
+                INSERT INTO login (character_main)
+                VALUES ($1)
+                RETURNING token
+            ", *cid)
+            .fetch_one(&self.pool)
+            .await?
+            .token;
 
-        let uri = EveAuthClient::auth_uri(
+        EveAuthClient::auth_uri(
                 &token.to_string(),
                 Some(&EVE_SCOPE.join(" "))
             )?
             .to_string()
             .parse::<Uri>()
-            .unwrap();
-        Ok(uri)
+            .map_err(|x| ServerError::GenericError(x.to_string()))
     }
 
     /// Gets a list of alts for the given [CharacterId]
@@ -189,6 +202,26 @@ impl EveService {
         Ok(refresh_token)
     }
 
+    pub async fn is_admin(
+        &self,
+        cid: CharacterId
+    ) -> Result<bool, ServerError> {
+        if let Some(x) = sqlx::query!("
+                SELECT admin
+                FROM   character
+                WHERE  character_id = $1
+            ",
+                *cid
+            )
+            .fetch_optional(&self.pool)
+            .await? {
+
+            Ok(x.admin)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Gets the character id from the database
     ///
     /// # Parameters
@@ -199,7 +232,7 @@ impl EveService {
     ///
     /// Character id of the logged in character
     ///
-    async fn character_id(
+    pub async fn character_id(
         &self,
         token: &Uuid
     ) -> Result<CharacterId, ServerError> {
@@ -293,78 +326,17 @@ impl EveService {
     }
 }
 
-/// Login query that is send by the eve auth servers
-#[derive(Debug, Deserialize)]
-pub struct EveAuthQuery {
-    pub code:  String,
-    pub state: Uuid,
-}
-
-pub struct LoggedInCharacter {
-    token:         Uuid,
-    eve_service:   EveService,
-}
-
-impl LoggedInCharacter {
-    pub fn new(token: Uuid, eve_service: EveService) -> Self {
-        Self {
-            token,
-            eve_service
-        }
-    }
-
-    pub async fn eve_auth_client(&self) -> Result<EveAuthClient, ServerError> {
-        let refresh_token = self.eve_service.refresh_token(
-            &self.character_id().await?,
-            &self.token
-        )
-        .await?;
-
-        let client = EveAuthClient::new(refresh_token)?;
-        Ok(client)
-    }
-
-    /// Gets the character id of requesting character
-    ///
-    /// # Returns
-    ///
-    /// Character id of the logged in character
-    ///
-    pub async fn character_id(&self) -> Result<CharacterId, ServerError> {
-        self.eve_service.character_id(&self.token).await
-    }
-
-    /// Gets all logged in alts for a character
-    ///
-    /// # Returns
-    ///
-    /// Character id of the logged in character
-    ///
-    pub async fn character_alts(&self) -> Result<Vec<CharacterId>, ServerError> {
-        let character_id = self.character_id().await?;
-        self.eve_service.alts(character_id).await
-    }
-}
-
 #[async_trait]
-impl<B> FromRequest<B> for LoggedInCharacter
+impl<B> FromRequest<B> for AuthService
 where
     B: Send,
 {
-    type Rejection = (StatusCode, String);
+    type Rejection = ServerError;
 
     async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
-        let token = TypedHeader::<Cookie>::from_request(req)
+        Extension::<AuthService>::from_request(req)
             .await
-            .map_err(internal_error)?
-            .get("token")
-            .map(Uuid::from_str)
-            .ok_or((StatusCode::BAD_REQUEST, "".into()))?
-            .map_err(|_| (StatusCode::BAD_REQUEST, "".into()))?;
-        let Extension(eve_service) = Extension::<EveService>::from_request(req)
-            .await
-            .map_err(internal_error)?;
-
-        Ok(Self::new(token, eve_service))
+            .map(|Extension(x)| x)
+            .map_err(ServerError::FromReqestError)
     }
 }

@@ -37,6 +37,8 @@ mod client;
 mod error;
 /// Module containing all macros
 mod macros;
+/// Module for handling market requests
+mod market;
 /// Module for handling reprocessing information
 mod reprocess;
 /// Module for handling schematics
@@ -55,6 +57,7 @@ pub mod services {
     pub use crate::asset::ConnectAssetService;
     pub use crate::blueprint::ConnectBlueprintService;
     pub use crate::character::ConnectCharacterService;
+    pub use crate::market::ConnectMarketService;
     pub use crate::reprocess::ConnectReprocessService;
     pub use crate::schematic::ConnectSchematicService;
     pub use crate::station::ConnectStationService;
@@ -67,6 +70,7 @@ pub use self::blueprint::*;
 pub use self::character::*;
 pub use self::client::*;
 pub use self::error::*;
+pub use self::market::*;
 pub use self::reprocess::*;
 pub use self::schematic::*;
 pub use self::station::*;
@@ -76,14 +80,15 @@ pub use self::zip::*;
 
 use serde::{Deserialize, Serialize};
 
-eve_id!(AllianceId, i32);
-eve_id!(CategoryId, i32);
-eve_id!(CharacterId, i32);
+eve_id!(AllianceId,    i32);
+eve_id!(CategoryId,    i32);
+eve_id!(CharacterId,   i32);
 eve_id!(CorporationId, i32);
-eve_id!(GroupId, i32);
-eve_id!(ItemId, i64);
-eve_id!(JobId, i32);
-eve_id!(LocationId, i64);
-eve_id!(StationId, i64);
-eve_id!(SystemId, i64);
-eve_id!(TypeId, i32);
+eve_id!(GroupId,       i32);
+eve_id!(ItemId,        i64);
+eve_id!(JobId,         i32);
+eve_id!(LocationId,    i64);
+eve_id!(StationId,     i64);
+eve_id!(SystemId,      i64);
+eve_id!(TypeId,        i32);
+eve_id!(RegionId,      i32);

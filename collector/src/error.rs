@@ -85,6 +85,21 @@ pub enum CollectorError {
     /// Error while downloading the SDE zip file
     LoadingSdeZip(caph_connector::ConnectError),
 
+    /// The client could not be created
+    CouldNotCreateClient(caph_connector::ConnectError),
+    /// Error while deleting market prices
+    DeleteMarketPrices(sqlx::Error),
+    /// Error while inserting market prices
+    InsertMarketPrices(sqlx::Error),
+    /// Error while fetching market prices
+    CouldNotGetMarketPrices(caph_connector::ConnectError),
+    /// Error while deleting industry systems
+    DeleteIndustrySystem(sqlx::Error),
+    /// Error while inserting industry systems
+    InsertIndustrySystem(sqlx::Error),
+    /// Error while fetching industry systems
+    CouldNotGetIndustrySystem(caph_connector::ConnectError),
+
     /// A transaction could not be established
     TransactionBeginNotSuccessfull(sqlx::Error),
     /// The transactin could not be commited
@@ -106,19 +121,3 @@ impl std::fmt::Display for CollectorError {
     }
 }
 
-impl IntoResponse for CollectorError {
-    type Body = Full<Bytes>;
-    type BodyError = Infallible;
-
-    fn into_response(self) -> axum::http::Response<Self::Body> {
-        let (status, msg) = match self {
-            _ => (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
-        };
-
-        let body = Json(json!({
-            "error": msg
-        }));
-
-        (status, body).into_response()
-    }
-}

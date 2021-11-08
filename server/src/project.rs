@@ -1,12 +1,272 @@
-use crate::{AssetService, BlueprintRaw, error::ServerError};
+use crate::{AssetService, AuthUser};
+use crate::error::ServerError;
 
-use caph_connector::{CharacterId, ItemId, LocationId, TypeId};
+use axum::response::IntoResponse;
+use axum::{Json, Router};
+use axum::extract::{Extension, Path};
+use axum::routing::{get, put};
+use caph_connector::{CharacterId, ItemId, LocationId, SystemId, TypeId};
+use caph_core::{ProjectMarketItemPrice, ProjectBuildstep};
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use std::collections::{HashMap, HashSet, VecDeque};
 use uuid::Uuid;
 
-pub type ProjectId = Uuid;
+pub fn router() -> Router {
+    Router::new()
+        .route("/", get(get_all).post(create))
+        .nest(
+            "/:pid",
+            Router::new()
+                .route("/", get(by_id).put(edit).delete(delete))
+                .route("/blueprints/required", get(required_blueprints))
+                .route("/buildsteps/:activity", get(buildsteps))
+                .route("/cost/trackings", get(trackings).post(add_tracking))
+                .route("/cost/trackings/:tid", put(edit_tracking).delete(delete_tracking))
+                .route("/market/:sid/buy", get(market_buy))
+                .route("/market/:sid/sell", get(market_sell))
+                .route("/materials/raw", get(raw_materials))
+                .route("/materials/stored", get(stored_materials))
+        )
+}
+
+/// Gets a specific project by its id
+async fn by_id(
+    user:      AuthUser,
+    service:   Extension<caph_core::ProjectService>,
+    Path(pid): Path<caph_core::ProjectId>
+) -> Result<Json<caph_core::Project>, ServerError> {
+    user.assert_access().await?;
+
+    let entry = service
+        .by_id(pid)
+        .await?;
+    if let Some(x) = entry {
+        Ok(Json(x))
+    } else {
+        Err(ServerError::NotFound)
+    }
+}
+
+/// Gets all projects the user has access to
+async fn get_all(
+    user:    AuthUser,
+    service: Extension<caph_core::ProjectService>,
+) -> Result<Json<Vec<caph_core::ProjectInfo>>, ServerError> {
+    user.assert_access().await?;
+
+    let cid = user.character_id().await?;
+    service
+        .all(cid)
+        .await
+        .map(Json)
+        .map_err(ServerError::CaphCoreProject)
+}
+
+/// Creates a new project
+async fn create(
+    user:       AuthUser,
+    service:    Extension<caph_core::ProjectService>,
+    Json(body): Json<caph_core::ProjectConfig>
+) -> Result<impl IntoResponse, ServerError> {
+    user.assert_access().await?;
+
+    let cid = user.character_id().await?;
+    service
+        .create(cid, body)
+        .await
+        .map(|x| (StatusCode::CREATED, Json(x)))
+        .map_err(ServerError::CaphCoreProject)
+}
+
+/// Edits a project and overwrites it with the given data
+async fn edit(
+    user:       AuthUser,
+    service:    Extension<caph_core::ProjectService>,
+    Path(pid):  Path<caph_core::ProjectId>,
+    Json(body): Json<caph_core::ProjectConfig>
+) -> Result<Json<caph_core::ProjectId>, ServerError> {
+    user.assert_access().await?;
+
+    service
+        .edit(pid, body)
+        .await
+        .map(Json)
+        .map_err(ServerError::CaphCoreProject)
+}
+
+/// Deletes the given project
+async fn delete(
+    user:      AuthUser,
+    service:   Extension<caph_core::ProjectService>,
+    Path(pid): Path<caph_core::ProjectId>,
+) -> Result<Json<caph_core::ProjectId>, ServerError> {
+    user.assert_access().await?;
+
+    let entry = service
+        .delete(pid)
+        .await?;
+    if let Some(x) = entry {
+        Ok(Json(x))
+    } else {
+        Err(ServerError::NotFound)
+    }
+}
+
+/// Gets all raw materials needed for the project
+async fn raw_materials(
+    user:      AuthUser,
+    service:   Extension<caph_core::ProjectService>,
+    Path(pid): Path<caph_core::ProjectId>
+) -> Result<Json<Vec<caph_core::ProjectMaterial>>, ServerError> {
+    user.assert_access().await?;
+
+    service
+        .raw_materials(pid)
+        .await
+        .map(Json)
+        .map_err(ServerError::CaphCoreProject)
+}
+
+/// Gets all stored materials
+async fn stored_materials(
+    user:      AuthUser,
+    service:   Extension<caph_core::ProjectService>,
+    Path(pid): Path<caph_core::ProjectId>
+) -> Result<Json<Vec<caph_core::ProjectMaterial>>, ServerError> {
+    user.assert_access().await?;
+
+    service
+        .stored_materials(pid)
+        .await
+        .map(Json)
+        .map_err(ServerError::CaphCoreProject)
+}
+
+/// Gets all blueprints that are required for the project
+async fn required_blueprints(
+    user:      AuthUser,
+    service:   Extension<caph_core::ProjectService>,
+    Path(pid): Path<caph_core::ProjectId>
+) -> Result<Json<Vec<caph_core::ProjectBlueprint>>, ServerError> {
+    user.assert_access().await?;
+
+    service
+        .required_blueprints(pid)
+        .await
+        .map(Json)
+        .map_err(ServerError::CaphCoreProject)
+}
+
+async fn buildsteps(
+    user:                  AuthUser,
+    service:               Extension<caph_core::ProjectService>,
+    Path((pid, activity)): Path<(caph_core::ProjectId, caph_core::Activity)>
+) -> Result<Json<Vec<caph_core::ProjectBuildstep>>, ServerError> {
+    user.assert_access().await?;
+
+    service
+        .buildsteps(pid, activity)
+        .await
+        .map(Json)
+        .map_err(ServerError::CaphCoreProject)
+}
+
+/// Gets a list of all raw items and their pricing
+async fn market_buy(
+    user:             AuthUser,
+    service:          Extension<caph_core::ProjectService>,
+    Path((pid, sid)): Path<(caph_core::ProjectId, SystemId)>
+) -> Result<Json<Vec<ProjectMarketItemPrice>>, ServerError> {
+    user.assert_access().await?;
+
+    service
+        .market_buy_price(pid, sid)
+        .await
+        .map(Json)
+        .map_err(ServerError::CaphCoreProject)
+}
+
+/// Gets a list of products and their current pricing
+async fn market_sell(
+    user:             AuthUser,
+    service:          Extension<caph_core::ProjectService>,
+    Path((pid, sid)): Path<(caph_core::ProjectId, SystemId)>
+) -> Result<Json<Vec<ProjectMarketItemPrice>>, ServerError> {
+    user.assert_access().await?;
+
+    service
+        .market_sell_price(pid, sid)
+        .await
+        .map(Json)
+        .map_err(ServerError::CaphCoreProject)
+}
+
+/// Fetches all costs that where added to the project
+async fn trackings(
+    user:      AuthUser,
+    service:   Extension<caph_core::ProjectService>,
+    Path(pid): Path<caph_core::ProjectId>
+) -> Result<Json<Vec<caph_core::ProjectCostTracking>>, ServerError> {
+    user.assert_access().await?;
+
+    service
+        .trackings(pid)
+        .await
+        .map(Json)
+        .map_err(ServerError::CaphCoreProject)
+}
+
+/// Adds a new cost to the project
+async fn add_tracking(
+    user:       AuthUser,
+    service:    Extension<caph_core::ProjectService>,
+    Path(pid):  Path<caph_core::ProjectId>,
+    Json(body): Json<caph_core::ProjectAddCostTracking>
+) -> Result<impl IntoResponse, ServerError> {
+    user.assert_access().await?;
+
+    service
+        .add_tracking(pid, body)
+        .await
+        .map(|_| (StatusCode::CREATED, ""))
+        .map_err(ServerError::CaphCoreProject)
+}
+
+/// Edits a tracking entry
+async fn edit_tracking(
+    user:             AuthUser,
+    service:          Extension<caph_core::ProjectService>,
+    Path((pid, tid)): Path<(caph_core::ProjectId, caph_core::TrackingId)>,
+    Json(body):       Json<caph_core::ProjectCostTracking>
+) -> Result<impl IntoResponse, ServerError> {
+    user.assert_access().await?;
+
+    service
+        .edit_tracking(pid, tid, body)
+        .await
+        .map(|_| (StatusCode::OK, ""))
+        .map_err(ServerError::CaphCoreProject)
+}
+
+/// Deletes a tracking entry
+async fn delete_tracking(
+    user:             AuthUser,
+    service:          Extension<caph_core::ProjectService>,
+    Path((pid, tid)): Path<(caph_core::ProjectId, caph_core::TrackingId)>,
+) -> Result<impl IntoResponse, ServerError> {
+    user.assert_access().await?;
+
+    service
+        .delete_tracking(pid, tid)
+        .await
+        .map(|_| (StatusCode::OK, ""))
+        .map_err(ServerError::CaphCoreProject)
+}
+
+pub type ProjectId  = Uuid;
+pub type TemplateId = Uuid;
+pub type TrackingId = Uuid;
 
 #[derive(Clone)]
 pub struct ProjectService {
@@ -28,618 +288,276 @@ impl ProjectService {
         }
     }
 
-    pub async fn projects(
+    /*pub async fn project_cost(
         &self,
-        cid: CharacterId
-    ) -> Result<Vec<Project>, ServerError> {
-        let entries = sqlx::query!(r#"
+        cid: CharacterId,
+        pid: ProjectId
+    ) -> Result<ProjectCost, ServerError> {
+        let mut material_cost = HashMap::new();
+        sqlx::query!(r#"
                 SELECT
-                    p.*,
-                    ARRAY_AGG(DISTINCT pc.item_id) AS "containers!",
-                    ARRAY_AGG(pp.type_id)          AS "product_type_id!",
-                    ARRAY_AGG(pp.count)            AS "product_count!"
+                  bmm.type_id AS "type_id!",
+                  CEIL(ptp.count::FLOAT / bm.quantity::FLOAT) AS runs,
+                  CEIL(
+                    CEIL(
+                        ptp.count::FLOAT / bm.quantity::FLOAT
+                    ) * bmm.quantity
+                  ) AS "quantity!",
+                  CEIL(
+                    CEIL(
+                            ptp.count::FLOAT / bm.quantity::FLOAT
+                        ) * bmm.quantity * mp.adjusted_price
+                    ) AS "price!",
+                  i.name
                 FROM project p
-                JOIN project_container pc
-                  ON pc.project_id = p.id
-                JOIN project_product pp
-                  ON pp.project_id = p.id
-                WHERE character_id = $1
-                GROUP BY p.id
-            "#,
-                *cid
-            )
-            .fetch_all(&self.pool)
-            .await?
-            .into_iter()
-            .map(|x| {
-                let containers = x.containers
-                    .into_iter()
-                    .map(|x| {
-                        ProjectContainer {
-                            item_id: x.into()
-                        }
-                    })
-                    .collect::<Vec<_>>();
-
-                let products = x.product_type_id.iter()
-                    .zip(x.product_count.iter())
-                    .into_iter()
-                    .map(|(type_id, count): (&i32, &i32)| {
-                        ProjectProduct {
-                            type_id: (*type_id).into(),
-                            count:   *count
-                        }
-                    })
-                    .collect::<Vec<_>>();
-
-                Project {
-                    id:   x.id,
-                    name: x.name,
-
-                    containers,
-                    products
-                }
-            })
-            .collect::<Vec<_>>();
-        Ok(entries)
-    }
-
-    /// Fetches all character infos from eve
-    ///
-    /// # Params
-    ///
-    /// * `cid` -> Character id to fetch
-    ///
-    /// # Returns
-    ///
-    /// Alliance, character and corporation information
-    ///
-    pub async fn create(
-        &self,
-        cid:     CharacterId,
-        project: CreateProject
-    ) -> Result<Uuid, ServerError> {
-        let mut trans = self.pool
-            .begin()
-            .await
-            .map_err(ServerError::TransactionBeginNotSuccessfull)?;
-
-        let pid: ProjectId = sqlx::query!("
-                INSERT INTO project
-                (
-                    character_id,
-                    name
-                )
-                VALUES ($1, $2)
-                RETURNING id
-            ",
-                *cid,
-                project.name
-            )
-            .fetch_one(&mut trans)
-            .await?
-            .id;
-
-        let containers = project
-            .containers
-            .into_iter()
-            .map(|x| *x.item_id)
-            .collect::<Vec<_>>();
-        sqlx::query!("
-                INSERT INTO project_container
-                (
-                    project_id,
-                    item_id
-                )
-                SELECT $1, * FROM UNNEST(
-                    $2::BIGINT[]
-                )
-            ",
-                &pid,
-                &containers
-            )
-            .execute(&mut trans)
-            .await?;
-
-        let products_type_ids = project
-            .products
-            .iter()
-            .map(|x| *x.type_id)
-            .collect::<Vec<_>>();
-        let product_counts = project
-            .products
-            .iter()
-            .map(|x| x.count)
-            .collect::<Vec<_>>();
-        sqlx::query!("
-                INSERT INTO project_product
-                (
-                    project_id,
-                    type_id,
-                    count
-                )
-                SELECT $1, * FROM UNNEST(
-                    $2::INTEGER[],
-                    $3::INTEGER[]
-                )
-            ",
-                &pid,
-                &products_type_ids,
-                &product_counts
-            )
-            .execute(&mut trans)
-            .await?;
-
-        trans.commit()
-            .await
-            .map_err(ServerError::TransactionCommitNotSuccessfull)?;
-
-        Ok(pid)
-    }
-
-    pub async fn by_id(
-        &self,
-        cid: CharacterId,
-        pid: ProjectId
-    ) -> Result<Option<Project>, ServerError> {
-        let entry = sqlx::query!(r#"
-                SELECT
-                    p.*,
-                    ARRAY_AGG(DISTINCT pc.item_id) AS "containers!",
-                    ARRAY_AGG(pp.type_id)          AS "product_type_id!",
-                    ARRAY_AGG(pp.count)            AS "product_count!"
-                FROM project p
-                JOIN project_container pc
-                ON pc.project_id = p.id
-                JOIN project_product pp
-                ON pp.project_id = p.id
-                WHERE character_id = $1
-                  AND p.id = $2
-                GROUP BY p.id
-            "#,
-                *cid,
-                pid
-            )
-            .fetch_optional(&self.pool)
-            .await?
-            .map(|x| {
-                let containers = x.containers
-                .into_iter()
-                .map(|x| {
-                    ProjectContainer {
-                        item_id: x.into()
-                    }
-                })
-                .collect::<Vec<_>>();
-
-            let products = x.product_type_id.iter()
-                .zip(x.product_count.iter())
-                .into_iter()
-                .map(|(type_id, count): (&i32, &i32)| {
-                    ProjectProduct {
-                        type_id: (*type_id).into(),
-                        count:   *count
-                    }
-                })
-                .collect::<Vec<_>>();
-
-                Project {
-                    id:   x.id,
-                    name: x.name,
-
-                    containers,
-                    products
-                }
-            });
-        Ok(entry)
-    }
-
-    pub async fn products(
-        &self,
-        cid: CharacterId,
-        pid: ProjectId
-    ) -> Result<Vec<ProjectProduct>, ServerError> {
-        let entry = sqlx::query!("
-                SELECT count, type_id
-                FROM project_product
-                WHERE (
-                    SELECT character_id
-                    FROM project
-                    WHERE character_id = $1
-                      AND id = $2
-                ) IS NOT NULL
-                  AND project_id = $2
-            ",
-                *cid,
-                pid
-            )
-            .fetch_all(&self.pool)
-            .await?
-            .into_iter()
-            .map(|x| {
-                ProjectProduct {
-                    count:   x.count,
-                    type_id: x.type_id.into(),
-                }
-            })
-            .collect::<Vec<_>>();
-        Ok(entry)
-    }
-
-    pub async fn containers(
-        &self,
-        cid: CharacterId,
-        pid: ProjectId
-    ) -> Result<Vec<ProjectContainer>, ServerError> {
-        let entry = sqlx::query!("
-                SELECT item_id
-                FROM project_container
-                WHERE (
-                    SELECT character_id
-                    FROM project
-                    WHERE character_id = $1
-                      AND id = $2
-                ) IS NOT NULL
-                  AND project_id = $2
-            ",
-                *cid,
-                pid
-            )
-            .fetch_all(&self.pool)
-            .await?
-            .into_iter()
-            .map(|x| {
-                ProjectContainer {
-                    item_id: x.item_id.into(),
-                }
-            })
-            .collect::<Vec<_>>();
-        Ok(entry)
-    }
-
-    pub async fn delete(
-        &self,
-        cid: CharacterId,
-        pid: ProjectId
-    ) -> Result<(), ServerError> {
-        sqlx::query!("
-                DELETE FROM project
-                WHERE character_id = $1
-                  AND id = $2
-            ",
-                *cid,
-                pid
-            )
-            .execute(&self.pool)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn update(
-        &self,
-        cid:     CharacterId,
-        pid:     ProjectId,
-        project: CreateProject
-    ) -> Result<Uuid, ServerError> {
-        let mut trans = self.pool
-            .begin()
-            .await
-            .map_err(ServerError::TransactionBeginNotSuccessfull)?;
-
-        sqlx::query!("
-                UPDATE project
-                SET name = $3
-                WHERE character_id = $1
-                  AND id = $2
-            ",
-                *cid,
-                pid,
-                project.name
-            )
-            .execute(&mut trans)
-            .await?;
-
-        sqlx::query!("
-                DELETE FROM project_container
-                WHERE project_id = $1
-            ",
-                pid
-            )
-            .execute(&mut trans)
-            .await?;
-        sqlx::query!("
-            DELETE FROM project_product
-            WHERE project_id = $1
-        ",
-            pid
-        )
-        .execute(&mut trans)
-        .await?;
-
-        let containers = project
-            .containers
-            .into_iter()
-            .map(|x| *x.item_id)
-            .collect::<Vec<_>>();
-        sqlx::query!("
-                INSERT INTO project_container
-                (
-                    project_id,
-                    item_id
-                )
-                SELECT $1, * FROM UNNEST(
-                    $2::BIGINT[]
-                )
-            ",
-                &pid,
-                &containers
-            )
-            .execute(&mut trans)
-            .await?;
-
-        let products_type_ids = project
-            .products
-            .iter()
-            .map(|x| *x.type_id)
-            .collect::<Vec<_>>();
-        let product_counts = project
-            .products
-            .iter()
-            .map(|x| x.count)
-            .collect::<Vec<_>>();
-        sqlx::query!("
-                INSERT INTO project_product
-                (
-                    project_id,
-                    type_id,
-                    count
-                )
-                SELECT $1, * FROM UNNEST(
-                    $2::INTEGER[],
-                    $3::INTEGER[]
-                )
-            ",
-                &pid,
-                &products_type_ids,
-                &product_counts
-            )
-            .execute(&mut trans)
-            .await?;
-
-        trans.commit()
-            .await
-            .map_err(ServerError::TransactionCommitNotSuccessfull)?;
-
-        Ok(pid)
-    }
-
-    pub async fn required_blueprints(
-        &self,
-        cid: CharacterId,
-        pid: ProjectId
-    ) -> Result<Vec<ProjectRequiredBlueprint>, ServerError> {
-        let entries = sqlx::query!("
-                SELECT tree
-                FROM blueprint_tree
-                WHERE type_id = ANY(
-                    SELECT pp.type_id
-                    FROM project p
-                    JOIN project_product pp
-                      ON pp.project_id = p.id
-                    WHERE p.character_id = $1
-                      AND p.id = $2
-                )
-            ",
-                *cid,
-                pid
-            )
-            .fetch_all(&self.pool)
-            .await?;
-        let mut parsed_tree = VecDeque::new();
-        for entry in entries {
-            let parsed: BlueprintTree = serde_json::from_value(entry.tree)?;
-            parsed_tree.push_back(parsed);
-        }
-
-        let mut unique_entries = HashSet::new();
-        while let Some(entry) = parsed_tree.pop_front() {
-            unique_entries.insert(entry.key);
-
-            if let Some(x) = entry.children {
-                parsed_tree.extend(x);
-            }
-        }
-
-        let unique_entries = unique_entries
-            .into_iter()
-            .map(|x| *x)
-            .collect::<Vec<_>>();
-
-        let entries = sqlx::query!(r#"
-                SELECT b.type_id AS "type_id!", i.name AS "name!"
-                FROM blueprint b
-                LEFT JOIN blueprint_material bm
-                  ON bm.blueprint = b.id
-                LEFT JOIN item i
-                  ON i.type_id = b.type_id
-                WHERE bm.type_id = ANY($1)
+                JOIN project_template_product ptp
+                  ON ptp.template_id = p.template
+                JOIN blueprint_material bm
+                  ON bm.type_id = ptp.type_id
+                JOIN blueprint_material bmm
+                  ON bmm.blueprint = bm.blueprint
+                JOIN market_price mp
+                  ON mp.type_id = bmm.type_id
+                JOIN item i
+                  ON i.type_id = bmm.type_id
+                WHERE bm.activity = 2
+                  AND bmm.activity = 2
                   AND bm.is_product = TRUE
-            "#,
-                &unique_entries
-            )
-            .fetch_all(&self.pool)
-            .await?
-            .into_iter()
-            .map(|x| {
-                ProjectRequiredBlueprint {
-                    type_id:  x.type_id.into(),
-                    name:     x.name,
-                }
-            })
-            .collect::<Vec<_>>();
-        Ok(entries)
-    }
-
-    pub async fn required_raw_materials(
-        &self,
-        cid: CharacterId,
-        pid: ProjectId
-    ) -> Result<Vec<BlueprintRaw>, ServerError> {
-        let required_blueprints = self
-            .required_blueprints(cid, pid)
-            .await?
-            .into_iter()
-            .map(|x| x.type_id)
-            .collect::<Vec<_>>();
-
-        let products = self.products(cid, pid)
-            .await?
-            .into_iter()
-            .map(|x| (x.type_id, x.count))
-            .collect::<HashMap<_, _>>();
-        let blueprint_products = self.asset
-            .blueprint_material_bulk(required_blueprints.clone(), Some(true))
-            .await?;
-        let tids = blueprint_products
-            .iter()
-            .map(|(x, _)| *x)
-            .collect::<Vec<_>>();
-        let mut raw_materials  = self.asset
-            .blueprint_raw_bulk(tids)
-            .await?;
-
-        let mut merged = HashMap::new();
-        for (type_id, count) in products {
-            let produces_per_run = blueprint_products
-                .get(&type_id)
-                .unwrap()
-                .quantity;
-
-            let runs_needed = count as f32 / produces_per_run as f32;
-            let runs_needed = runs_needed.ceil() as i32;
-
-            raw_materials
-                .get_mut(&type_id)
-                .unwrap()
-                .into_iter()
-                .map(|x| {
-                    x.quantity = x.quantity * runs_needed;
-                    x
-                })
-                .for_each(|x| {
-                    merged
-                        .entry(x.type_id)
-                        .and_modify(|e: &mut BlueprintRaw| x.quantity = e.quantity)
-                        .or_insert(x.clone());
-                });
-        }
-
-        let merged = merged
-            .into_iter()
-            .map(|(_, x)| x)
-            .collect::<Vec<_>>();
-
-        Ok(merged)
-    }
-
-    pub async fn stored_materials(
-        &self,
-        cid: CharacterId,
-        pid: ProjectId
-    ) -> Result<Vec<ProjectStoredMaterial>, ServerError> {
-        let entries = sqlx::query!(r#"
-                SELECT
-                    a.location_id,
-                    a.reference_id AS "reference_id!",
-                    a.type_id,
-                    a.quantity
-                FROM asset a
-                WHERE a.reference_id = ANY(
-                    SELECT pc.item_id
-                    FROM project p
-                    JOIN project_container pc
-                      ON p.id = pc.project_id
-                    WHERE p.character_id = $1
-                      AND p.id = $2
-                )
+                  AND bmm.is_product = FALSE
+                  AND p.owner = $1
+                  AND p.id = $2
             "#,
                 *cid,
                 pid
             )
             .fetch_all(&self.pool)
-            .await?;
+            .await?
+            .into_iter()
+            .for_each(|x| {
+                material_cost
+                    .entry(x.type_id)
+                    .and_modify(|y: &mut ProjectSubCost| {
+                        y.quantity += x.quantity as i32;
+                        y.price    += x.price    as i32;
+                    })
+                    .or_insert(ProjectSubCost {
+                        name:     x.name,
+                        type_id:  (x.type_id as i32).into(),
+                        quantity: x.quantity as i32,
+                        price:    x.price    as i32
+                    });
+            });
 
-        let mut collected = HashMap::new();
-        for entry in entries {
-            collected
-                .entry(entry.type_id)
-                .and_modify(|x: &mut ProjectStoredMaterial| {
-                    x.quantity += entry.quantity;
-                })
-                .or_insert({
-                    ProjectStoredMaterial {
-                        container_id: entry.reference_id.into(),
-                        location_id:  entry.location_id.into(),
-                        type_id:      entry.type_id.into(),
-                        quantity:     entry.quantity
-                    }
-                });
-        }
-
-        let entries = collected
+        let materials = material_cost
             .into_iter()
             .map(|(_, x)| x)
             .collect::<Vec<_>>();
+        let material_total_cost: f32 = materials
+            .iter()
+            .map(|x| x.price as f32)
+            .sum();
 
-        Ok(entries)
-    }
+        let facility_tax_perc = 3f32; // TODO: replace
+        let system_cost_index_perc = sqlx::query!("
+                SELECT cost_index
+                FROM industry_system
+                WHERE system_id = $1
+                  AND activity = 'manufacturing'
+            ",
+                30002001 // TODO: replace with actual system id
+            )
+            .fetch_one(&self.pool)
+            .await?
+            .cost_index as f32;
+        let facility_bonus_perc = 4f32; // TODO replace with actual structure bonus
+
+        let system_cost_index = f32::round(material_total_cost * system_cost_index_perc);
+        let facility_bonus = f32::round(system_cost_index * (facility_bonus_perc / 100f32));
+
+        let mut production_cost = system_cost_index - facility_bonus;
+        let facility_tax = f32::round(production_cost * (facility_tax_perc as f32 / 100f32));
+        production_cost += facility_tax;
+
+        let mut products = HashMap::new();
+        sqlx::query!(r#"
+                SELECT
+                  bm.type_id AS "type_id!",
+                  CEIL(ptp.count::FLOAT / bm.quantity::FLOAT) AS runs,
+                  CEIL(
+                    CEIL(
+                        ptp.count::FLOAT / bm.quantity::FLOAT
+                        ) * bm.quantity
+                    ) AS "quantity!",
+                  CEIL(
+                    CEIL(
+                        ptp.count::FLOAT / bm.quantity::FLOAT
+                        ) * bm.quantity * mp.adjusted_price
+                    ) AS "price!",
+                  i.name
+                FROM project p
+                JOIN project_template_product ptp
+                  ON ptp.template_id = p.template
+                JOIN blueprint_material bm
+                  ON bm.type_id = ptp.type_id
+                JOIN market_price mp
+                  ON mp.type_id = bm.type_id
+                JOIN item i
+                  ON i.type_id = bm.type_id
+                WHERE bm.activity = 2
+                  AND bm.is_product = TRUE
+                  AND p.owner = $1
+                  AND p.id = $2
+            "#,
+                *cid,
+                pid
+            )
+            .fetch_all(&self.pool)
+            .await?
+            .into_iter()
+            .for_each(|x| {
+                products
+                    .entry(x.type_id)
+                    .and_modify(|y: &mut ProjectSubCost| {
+                        y.quantity += x.quantity as i32;
+                        y.price    += x.price    as i32;
+                    })
+                    .or_insert(ProjectSubCost {
+                        name:     x.name,
+                        type_id:  (x.type_id as i32).into(),
+                        quantity: x.quantity as i32,
+                        price:    x.price    as i32
+                    });
+            });
+
+        let products = products
+            .into_iter()
+            .map(|(_, x)| x)
+            .collect::<Vec<_>>();
+        let sell_price: f32 = products
+            .iter()
+            .map(|x| x.price as f32)
+            .sum();
+        let total_cost = material_total_cost + production_cost;
+
+        Ok(ProjectCost {
+            products,
+            materials,
+
+            material_total_cost,
+            system_cost_index,
+            system_cost_index_perc,
+            facility_bonus,
+            facility_bonus_perc,
+            facility_tax,
+            facility_tax_perc,
+            production_cost,
+            total_cost,
+            sell_price,
+        })
+    }*/
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Project {
     pub id:         Uuid,
     pub name:       String,
+    pub runs:       i32,
+    pub template:   Uuid,
 
-    pub containers: Vec<ProjectContainer>,
-    pub products:   Vec<ProjectProduct>
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct CreateProject {
-    pub name: String,
-
-    pub containers: Vec<ProjectContainer>,
-    pub products:   Vec<ProjectProduct>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ProjectContainer {
-    pub item_id: ItemId,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ProjectProduct {
-    pub type_id: TypeId,
-    pub count:   i32
+    pub containers: Vec<i64>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct ProjectRequiredBlueprint {
+pub struct ProjectStoredMaterial {
+    pub item_id:      ItemId,
+    pub container_id: ItemId,
+    pub location_id:  LocationId,
+    pub type_id:      TypeId,
+    pub quantity:     i32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ProjectSetting {
+    containers: Vec<i64>,
+    name:       String,
+    runs:       i32,
+    template:   Uuid,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ProjectCost {
+    pub products:                Vec<ProjectSubCost>,
+    pub materials:               Vec<ProjectSubCost>,
+
+    pub material_total_cost:     f32,
+    pub system_cost_index:       f32,
+    pub system_cost_index_perc:  f32,
+    pub facility_bonus:          f32,
+    pub facility_bonus_perc:     f32,
+    pub facility_tax:            f32,
+    pub facility_tax_perc:       f32,
+    pub production_cost:         f32,
+    pub total_cost:              f32,
+    pub sell_price:              f32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ProjectSubCost {
+    pub name:     String,
+    pub type_id:  TypeId,
+    pub quantity: i32,
+    pub price:    i32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ProjectCostTracking {
+    pub amount:      f64,
+    pub description: String,
+
+    // All values are not set when the entry is created
+    #[serde(default)]
+    pub id:          Uuid,
+    #[serde(default)]
+    pub creator:     Option<CharacterId>,
+    #[serde(default)]
+    pub created_at:  i64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Template {
+    pub id:         Uuid,
+    pub name:       String,
+
+    pub products:   Vec<TemplateProduct>
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TemplateSetting {
+    pub name:     String,
+
+    pub products: Vec<TemplateProduct>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TemplateRequiredBlueprint {
     pub name:    String,
     pub type_id: TypeId,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TemplateProduct {
+    pub type_id: TypeId,
+    pub count:   i32,
+
+    /// Only set in the response
+    #[serde(default)]
+    pub name:    String
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BlueprintTree {
     pub key:      TypeId,
     pub label:    String,
+    pub quantity: i32,
     pub children: Option<Vec<BlueprintTree>>
-}
-
-#[derive(Debug, Serialize)]
-pub struct ProjectStoredMaterial {
-    pub container_id: ItemId,
-    pub location_id:  LocationId,
-    pub type_id:      TypeId,
-    pub quantity:     i32,
 }

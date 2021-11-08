@@ -1,7 +1,7 @@
 use crate::{AssetFilter, ResolveIdNameFilter};
 use crate::asset::AssetService;
+use crate::auth_user::AuthUser;
 use crate::error::ServerError;
-use crate::eve::LoggedInCharacter;
 
 use axum::{Json, Router};
 use axum::extract::{Extension, Path, Query};
@@ -48,10 +48,10 @@ pub fn router() -> Router {
 ///
 async fn asset_by_id(
     asset_service: Extension<AssetService>,
-    character:     LoggedInCharacter,
+    user:          AuthUser,
     Path(iid):     Path<ItemId>
 ) -> Result<impl IntoResponse, ServerError> {
-    let cid = character.character_id().await?;
+    let cid = user.character_id().await?;
     let entry = asset_service.asset(cid, iid).await?;
 
     if let Some(entry) = entry {
@@ -95,20 +95,20 @@ async fn asset_blueprint_flat(
 
 async fn assets(
     asset_service: Extension<AssetService>,
-    character:     LoggedInCharacter,
+    user:          AuthUser,
     Query(filter): Query<AssetFilter>
 ) -> Result<impl IntoResponse, ServerError> {
-    let cids = character.character_alts().await?;
+    let cids = user.character_alts().await?;
     let alts = asset_service.assets(cids, filter).await?;
     Ok((StatusCode::OK, Json(alts)))
 }
 
 async fn asset_name(
     asset_service: Extension<AssetService>,
-    character:     LoggedInCharacter,
+    user:          AuthUser,
     Path(iid):     Path<ItemId>
 ) -> Result<impl IntoResponse, ServerError> {
-    let cid = character.character_id().await?;
+    let cid = user.character_id().await?;
     let name = asset_service.asset_name(cid, iid).await?;
     Ok((StatusCode::OK, Json(name)))
 }

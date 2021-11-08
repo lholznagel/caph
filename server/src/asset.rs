@@ -29,9 +29,10 @@ impl AssetService {
                     a.*,
                     ab.material_efficiency,
                     ab.time_efficiency,
-                    ab.quantity > -1 AS original,
+                    ab.runs = -1 AS original,
                     ab.runs,
                     i.name,
+                    i.volume,
                     i.category_id,
                     i.group_id
                 FROM asset a
@@ -66,6 +67,7 @@ impl AssetService {
                     reference_id:  reference_id.map(|x| x.into()),
                     quantity:      x.get("quantity"),
                     owner:         character_id.into(),
+                    volume:        x.get("volume"),
                     category_id:   category_id.into(),
                     group_id:      group_id.into(),
                     location_flag: x.get("location_flag"),
@@ -141,9 +143,10 @@ impl AssetService {
                     SUM(a.quantity) AS quantity,
                     ab.material_efficiency,
                     ab.time_efficiency,
-                    ab.quantity > -1 AS original,
+                    ab.runs = -1 AS original,
                     ab.runs,
                     i.name,
+                    i.volume,
                     i.category_id,
                     i.group_id
                 FROM asset a
@@ -181,6 +184,7 @@ impl AssetService {
                     ab.time_efficiency,
                     ab.runs,
                     i.name,
+                    i.volume,
                     i.category_id,
                     i.group_id
                 ORDER BY i.name
@@ -202,6 +206,7 @@ impl AssetService {
                     item_ids:     x.get("item_ids"),
                     location_ids: x.get("location_ids"),
                     quantity:     x.get("quantity"),
+                    volume:       x.get("volume"),
                     name:         x.get("name"),
                     category_id:  category_id.into(),
                     group_id:     group_id.into(),
@@ -520,6 +525,7 @@ pub struct Asset {
     pub location_id:   LocationId,
     pub owner:         CharacterId,
     pub quantity:      i32,
+    pub volume:        f32,
     pub category_id:   CategoryId,
     pub group_id:      GroupId,
 
@@ -541,6 +547,7 @@ pub struct CharacterAsset {
     pub item_ids:      Vec<i64>,
     pub location_ids:  Vec<i64>,
     pub quantity:      i64,
+    pub volume:        f32,
     pub category_id:   CategoryId,
     pub group_id:      GroupId,
     pub name:          String,

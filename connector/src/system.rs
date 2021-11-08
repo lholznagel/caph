@@ -36,7 +36,7 @@ impl ConnectSystemService {
             entries.push(entry);
         }
 
-        Ok(ConnectSystemService {
+        Ok(Self {
             entries
         })
     }

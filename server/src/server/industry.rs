@@ -1,5 +1,5 @@
+use crate::auth_user::AuthUser;
 use crate::error::ServerError;
-use crate::eve::LoggedInCharacter;
 use crate::industry::IndustryService;
 
 use axum::{Json, Router};
@@ -15,9 +15,9 @@ pub fn router() -> Router {
 
 async fn jobs(
     industry_service: Extension<IndustryService>,
-    character:        LoggedInCharacter,
+    user:             AuthUser,
 ) -> Result<impl IntoResponse, ServerError> {
-    let cid = character.character_id().await?;
+    let cid = user.character_id().await?;
     let res = industry_service.jobs(cid).await?;
     Ok((StatusCode::OK, Json(res)))
 }

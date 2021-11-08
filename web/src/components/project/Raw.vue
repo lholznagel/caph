@@ -48,7 +48,7 @@
 import { Options, Vue, prop } from 'vue-class-component';
 import { NCollapse, NCollapseItem, NProgress, NSkeleton, NTable, NTree } from 'naive-ui';
 import { IAssetBlueprintRaw } from '@/services/asset';
-import { IProjectStoredMaterial, ProjectService } from '@/services/project';
+import { ProjectService, IProjectStored, ITemplateMaterial } from '@/services/project';
 
 import FormatNumber from '@/components/FormatNumber.vue';
 import ItemIcon from '@/components/ItemIcon.vue';
@@ -93,8 +93,9 @@ export default class ProjectTree extends Vue.with(Props) {
     let salvage  = new Map();
     let misc     = new Map();
 
-    let stored    = await ProjectService.stored_materials(this.pid);
-    let materials = await ProjectService.required_raw_materials(this.pid);
+    let project   = await ProjectService.project(this.pid);
+    let stored    = await ProjectService.project_stored_materials(this.pid);
+    let materials = await ProjectService.template_required_materials(project.template);
 
     for (let material of materials) {
       if (material.group_id === 18) {
@@ -140,17 +141,17 @@ export default class ProjectTree extends Vue.with(Props) {
     this.busy = false;
   }
 
-  public calc_progress(x: IProjectStoredMaterial): number {
+  public calc_progress(x: IAssetBlueprintRaw): number {
     return Math.ceil(x.stored / (x.quantity / 100) * 100) / 100 || 0;
   }
 
   private group(
-    material: IProjectStoredMaterial,
-    map:      Map<number, IProjectStoredMaterial>,
-    stored:   IProjectStoredMaterial[]
-  ): Map<number, IProjectStoredMaterial> {
+    material: ITemplateMaterial,
+    map:      Map<number, ITemplateMaterial>,
+    stored:   IProjectStored[]
+  ): Map<number, ITemplateMaterial> {
     if (map.has(material.type_id)) {
-      let cur = <IProjectStoredMaterial>map.get(material.type_id);
+      let cur = <ITemplateMaterial>map.get(material.type_id);
       cur.quantity += material.quantity;
       map.set(material.type_id, cur);
     } else {

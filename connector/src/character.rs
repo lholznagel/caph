@@ -27,7 +27,7 @@ impl<'a> ConnectCharacterService<'a> {
         client: &'a EveAuthClient,
         cid:    CharacterId,
     ) -> Self {
-        ConnectCharacterService {
+        Self {
             client,
             cid,
         }
@@ -46,7 +46,7 @@ impl<'a> ConnectCharacterService<'a> {
     pub async fn assets(
         &self,
     ) -> Result<Vec<CharacterAssetEntry>, ConnectError> {
-        let path = format!("characters/{}/assets", self.cid);
+        let path = format!("latest/characters/{}/assets", self.cid);
         self
             .client
             .fetch_page::<CharacterAssetEntry>(&path)
@@ -68,7 +68,7 @@ impl<'a> ConnectCharacterService<'a> {
         &self,
         iids: Vec<ItemId>
     ) -> Result<Vec<CharacterAssetName>, ConnectError> {
-        let path = format!("characters/{}/assets/names", self.cid);
+        let path = format!("latest/characters/{}/assets/names", self.cid);
         self
             .client
             .post::<_, Vec<CharacterAssetName>>(iids, &path)
@@ -89,7 +89,7 @@ impl<'a> ConnectCharacterService<'a> {
     pub async fn blueprints(
         &self,
     ) -> Result<Vec<CharacterBlueprintEntry>, ConnectError> {
-        let path = format!("characters/{}/blueprints", self.cid);
+        let path = format!("latest/characters/{}/blueprints", self.cid);
         self
             .client
             .fetch_page::<CharacterBlueprintEntry>(&path)
@@ -110,7 +110,7 @@ impl<'a> ConnectCharacterService<'a> {
     pub async fn info(
         &self,
     ) -> Result<CharacterInfo, ConnectError> {
-        let path = format!("characters/{}/", self.cid);
+        let path = format!("latest/characters/{}/", self.cid);
         self
             .client
             .fetch::<CharacterInfo>(&path)
@@ -139,7 +139,7 @@ impl<'a> ConnectCharacterService<'a> {
             name: String
         }
 
-        let path = format!("alliances/{}", aid);
+        let path = format!("latest/alliances/{}", aid);
         self
             .client
             .fetch::<Alliance>(&path)
@@ -169,7 +169,7 @@ impl<'a> ConnectCharacterService<'a> {
             name: String
         }
 
-        let path = format!("corporations/{}", cid);
+        let path = format!("latest/corporations/{}", cid);
         self
             .client
             .fetch::<Corp>(&path)
@@ -193,14 +193,14 @@ impl<'a> ConnectCharacterService<'a> {
         &self,
         cid: CorporationId
     ) -> Result<Vec<IndustryJob>, ConnectError> {
-        let path = format!("characters/{}/industry/jobs", self.cid);
+        let path = format!("latest/characters/{}/industry/jobs", self.cid);
         let mut character = self
             .client
             .fetch::<Vec<IndustryJob>>(&path)
             .await
             .map_err(Into::into)?;
 
-        let path = format!("corporations/{}/industry/jobs", cid);
+        let path = format!("latest/corporations/{}/industry/jobs", cid);
         let corporation = self
             .client
             .fetch::<Vec<IndustryJob>>(&path)
@@ -295,6 +295,7 @@ pub struct IndustryJob {
     #[serde(rename = "installer_id")]
     pub character_id: CharacterId,
     /// Id of the station the job was started
+    #[serde(alias = "location_id")]
     #[serde(rename = "station_id")]
     pub station_id:   StationId,
     /// Unique id of the job

@@ -22,15 +22,15 @@
 mod character;
 /// Collection of all errors
 mod error;
+/// Handles all market stuff
+mod market;
 /// Handles all EVE-SDE stuff
 mod sde;
-/// Exposes an API interface
-mod server;
 /// Helper for time
 mod time;
 
 pub use self::character::*;
-pub use self::error::*;
+pub use self::error::*; 
+pub use self::market::*;
 pub use self::sde::*;
-pub use self::server::*;
 pub use self::time::*;

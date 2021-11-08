@@ -22,27 +22,19 @@ const routes: Array<RouteRecordRaw> = [
     )
   },
   {
-    path: '/industry/projects',
-    name: 'industry_projects',
+    path: '/projects',
+    name: 'projects_projects',
     component: () => import(
-      /* webpackChunkName: "industry_projects" */
-      '@/views/Projects.vue'
+      /* webpackChunkName: "projects_projects" */
+      '@/project/VProjects.vue'
     )
   },
   {
-    path: '/industry/projects/new',
-    name: 'project_new',
+    path: '/projects/:pid',
+    name: 'projects',
     component: () => import(
-      /* webpackChunkName: "industry_project_settings" */
-      '@/views/ProjectSettings.vue'
-    )
-  },
-  {
-    path: '/industry/projects/:pid',
-    name: 'project',
-    component: () => import(
-      /* webpackChunkName: "industry_project" */
-      '@/views/Project.vue'
+      /* webpackChunkName: "projects" */
+      '@/project/VProject.vue'
     )
   },
   {
@@ -60,12 +52,32 @@ const routes: Array<RouteRecordRaw> = [
       /* webpackChunkName: "settings_stations" */
       '@/views/SettingStations.vue'
     )
+  },
+  {
+    path: '/settings/corporation/blueprints',
+    name: 'corporation_blueprints',
+    component: () => import(
+      /* webpackChunkName: "settings_corporation_blueprints" */
+      '@/views/SettingCorporationBlueprints.vue'
+    )
+  }, {
+    path: '/admin/features',
+    name: 'admin_features',
+    component: () => import(
+      /* webpackChunkName: "admin_features" */
+      '@/views/AdminFeatures.vue'
+    )
   }
 ]
 
 const router = createRouter({
   history: createWebHistory(process.env.BASE_URL),
   routes
-})
+});
+
+router.beforeEach((to, from, next) => {
+  // TODO: implement check if the user can see the page
+  next();
+});
 
 export default router;

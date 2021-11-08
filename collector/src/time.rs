@@ -8,6 +8,18 @@ pub struct Time {
 }
 
 impl Time {
+    /// Wrappes the character function
+    /// 
+    pub fn duration_next_market(&self) -> Duration {
+        self.duration_next_character()
+    }
+
+    /// Wrappes the character function
+    /// 
+    pub fn datetime_next_market(&self) -> NaiveDateTime {
+        self.datetime_next_character()
+    }
+
     /// Creates a new duration for the next character task run
     ///
     pub fn duration_next_character(&self) -> Duration {
@@ -38,6 +50,11 @@ impl Time {
             date_time.hour() + 1
         } else {
             date_time.hour()
+        };
+        let hours = if hours == 24 {
+            0
+        } else {
+            hours
         };
 
         let time = NaiveTime::from_hms(hours, minutes, 0);

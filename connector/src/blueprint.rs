@@ -31,7 +31,7 @@ impl ConnectBlueprintService {
     pub fn new(zip: &mut SdeService) -> Result<Self, ConnectError> {
         let entries = zip.get_file(Self::PATH)?;
 
-        Ok(ConnectBlueprintService {
+        Ok(Self {
             entries
         })
     }

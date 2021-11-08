@@ -22,6 +22,11 @@
         </tr>
 
         <tr>
+          <th>Volume</th>
+          <td><format-number :value="info.quantity * info.volume" />m³</td>
+        </tr>
+
+        <tr>
           <th>Location</th>
           <td>
             <station-name
@@ -95,6 +100,7 @@ import { AssetService, IAsset } from '@/services/asset';
 
 import AssetName from '@/components/AssetName.vue';
 import CategoryName from '@/components/CategoryName.vue';
+import FormatNumber from '@/components/FormatNumber.vue';
 import StationName from '@/components/StationName.vue';
 import Owner from '@/components/Owner.vue';
 
@@ -112,6 +118,7 @@ class Props {
 
     AssetName,
     CategoryName,
+    FormatNumber,
     StationName,
     Owner
   }

@@ -29,7 +29,7 @@ deploy-server: release
 	sudo systemctl restart caph_server
 
 deploy-web:
-	cd web; npm run release
+	cd web; npm run build
 	sudo rsync --recursive --inplace --delete web/dist/ /opt/caph/web
 
 deploy:

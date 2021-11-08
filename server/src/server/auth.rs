@@ -1,16 +1,16 @@
+use crate::auth::EveAuthQuery;
+use crate::AuthService;
+use crate::auth_user::AuthUser;
 use crate::character::CharacterService;
 use crate::error::ServerError;
-use crate::eve::{EveAuthQuery, EveService, LoggedInCharacter};
 
 use axum::{Json, Router};
-use axum::extract::{Extension, Query, TypedHeader};
+use axum::extract::{Extension, Query};
 use axum::http::header::{LOCATION, SET_COOKIE};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Redirect};
 use axum::routing::get;
-use headers::{Cookie, HeaderMap};
-use std::str::FromStr;
-use uuid::Uuid;
+use headers::HeaderMap;
 
 /// Url to redirect after login
 const REDIRECT: &str = "REDIRECT";
@@ -35,8 +35,8 @@ pub fn router() -> Router {
 ///
 /// # Params
 ///
-/// * `eve_service` -> Service for handling EVE authentication stuff
-/// * `query`       -> Query params that come from the EVE servers after login
+/// * `auth_service` -> Service for handling authentication
+/// * `query`        -> Query params that come from the EVE servers after login
 ///
 /// # Fails
 ///
@@ -48,10 +48,10 @@ pub fn router() -> Router {
 /// to the main page of the webside
 ///
 async fn callback(
-    eve_service: Extension<EveService>,
-    query:       Query<EveAuthQuery>
+    Extension(auth_service): Extension<AuthService>,
+    Query(query):            Query<EveAuthQuery>
 ) -> Result<impl IntoResponse, ServerError> {
-    let token = eve_service
+    let token = auth_service
         .auth(&query.code, query.state)
         .await?;
 
@@ -89,9 +89,9 @@ async fn callback(
 /// Redirect to the EVE login page
 ///
 async fn login(
-    Extension(eve_service): Extension<EveService>
+    Extension(auth_service): Extension<AuthService>
 ) -> Result<impl IntoResponse, ServerError> {
-    let url = eve_service.login().await?;
+    let url = auth_service.login().await?;
     Ok(Redirect::temporary(url))
 }
 
@@ -101,8 +101,8 @@ async fn login(
 ///
 /// # Params
 ///
-/// * `eve_service` -> Service to handle eve authentication stuff
-/// * `cookie`      -> Cookie of the currently logged in character
+/// * `auth_service` -> Service to handle authentication
+/// * `cookie`       -> Cookie of the currently logged in character
 ///
 /// # Errors
 ///
@@ -114,25 +114,22 @@ async fn login(
 /// Redirect to the EVE login page
 ///
 async fn login_alt(
-    Extension(eve_service): Extension<EveService>,
-    TypedHeader(cookie):    TypedHeader<Cookie>
+    Extension(auth_service): Extension<AuthService>,
+    user: AuthUser
 ) -> Result<impl IntoResponse, ServerError> {
-    let token = cookie
-        .get("token")
-        .ok_or(ServerError::InvalidUser)?;
-    let token = Uuid::from_str(token).unwrap();
-    let url = eve_service.login_alt(token).await?;
+    let cid = user.character_id().await?;
+    let url = auth_service.login_alt(cid).await?;
     Ok(Redirect::temporary(url))
 }
 
 async fn whoami(
     character_service: Extension<CharacterService>,
-    character:         LoggedInCharacter
+    user:              AuthUser
 ) -> Result<impl IntoResponse, ServerError> {
-    let client = character
+    let client = user
         .eve_auth_client()
         .await?;
-    let cid = character
+    let cid = user
         .character_id()
         .await?;
     let whoami = character_service

@@ -17,9 +17,9 @@ DROP TABLE IF EXISTS blueprint_raw CASCADE;
 DROP TABLE IF EXISTS blueprint_tree CASCADE;
 DROP TABLE IF EXISTS blueprint_job CASCADE;
 DROP TABLE IF EXISTS industry_job CASCADE;
-DROP TABLE IF EXISTS project CASCADE;
-DROP TABLE IF EXISTS project_product CASCADE;
-DROP TABLE IF EXISTS project_container CASCADE;
+DROP TABLE IF EXISTS project_template CASCADE;
+DROP TABLE IF EXISTS project_template_product CASCADE;
+DROP TABLE IF EXISTS project_template_container CASCADE;
 DROP TABLE IF EXISTS station CASCADE;
 DROP TABLE IF EXISTS system CASCADE;
 
@@ -142,6 +142,8 @@ CREATE TABLE blueprint_flat(
     mtype_id INTEGER NOT NULL,
     quantity INTEGER NOT NULL,
 
+    produces INTEGER NOT NULL,
+
     PRIMARY KEY (type_id, mtype_id)
 );
 
@@ -195,21 +197,29 @@ CREATE TABLE system(
     PRIMARY KEY(id)
 );
 
+CREATE TABLE industry_system (
+    system_id  BIGINT           NOT NULL,
+    cost_index DOUBLE PRECISION NOT NULL,
+    activity   VARCHAR          NOT NULL
+);
+
 --------------------------------------------------------------------------------
 --                  Character specific tables
 --------------------------------------------------------------------------------
 
 -- Contains all characters that successfully logged in
 CREATE TABLE character(
-    alliance_id             INTEGER     NOT NULL,
+    alliance_id             INTEGER,
     character_id            INTEGER     NOT NULL,
     corporation_id          INTEGER     NOT NULL,
 
     character_main          INTEGER,
 
-    alliance_name           VARCHAR(50) NOT NULL,
+    alliance_name           VARCHAR(50),
     character_name          VARCHAR(50) NOT NULL,
     corporation_name        VARCHAR(50) NOT NULL,
+
+    admin                   BOOLEAN     NOT NULL DEFAULT FALSE,
 
     PRIMARY KEY (character_id),
 
@@ -241,6 +251,11 @@ CREATE TABLE asset(
 CREATE TABLE asset_blueprint(
     item_id                 BIGINT NOT NULL,
 
+    -- Type Id of the blueprint
+    type_id                 INTEGER NOT NULL,
+    -- Product type id
+    ptype_id                INTEGER NOT NULL,
+
     quantity                INTEGER NOT NULL,
     material_efficiency     INTEGER NOT NULL,
     time_efficiency         INTEGER NOT NULL,
@@ -262,10 +277,6 @@ CREATE TABLE asset_name(
     name         VARCHAR NOT NULL,
 
     PRIMARY KEY (character_id, item_id),
-
-    FOREIGN KEY (character_id, item_id)
-        REFERENCES asset (character_id, item_id)
-        ON DELETE CASCADE,
 
     FOREIGN KEY (character_id)
         REFERENCES character (character_id)
@@ -290,61 +301,13 @@ CREATE TABLE industry_job(
         ON DELETE CASCADE
 );
 
-CREATE TABLE project(
-    id           UUID    NOT NULL DEFAULT uuid_generate_v4(),
-    character_id INTEGER NOT NULL,
-
-    name         VARCHAR NOT NULL,
-
-    PRIMARY KEY (id)
-);
-
-CREATE TABLE project_container(
-    id         UUID   NOT NULL DEFAULT uuid_generate_v4(),
-    project_id UUID   NOT NULL,
-
-    item_id    BIGINT NOT NULL,
-
-    PRIMARY KEY (id),
-    FOREIGN KEY (project_id)
-        REFERENCES project (id)
-        ON DELETE CASCADE
-);
-
-CREATE TABLE project_product(
-    id         UUID    NOT NULL DEFAULT uuid_generate_v4(),
-    project_id UUID    NOT NULL,
-
-    type_id    INTEGER NOT NULL,
-    count      INTEGER NOT NULL,
-
-    PRIMARY KEY (id),
-    FOREIGN KEY (project_id)
-        REFERENCES project (id)
-        ON DELETE CASCADE
-);
-
--- Contains every character that ever tried to login, if the login was not
--- successful and the user tried again, the user will be here multiple times
-CREATE TABLE login(
-    token                   UUID NOT NULL DEFAULT uuid_generate_v4(),
-
-    expire_date             TIMESTAMPTZ,
-
-    character_id            INTEGER,
-    character_main          INTEGER,
-
-    access_token            VARCHAR,
-    refresh_token           VARCHAR,
-
-    PRIMARY KEY(token)
-);
-
 -- Deletes all unsuccessful logins
-DELETE FROM login WHERE access_token IS NULL AND refresh_token IS NULL
+DELETE FROM login WHERE access_token IS NULL AND refresh_token IS NULL;
 
 --------------------------------------------------------------------------------
 --                  Additional indecies
 --------------------------------------------------------------------------------
-CREATE INDEX asset_type_id     ON asset(type_id);
-CREATE INDEX blueprint_type_id ON blueprint(type_id);
+CREATE INDEX asset_type_id            ON asset(type_id);
+CREATE INDEX blueprint_type_id        ON blueprint(type_id);
+CREATE INDEX industry_system_index    ON industry_system(system_id);
+CREATE INDEX industry_activity_index  ON industry_system(activity);

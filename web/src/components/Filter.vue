@@ -103,13 +103,6 @@ export default class Filter extends Vue.with(Props) {
     }
   }
 
-  private reset() {
-      this.search = '';
-      this.selectedKey = '';
-      this.filterOptions = this.filterOptionsOrig;
-      this.showOptions = false;
-  }
-
   public handleKeydown(event: any) {
     if (event.keyCode === 8) {
       if (this.search.indexOf(':') === -1) {
@@ -138,6 +131,13 @@ export default class Filter extends Vue.with(Props) {
 
   public onClickOutside() {
     this.showOptions = false;
+  }
+
+  private reset() {
+      this.search = '';
+      this.selectedKey = '';
+      this.filterOptions = this.filterOptionsOrig;
+      this.showOptions = false;
   }
 }
 

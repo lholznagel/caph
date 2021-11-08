@@ -31,7 +31,7 @@ class Props {
   }
 })
 export default class ProjectTree extends Vue.with(Props) {
-  public busy: boolean = false;
+  /*public busy: boolean = false;
   public trees: any[] = [];
 
   public async created() {
@@ -43,6 +43,6 @@ export default class ProjectTree extends Vue.with(Props) {
     }
 
     this.busy = false;
-  }
+  }*/
 }
 </script>

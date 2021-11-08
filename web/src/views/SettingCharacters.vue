@@ -1,27 +1,57 @@
 <template>
-  <n-card title="Settings">
-    <n-skeleton text v-if="busy" :repeat="6" />
+  <div>
+    <n-page-header>
+      <template #title>
+        <h1>
+          Characters
+        </h1>
+      </template>
 
-    <n-grid x-gap="12" :cols="5" v-if="!busy">
-      <n-grid-item>
-        <div>
-          <n-image width="340" :src="character.character_icon" />
-          <span>{{ character.character }}</span>
-        </div>
-      </n-grid-item>
-      <n-grid-item v-for="alias in characterAlts" :key="alias.character_id">
-        <n-image width="340" :src="alias.character_icon" />
-        <span>{{ alias.character }}</span>
-      </n-grid-item>
-   </n-grid>
+      <template #extra>
+        <n-button @click="addAlt" type="primary" ghost>Add character</n-button>
+      </template>
+    </n-page-header>
 
-    <n-button @click="addAlt">Add character</n-button>
-  </n-card>
+    <n-card>
+      <n-skeleton text v-if="busy" :repeat="6" />
+
+      <n-grid x-gap="12" :cols="6" v-if="!busy">
+        <n-grid-item v-for="character in characters">
+          <div>
+            <n-image width="200" :src="character.character_icon" />
+
+            <n-space vertical>
+              <span>{{ character.character }}</span>
+              <span>
+                <n-space>
+                  <n-button
+                    @click="refresh(character.character_id)"
+                    :disabled="refresh_map[character.character_id]"
+                    :loading="refresh_map[character.character_id]"
+                  >
+                    Refresh
+                  </n-button>
+                  <n-button
+                    @click="remove(character.character_id)"
+                    type="error"
+                    ghost
+                  >
+                    Remove
+                  </n-button>
+                </n-space>
+              </span>
+            </n-space>
+          </div>
+        </n-grid-item>
+     </n-grid>
+    </n-card>
+  </div>
 </template>
 
 <script lang="ts">
-import {CharacterService, DEFAULT_CHARACTER, ICharacter} from '@/services/character';
-import { NButton, NCard, NImage, NSkeleton, NGrid, NGridItem } from 'naive-ui';
+import {CharacterService, ICharacter} from '@/services/character';
+import { NButton, NCard, NImage, NGrid, NGridItem, NSkeleton, NSpace,
+NPageHeader } from 'naive-ui';
 import { Options, Vue } from 'vue-class-component';
 
 @Options({
@@ -31,26 +61,47 @@ import { Options, Vue } from 'vue-class-component';
     NGrid,
     NGridItem,
     NImage,
-    NSkeleton
+    NPageHeader,
+    NSkeleton,
+    NSpace,
   }
 })
 export default class Settings extends Vue {
   public busy: boolean = false;
 
-  public character: ICharacter        = DEFAULT_CHARACTER;
-  public characterAlts: ICharacter[] = [];
+  public characters: ICharacter[] = [];
+
+  public refresh_map: { [key: number]: boolean } = {}
 
   public async created() {
     this.busy = true;
 
-    this.character     = await CharacterService.info();
-    this.characterAlts = await CharacterService.alts();
+    await this.load();
 
     this.busy = false;
   }
 
   public addAlt() {
     window.location.href = `/api/auth/login/alt`;
+  }
+
+  public refresh(cid: number) {
+    this.refresh_map[cid] = true;
+
+    setTimeout(() => { this.refresh_map[cid] = false }, 5000);
+  }
+
+  public async remove(cid: number) {
+    await CharacterService.remove(cid);
+    await this.load();
+  }
+
+  private async load() {
+    this.characters = [];
+    let character      = await CharacterService.info();
+    let character_alts = await CharacterService.alts();
+    this.characters.push(character);
+    this.characters = this.characters.concat(character_alts);
   }
 }
 </script>

@@ -31,7 +31,7 @@ impl ConnectReprocessService {
     pub fn new(zip: &mut SdeService) -> Result<Self, ConnectError> {
         let entries = zip.get_file(Self::PATH)?;
 
-        Ok(ConnectReprocessService {
+        Ok(Self {
             entries
         })
     }

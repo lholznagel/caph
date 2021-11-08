@@ -1,4 +1,4 @@
-import axios, { AxiosResponse } from 'axios';
+import axios from 'axios';
 
 const KV_NAME = 'resolve_locations';
 
@@ -18,6 +18,10 @@ export class CharacterService {
     return (await axios.get('/api/character/ids')).data;
   }
 
+  public static async remove(cid: number): Promise<void> {
+    return (await axios.delete(`/api/character/${cid}`)).data;
+  }
+
   public static async character_name(cid: number): Promise<string> {
     if (this.character_names[cid]) {
       return this.character_names[cid];
@@ -30,7 +34,6 @@ export class CharacterService {
       return this.character_names[cid];
     }
   }
-
 
   public static async itemLocation(id: number): Promise<IItemLocation> {
     const localItems: IItemLocation[] = this.load();
@@ -50,6 +53,10 @@ export class CharacterService {
   public static itemLocationByName(name: string): IItemLocation | undefined {
     const localItems: IItemLocation[] = this.load();
     return localItems.find((x: IItemLocation) => x.name === name);
+  }
+
+  public static async refreshCharacter(cid: number): Promise<void> {
+    return await axios.get(`/api/character/${cid}/refresh`);
   }
 
   private static load(): IItemLocation[] {
@@ -105,15 +112,3 @@ export interface ICharacter {
   corporation_icon: string;
   corporation_id:   number;
 }
-
-export const DEFAULT_CHARACTER: ICharacter = {
-  character:        '',
-  character_id:     0,
-  character_icon:   '',
-  alliance:         '',
-  alliance_id:      0,
-  alliance_icon:    '',
-  corporation:      '',
-  corporation_icon: '',
-  corporation_id:   0,
-};

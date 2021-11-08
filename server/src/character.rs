@@ -41,7 +41,7 @@ impl CharacterService {
         if let Some(c) = character {
             let character = Character::new(
                 c.alliance_name,
-                c.alliance_id.into(),
+                c.alliance_id.map(|x| x.into()),
                 c.character_name,
                 c.character_id.into(),
                 c.corporation_name,
@@ -122,6 +122,28 @@ impl CharacterService {
         Ok(characters)
     }
 
+    pub async fn remove(
+        &self,
+        cid: CharacterId
+    ) -> Result<(), ServerError> {
+        sqlx::query!("
+                DELETE FROM character WHERE character_id = $1
+            ",
+                *cid
+            )
+            .execute(&self.pool)
+            .await?;
+        sqlx::query!("
+                DELETE FROM login
+                WHERE character_id = $1
+            ",
+                *cid
+            )
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     /// Fetches information either from the database or the eve servers
     ///
     /// # Params
@@ -158,7 +180,7 @@ impl CharacterService {
         if let Some(x) = character {
             let character = Character::new(
                 x.alliance_name,
-                x.alliance_id.into(),
+                x.alliance_id.map(|x| x.into()),
                 x.character_name,
                 x.character_id.into(),
                 x.corporation_name,
@@ -170,6 +192,16 @@ impl CharacterService {
             self.save(&character, main).await?;
             Ok(character)
         }
+    }
+
+    pub async fn refresh(
+        &self,
+        cid: CharacterId
+    ) -> Result<(), ServerError> {
+        let uri = std::env::var("COLLECTOR_ADDR").unwrap();
+        reqwest::get(format!("{}/api/character/{}", uri, cid)).await.unwrap();
+
+        Ok(())
     }
 
     /// Saves the character information in the database
@@ -194,7 +226,7 @@ impl CharacterService {
                 )
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
             ",
-            *character.alliance_id as i32,
+            character.alliance_id.map(|x| *x),
             character.alliance,
             *character.character_id as i32,
             character.character,
@@ -227,8 +259,12 @@ impl CharacterService {
 
         let character = character_service.info().await?;
 
-        let aid = character.alliance_id.unwrap();
-        let alliance = character_service.alliance_name(aid).await?;
+        let aid = character.alliance_id;
+        let alliance = if let Some(x) = aid {
+            Some(character_service.alliance_name(x).await?)
+        } else {
+            None
+        };
 
         let coid = character.corporation_id;
         let corporation = character_service.corporation_name( coid).await?;
@@ -247,9 +283,9 @@ impl CharacterService {
 /// Represents a character with all its information
 #[derive(Debug, Serialize)]
 pub struct Character {
-    pub alliance:         String,
-    pub alliance_icon:    String,
-    pub alliance_id:      AllianceId,
+    pub alliance:         Option<String>,
+    pub alliance_icon:    Option<String>,
+    pub alliance_id:      Option<AllianceId>,
     pub character:        String,
     pub character_id:     CharacterId,
     pub character_icon:   String,
@@ -260,20 +296,23 @@ pub struct Character {
 
 impl Character {
     pub fn new(
-        alliance:       String,
-        alliance_id:    AllianceId,
+        alliance:       Option<String>,
+        alliance_id:    Option<AllianceId>,
         character:      String,
         character_id:   CharacterId,
         corporation:    String,
         corporation_id: CorporationId
     ) -> Self {
+        let alliance_icon = if let Some(x) = alliance_id {
+            Some(format!("https://images.evetech.net/alliances/{}/logo?size=1024", x))
+        } else {
+            None
+        };
+
         Self {
             alliance,
-            alliance_id: alliance_id.into(),
-            alliance_icon: format!(
-                "https://images.evetech.net/alliances/{}/logo?size=1024",
-                alliance_id
-            ),
+            alliance_id,
+            alliance_icon,
             character,
             character_id: character_id.into(),
             character_icon: format!(

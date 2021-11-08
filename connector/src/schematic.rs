@@ -31,7 +31,7 @@ impl ConnectSchematicService {
     pub fn new(zip: &mut SdeService) -> Result<Self, ConnectError> {
         let entries: HashMap<TypeId, SchematicEntry> = zip.get_file(Self::PATH)?;
 
-        Ok(ConnectSchematicService {
+        Ok(Self {
             entries,
         })
     }

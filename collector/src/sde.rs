@@ -2,7 +2,7 @@ use crate::error::CollectorError;
 
 use caph_connector::{BlueprintMaterial, BlueprintSkill, SdeService, TypeId};
 use caph_connector::services::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Type};
 use std::{collections::{HashMap, VecDeque}, fmt};
 use uuid::Uuid;
@@ -275,6 +275,7 @@ impl Sde {
         let mut bm_is_product = Vec::new();
         let mut bm_probability = Vec::new();
         let mut bm_activity = Vec::new();
+        let mut bm_ptype_id = Vec::new();
 
         // blueprint_skill
         let mut bs_blueprint_id = Vec::new();
@@ -294,6 +295,18 @@ impl Sde {
                 bm_is_product.push(false);
                 bm_probability.push(material.probability);
                 bm_activity.push(activity.into());
+
+                if activity == BlueprintActivity::Manufacture ||
+                   activity == BlueprintActivity::Reaction {
+
+                   if let Some(product) = products.get(0) {
+                        bm_ptype_id.push(Some(*product.type_id));
+                   } else {
+                       bm_ptype_id.push(None);
+                   }
+                } else {
+                    bm_ptype_id.push(None);
+                }
             }
 
             for product in products {
@@ -303,6 +316,13 @@ impl Sde {
                 bm_is_product.push(true);
                 bm_probability.push(product.probability);
                 bm_activity.push(activity.into());
+
+                if activity == BlueprintActivity::Manufacture ||
+                   activity == BlueprintActivity::Reaction {
+                    bm_ptype_id.push(Some(*product.type_id));
+                } else {
+                    bm_ptype_id.push(None);
+                }
             }
         };
         let mut insert_skill = |
@@ -436,6 +456,7 @@ impl Sde {
                     blueprint,
                     activity,
                     type_id,
+                    ptype_id,
 
                     quantity,
                     is_product,
@@ -446,13 +467,15 @@ impl Sde {
                     $2::SMALLINT[],
                     $3::INTEGER[],
                     $4::INTEGER[],
-                    $5::BOOLEAN[],
-                    $6::REAL[]
+                    $5::INTEGER[],
+                    $6::BOOLEAN[],
+                    $7::REAL[]
                 )
             ",
                 &bm_blueprint_id,
                 &bm_activity,
                 &bm_type_id,
+                &bm_ptype_id as _,
                 &bm_quantity,
                 &bm_is_product,
                 &bm_probability as _,
@@ -730,6 +753,7 @@ impl Sde {
         blueprint_service: &ConnectBlueprintService,
         schematic_service: &ConnectSchematicService
     ) -> Result<(), CollectorError> {
+
         let assets = asset_service.type_ids().clone();
 
         let productions = blueprint_service
@@ -773,7 +797,7 @@ impl Sde {
                     .map(|x| {
                         ProductMaterial {
                             type_id:  x.type_id,
-                            quantity: x.quantity
+                            quantity: x.quantity,
                         }
                     })
                     .collect::<Vec<_>>();
@@ -785,7 +809,7 @@ impl Sde {
             })
             .map(|x| (x.type_id, x))
             .collect::<HashMap<_, _>>();
-        let schematics = schematic_service
+        /*let schematics = schematic_service
             .entries()
             .clone()
             .iter()
@@ -806,7 +830,7 @@ impl Sde {
                 }
             })
             .map(|x| (x.type_id, x))
-            .collect::<HashMap<_, _>>();
+            .collect::<HashMap<_, _>>();*/
 
         let mut resolved: HashMap<TypeId, BlueprintTree> = HashMap::new();
 
@@ -820,13 +844,13 @@ impl Sde {
             .map(|(_, x)| x)
             .cloned()
             .collect::<VecDeque<_>>();
-        let queue_schematics = schematics
+        /*let queue_schematics = schematics
             .iter()
             .map(|(_, x)| x)
             .cloned()
-            .collect::<VecDeque<_>>();
+            .collect::<VecDeque<_>>();*/
         queue_bps.extend(queue_reactions);
-        queue_bps.extend(queue_schematics);
+        //queue_bps.extend(queue_schematics);
 
         while let Some(x) = queue_bps.pop_front() {
             let mut all_resolved = true;
@@ -844,9 +868,9 @@ impl Sde {
                     all_resolved = false;
                 } else if reactions.contains_key(&pmaterial.type_id) {
                     all_resolved = false;
-                } else if schematics.contains_key(&pmaterial.type_id) {
+                } /*else if schematics.contains_key(&pmaterial.type_id) {
                     all_resolved = false;
-                } else {
+                } */else {
                     continue;
                 }
             }
@@ -893,32 +917,57 @@ impl Sde {
             }
         }
 
-        let mut flat_map = Vec::new();
-        let mut resolved_raw_ressources = HashMap::new();
+        #[derive(Debug, Deserialize)]
+        struct BlueprintFlatTree {
+            /// [TypeId] of the blueprint
+            pub type_id:  TypeId,
+            /// [TypeId] of the material
+            pub mtype_id: TypeId,
+            /// Total amount required for building the blueprint
+            pub required: i32,
+            /// Each run produces
+            pub produces: i32,
+        }
+        type PTypeId = TypeId;
+        type MTypeId = TypeId;
+        let mut flat_map: HashMap<(PTypeId, MTypeId), BlueprintFlatTree> = HashMap::new();
         for (type_id, entry) in resolved.iter() {
-            let mut raw_resources = HashMap::new();
+            let entry = if let Some(e) = productions.get(type_id) {
+                e
+            } else if let Some(e) = reactions.get(type_id) {
+                e
+            } else {
+                continue;
+            };
             let mut resources = VecDeque::new();
-            resources.extend(entry.clone().children.unwrap_or_default());
+            resources.extend(entry.materials.clone());
 
             while let Some(x) = resources.pop_front() {
-                let children = x.children.clone().unwrap_or_default();
-                if children.is_empty() {
-                    raw_resources
-                        .entry(x.key)
-                        .and_modify(|e| *e += x.quantity)
-                        .or_insert(x.quantity);
+                let entry = if let Some(e) = productions.get(&x.type_id) {
+                    e
+                } else if let Some(e) = reactions.get(&x.type_id) {
+                    e
                 } else {
-                    resources.extend(children);
+                    continue;
+                };
 
-                    flat_map.push(BlueprintFlat {
-                        type_id:  type_id.clone(),
-                        mtype_id: x.key,
-                        quantity: x.quantity,
-                    });
+                if entry.materials.is_empty() {
+                    continue;
                 }
-            }
+                resources.extend(entry.materials.clone());
 
-            resolved_raw_ressources.insert(type_id, raw_resources);
+                flat_map
+                    .entry((*type_id, x.type_id))
+                    .and_modify(|e: &mut BlueprintFlatTree| {
+                        e.required += x.quantity
+                    })
+                    .or_insert(BlueprintFlatTree {
+                        type_id:  type_id.clone(),
+                        mtype_id: x.type_id,
+                        required: x.quantity,
+                        produces: entry.quantity
+                    });
+            }
         }
 
         let type_ids = resolved.iter().map(|(x, _)| **x).collect::<Vec<_>>();
@@ -955,7 +1004,7 @@ impl Sde {
             .await
             .map_err(CollectorError::InsertingSdeBlueprintTree)?;
 
-        let mut item_type_ids = Vec::new();
+        /*let mut item_type_ids = Vec::new();
         let mut material_type_ids = Vec::new();
         let mut material_quantities = Vec::new();
         for (type_id, entries) in resolved_raw_ressources {
@@ -988,15 +1037,17 @@ impl Sde {
             )
             .execute(&mut trans)
             .await
-            .map_err(CollectorError::InsertingSdeBlueprintRaw)?;
+            .map_err(CollectorError::InsertingSdeBlueprintRaw)?;*/
 
         let mut item_type_ids = Vec::new();
         let mut material_type_ids = Vec::new();
         let mut material_quantities = Vec::new();
-        for entry in flat_map {
+        let mut produces = Vec::new();
+        for (_, entry) in flat_map {
             item_type_ids.push(*entry.type_id);
             material_type_ids.push(*entry.mtype_id);
-            material_quantities.push(entry.quantity);
+            material_quantities.push(entry.required);
+            produces.push(entry.produces);
         }
         sqlx::query!("DELETE FROM blueprint_flat CASCADE")
             .execute(&mut trans)
@@ -1007,18 +1058,21 @@ impl Sde {
                 (
                     type_id,
                     mtype_id,
-                    quantity
+                    quantity,
+                    produces
                 )
                 SELECT * FROM UNNEST(
                     $1::INTEGER[],
                     $2::INTEGER[],
-                    $3::INTEGER[]
+                    $3::INTEGER[],
+                    $4::INTEGER[]
                 )
                 ON CONFLICT DO NOTHING
             ",
                 &item_type_ids,
                 &material_type_ids,
-                &material_quantities
+                &material_quantities,
+                &produces
             )
             .execute(&mut trans)
             .await
@@ -1062,14 +1116,14 @@ struct BlueprintFlat {
     quantity: i32
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 struct ProductMaterial {
     type_id:  TypeId,
     quantity: i32,
 }
 
 /// All valid activities that a blueprint can have
-#[derive(Copy, Clone, Debug, Type)]
+#[derive(Copy, Clone, Debug, Type, Eq, PartialEq)]
 pub enum BlueprintActivity {
     /// Activity of copying a blueprint, to create a bpc
     Copy,

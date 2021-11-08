@@ -1,4 +1,4 @@
-use axum::body::{Bytes, Full};
+use axum::body::{Bytes, Full, BoxBody};
 use axum::http::StatusCode;
 use axum::Json;
 use axum::response::IntoResponse;
@@ -10,11 +10,17 @@ use std::fmt;
 #[derive(Debug)]
 pub enum ServerError {
     SerdeJsonError(serde_json::Error),
+    Database(sqlx::Error),
     DatabaseError(sqlx::Error),
     ConnectError(caph_connector::ConnectError),
 
+    /// General non specified error
+    GenericError(String),
+
     InvalidUser,
     NotFound,
+    Unauthorized,
+    BadRequest,
 
     /// The address could not be parsed
     CouldNotParseServerListenAddr,
@@ -25,9 +31,20 @@ pub enum ServerError {
     TransactionBeginNotSuccessfull(sqlx::Error),
     /// The transactin could not be commited
     TransactionCommitNotSuccessfull(sqlx::Error),
+
+    FromReqestError(axum::extract::rejection::ExtensionRejection),
+
+    CaphCoreProject(caph_core::ProjectError),
+    CaphCoreMarket(caph_core::MarketError),
 }
 
 impl Error for ServerError {}
+
+impl From<caph_core::ProjectError> for ServerError {
+    fn from(x: caph_core::ProjectError) -> Self {
+        Self::CaphCoreProject(x)
+    }
+}
 
 impl From<serde_json::Error> for ServerError {
     fn from(e: serde_json::Error) -> Self {
@@ -54,13 +71,12 @@ impl fmt::Display for ServerError {
 }
 
 impl IntoResponse for ServerError {
-    type Body = Full<Bytes>;
-    type BodyError = Infallible;
-
-    fn into_response(self) -> axum::http::Response<Self::Body> {
+    fn into_response(self) -> axum::http::Response<BoxBody> {
         let (status, msg) = match self {
-            ServerError::InvalidUser => (StatusCode::FORBIDDEN, "Forbidden"),
-            ServerError::NotFound    => (StatusCode::NOT_FOUND, "Requested entry not found"),
+            ServerError::BadRequest   => (StatusCode::BAD_REQUEST, "Bad Request"),
+            ServerError::InvalidUser  => (StatusCode::FORBIDDEN, "Forbidden"),
+            ServerError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized"),
+            ServerError::NotFound     => (StatusCode::NOT_FOUND, "Requested entry not found"),
             _ => {
                 tracing::error!("Error {:?}", self);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
@@ -77,6 +93,7 @@ impl IntoResponse for ServerError {
 
 /// Utility function for mapping any error into a `500 Internal Server Error`
 /// response.
+#[deprecated]
 pub fn internal_error<E>(err: E) -> (StatusCode, String)
 where
     E: std::error::Error,

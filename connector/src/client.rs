@@ -33,7 +33,7 @@ pub trait RequestClient {
     ///
     async fn fetch<T>(
         &self,
-        path: &str
+        path: &str,
     ) -> Result<T, ConnectError>
     where T: DeserializeOwned;
 
@@ -55,7 +55,7 @@ pub trait RequestClient {
     ///
     async fn fetch_page<T>(
         &self,
-        path: &str
+        path: &str,
     ) -> Result<Vec<T>, ConnectError>
     where T: DeserializeOwned + Send;
 
@@ -79,7 +79,7 @@ pub trait RequestClient {
     async fn post<R, T>(
         &self,
         data: R,
-        path: &str
+        path: &str,
     ) -> Result<T, ConnectError>
     where
         R: Debug + Serialize + Send + Sync,
@@ -99,7 +99,7 @@ pub struct EveClient(Client);
 
 impl EveClient {
     /// URL to the EVE-API
-    const EVE_API_URL:    &'static str = "https://esi.evetech.net/latest";
+    const EVE_API_URL:    &'static str = "https://esi.evetech.net";
     /// Name of the ENV of the user agent
     const ENV_USER_AGENT: &'static str = "EVE_USER_AGENT";
 
@@ -162,23 +162,24 @@ impl EveClient {
     ///
     #[tracing::instrument(level = "debug")]
     async fn send(&self, path: &str) -> Result<Response, ConnectError> {
+        let path = format!("{}/{}", Self::EVE_API_URL, path);
         let mut retry_counter = 0usize;
 
         loop {
             if retry_counter == 3 {
-                tracing::error!("Too many retries requesting {}.", path);
+                tracing::error!("Too many retries requesting {}.", &path);
                 return Err(ConnectError::TooManyRetries(path.into()));
             }
 
             let response = self.0
-                .get(path)
+                .get(&path)
                 .send()
                 .await
                 .map_err(ConnectError::ReqwestError)?;
 
             if !response.status().is_success() {
                 retry_counter += 1;
-                tracing::error!(
+                tracing::warn!(
                     r#"Fetch resulted in non successful status code.
                        Statuscode was {}. Retrying {}."#,
                     response.status(),
@@ -204,15 +205,15 @@ impl EveClient {
     ///   is returned
     ///
     #[tracing::instrument(level = "debug")]
-    fn page_count(&self, response: &Response) -> u8 {
+    fn page_count(&self, response: &Response) -> u16 {
         let headers = response.headers();
         if let Some(x) = headers.get("x-pages") {
             x.to_str()
                 .unwrap_or_default()
-                .parse::<u8>()
+                .parse::<u16>()
                 .unwrap_or_default()
         } else {
-            0u8
+            0u16
         }
     }
 }
@@ -222,10 +223,9 @@ impl RequestClient for EveClient {
     #[tracing::instrument(level = "debug")]
     async fn fetch<T>(
         &self,
-        path: &str
+        path: &str,
     ) -> Result<T, ConnectError>
     where T: DeserializeOwned {
-        let path = format!("{}/{}", Self::EVE_API_URL, path);
         let json = self.send(&path)
             .await?
             .json::<T>()
@@ -237,7 +237,7 @@ impl RequestClient for EveClient {
     #[tracing::instrument(level = "debug")]
     async fn fetch_page<T>(
         &self,
-        path: &str
+        path: &str,
     ) -> Result<Vec<T>, ConnectError>
     where T: DeserializeOwned + Send {
         let response = self
@@ -274,7 +274,7 @@ impl RequestClient for EveClient {
     async fn post<R, T>(
         &self,
         _data: R,
-        _path: &str
+        _path: &str,
     ) -> Result<T, ConnectError>
     where
         R: Debug + Serialize + Send + Sync,
@@ -326,7 +326,7 @@ pub struct EveAuthClient {
 
 impl EveAuthClient {
     /// URL to the EVE-API
-    const EVE_API_URL:    &'static str = "https://esi.evetech.net/latest";
+    const EVE_API_URL:    &'static str = "https://esi.evetech.net";
     /// URL to the EVE-API oauth login page
     const EVE_LOGIN_URL:  &'static str = "https://login.eveonline.com/v2/oauth/authorize";
     /// URL to the EVE-API oauth token
@@ -495,8 +495,8 @@ impl EveAuthClient {
     ///
     /// # Errors
     ///
-    /// The function will return an error if either the ENV `EVE_CALLBACK` or
-    /// the ENV `EVE_CLIENT_ID` are not set.
+    /// The function will return an error if either the ENV `EVE_CALLBACK`,
+    /// the ENV `EVE_CLIENT_ID` or ENV `EVE_CALLBACK` are not set.
     ///
     /// # Usage
     ///
@@ -755,7 +755,7 @@ impl RequestClient for EveAuthClient {
     #[tracing::instrument(level = "debug")]
     async fn fetch<T>(
         &self,
-        path: &str
+        path: &str,
     ) -> Result<T, ConnectError>
     where T: DeserializeOwned {
         let path = format!("{}/{}", Self::EVE_API_URL, path);
@@ -770,7 +770,7 @@ impl RequestClient for EveAuthClient {
     #[tracing::instrument(level = "debug")]
     async fn fetch_page<T>(
         &self,
-        path: &str
+        path: &str,
     ) -> Result<Vec<T>, ConnectError>
     where T: DeserializeOwned + Send {
         let path = format!("{}/{}", Self::EVE_API_URL, path);
@@ -809,7 +809,7 @@ impl RequestClient for EveAuthClient {
     async fn post<R, T>(
         &self,
         data: R,
-        path: &str
+        path: &str,
     ) -> Result<T, ConnectError>
     where
         R: Debug + Serialize + Send + Sync,

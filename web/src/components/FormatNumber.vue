@@ -1,5 +1,5 @@
 <template>
-  <n-text>{{ format() }}</n-text>
+  <n-text :type="type">{{ format() }}</n-text>
 </template>
 
 <script lang="ts">
@@ -17,6 +17,18 @@ class Props {
     type:     Boolean,
     required: false,
   });
+
+  withComma = prop({
+    type:     Boolean,
+    required: false,
+    default:  false
+  });
+
+  type = prop({
+    type:     String,
+    required: false,
+    default:  'default'
+  })
 }
 
 @Options({
@@ -29,7 +41,7 @@ export default class FormatNumber extends Vue.with(Props) {
     if (this.isTime) {
       return formatTime(this.value);
     } else {
-      return formatNumber(this.value);
+      return formatNumber(this.value, this.withComma);
     }
   }
 }

@@ -1,41 +1,61 @@
 <template>
-  <n-card title="Industry Jobs">
-    <n-skeleton text :repeat="5" v-if="busy" />
+  <div>
+    <n-page-header>
+      <template #title>
+        <h1>
+          Industry Jobs
+        </h1>
+      </template>
+    </n-page-header>
 
-    <n-table v-if="!busy">
-      <thead>
-        <tr>
-          <th width="48px"></th>
-          <th>Blueprint</th>
-          <th>Activity</th>
-          <th>Location</th>
-          <th>End (EVE-Time)</th>
-          <th>Remaining</th>
-          <th>Owner</th>
-        </tr>
-      </thead>
+    <n-card>
+      <n-skeleton text :repeat="5" v-if="busy" />
 
-      <tbody>
-        <tr v-for="job in jobs" :key="job.job_id">
-          <td><item-icon :id="job.blueprint_type_id" type="bp" /></td>
-          <td>{{ job.name }}</td>
-          <td>{{ getActivityName(job.activity_id) }}</td>
-          <td><station-name :id="job.station_id" /></td>
-          <td>{{ job.end_date }}</td>
-          <td>
-            <n-tag v-if="job.remaining === 0" type="success">Done</n-tag>
-            <format-number v-if="job.remaining > 0" :value="job.remaining || 0" is-time />
-          </td>
-          <td><owner :id="job.installer_id" /></td>
-        </tr>
-      </tbody>
-    </n-table>
-  </n-card>
+      <n-table v-if="!busy">
+        <thead>
+          <tr>
+            <th width="48px"></th>
+            <th>Blueprint</th>
+            <th>Activity</th>
+            <th>Location</th>
+            <th>End (EVE-Time)</th>
+            <th>Remaining</th>
+            <th>Owner</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr v-for="job in jobs" :key="job.job_id">
+            <td><item-icon :id="job.blueprint_type_id" type="bp" /></td>
+            <td>{{ job.name }}</td>
+            <td>{{ getActivityName(job.activity_id) }}</td>
+            <td><station-name :id="job.station_id" /></td>
+            <td>
+                <n-button
+                  text
+                  tag="a"
+                  target="_blank"
+                  type="primary"
+                  :href="'https://time.nakamura-labs.com/?#' + new Date(job.end_date).valueOf() / 1000"
+                >
+                  {{ job.end_date }}
+                </n-button>
+              </td>
+            <td>
+              <n-tag v-if="job.remaining === 0" type="success">Done</n-tag>
+              <format-number v-if="job.remaining > 0" :value="job.remaining || 0" is-time />
+            </td>
+            <td><owner :id="job.installer_id" /></td>
+          </tr>
+        </tbody>
+      </n-table>
+    </n-card>
+  </div>
 </template>
 
 <script lang="ts">
 import { IIndustryJob, IndustryService } from '@/services/industry';
-import { NButton, NCard, NSkeleton, NTable, NTag } from 'naive-ui';
+import { NButton, NCard, NPageHeader, NSkeleton, NTable, NTag } from 'naive-ui';
 import { Options, Vue } from 'vue-class-component';
 
 import FormatNumber from '@/components/FormatNumber.vue';
@@ -47,6 +67,7 @@ import Owner from '@/components/Owner.vue';
   components: {
     NButton,
     NCard,
+    NPageHeader,
     NSkeleton,
     NTable,
     NTag,

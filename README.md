@@ -4,6 +4,7 @@
 
 - **collector**      -> Collects data either from the SDE.zip file, from the EVE-API or from other external APIs
 - **connector**      -> Wraps authentication, SDE and EVE-API in one project and exposes them as a single library
+- **core**           -> Core libarary that provides services that are used by other projects
 - **server**         -> Contains the API for the web application
 - **web**            -> Web-Application
 - **evemon_to_json** -> Converts a evemon file to a json file TODO: rename, rewrite or delete
@@ -32,6 +33,7 @@
 
 * `SERVER_BIND_ADDR` -> Address the server should bind to.
                         Default: `127.0.0.1:8080`
+* `COLLECTOR_ADDR`   -> Address the collector listen. Optional
 * `DATABASE_URL`     -> Database connection string
 * `EVE_USER_AGENT`   -> User agent that is set with every request to the EVE-API
 * `EVE_CALLBACK`     -> Callback after login, set when creating the application

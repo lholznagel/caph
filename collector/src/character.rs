@@ -89,7 +89,6 @@ impl Character {
 
         // TODO: group all toons from a character together
         //       create an eve auth client for each character
-        
         // CharacterId -> If of the main character
         // Vec<CharacterReq> -> list contianing the main and all toons
         let mut characters: HashMap<CharacterId, Vec<CharacterReq>> = HashMap::new();
@@ -112,7 +111,7 @@ impl Character {
             char_proc.push(e);
         }
 
-        while let Some(_) = char_proc.next().await {
+        while let Some(x) = char_proc.next().await {
             // nothing to do, we just want to wait until all characters are
             // fetched
         }
@@ -126,18 +125,13 @@ impl Character {
     ) -> Result<(), CollectorError> {
         let cids = characters.character_ids();
 
-        let mut trans = self.pool
-            .begin()
-            .await
-            .map_err(CollectorError::TransactionBeginNotSuccessfull)?;
-
         // We can only execute one command at a time
-        sqlx::query!("
+        let x = sqlx::query!("
                 DELETE FROM asset CASCADE WHERE character_id = ANY($1)
             ",
                 &cids
             )
-            .execute(&mut trans)
+            .execute(&self.pool)
             .await
             .map_err(CollectorError::DeletingCharacterAssets)?;
         sqlx::query!("
@@ -145,7 +139,7 @@ impl Character {
             ",
                 &cids
             )
-            .execute(&mut trans)
+            .execute(&self.pool)
             .await
             .map_err(CollectorError::DeletingCharacterAssetNames)?;
         sqlx::query!("
@@ -153,7 +147,7 @@ impl Character {
             ",
                 &cids
             )
-            .execute(&mut trans)
+            .execute(&self.pool)
             .await
             .map_err(CollectorError::DeletingCharacterBlueprints)?;
         sqlx::query!("
@@ -161,57 +155,58 @@ impl Character {
             ",
                 &cids
             )
-            .execute(&mut trans)
+            .execute(&self.pool)
             .await
             .map_err(CollectorError::DeletingCharacterIndustryJobs)?;
 
         for character in characters.0 {
-            trans = self.assets(
+            let x = self.assets(
                 &character.client,
                 character.character_id,
-                trans
             )
-            .await?;
+            .await;
+            if let Err(e) = x {
+                log::error!("Failed task asset_names for [{}]. {:?}", character.character_id, e)
+            }
 
-            /*trans = self.asset_names(
+            let x = self.blueprints(
                 &character.client,
                 character.character_id,
-                trans
             )
-            .await?;*/
+            .await;
+            if let Err(e) = x {
+                log::error!("Failed task asset_names for [{}]. {:?}", character.character_id, e)
+            }
 
-            trans = self.blueprints(
-                &character.client,
-                character.character_id,
-                trans
-            )
-            .await?;
-
-            trans = self.industry_jobs(
+            let x = self.industry_jobs(
                 &character.client,
                 character.character_id,
                 character.corporation_id,
-                trans
             )
-            .await?;
+            .await;
+            if let Err(e) = x {
+                log::error!("Failed task asset_names for [{}]. {:?}", character.character_id, e)
+            }
 
-            dbg!(character.character_id);
+            let x = self.asset_names(
+                &character.client,
+                character.character_id,
+            )
+            .await;
+            if let Err(e) = x {
+                log::error!("Failed task asset_names for [{}]. {:?}", character.character_id, e)
+            }
         }
-
-        trans.commit()
-            .await
-            .map_err(CollectorError::TransactionCommitNotSuccessfull)?;
 
         Ok(())
     }
 
     #[instrument]
-    async fn assets<'a>(
+    async fn assets(
         &self,
         client:    &EveAuthClient,
         cid:       CharacterId,
-        mut trans: Transaction<'a, Postgres>
-    ) -> Result<Transaction<'a, Postgres>, CollectorError> {
+    ) -> Result<(), CollectorError> {
         let assets = ConnectCharacterService::new(client, cid)
             .assets()
             .await
@@ -279,24 +274,26 @@ impl Character {
             &quantities,
             &location_flags,
         )
-        .execute(&mut trans)
+        .execute(&self.pool)
         .await
         .map_err(CollectorError::InsertingCharacterAssets)?;
 
-        Ok(trans)
+        Ok(())
     }
 
     #[instrument]
-    async fn asset_names<'a>(
+    async fn asset_names(
         &self,
         client:    &EveAuthClient,
         cid:       CharacterId,
-        mut trans: Transaction<'a, Postgres>
-    ) -> Result<Transaction<'a, Postgres>, CollectorError> {
+    ) -> Result<(), CollectorError> {
         let iids = sqlx::query!("
                 SELECT item_id
-                FROM asset
-                WHERE character_id = $1
+                FROM asset a
+                JOIN item i
+                  ON a.type_id = i.type_id
+                WHERE a.character_id = $1
+                  AND (i.category_id = 2 OR i.category_id = 6)
             ",
                 *cid
             )
@@ -341,20 +338,20 @@ impl Character {
             &item_ids,
             &names,
         )
-        .execute(&mut trans)
+        .execute(&self.pool)
         .await
-        .map_err(CollectorError::InsertingCharacterAssetNames)?;
+        .unwrap();
+        //.map_err(CollectorError::InsertingCharacterAssetNames)?;
 
-        Ok(trans)
+        Ok(())
     }
 
     #[instrument]
-    async fn blueprints<'a>(
+    async fn blueprints(
         &self,
         client:    &EveAuthClient,
         cid:       CharacterId,
-        mut trans: Transaction<'a, Postgres>
-    ) -> Result<Transaction<'a, Postgres>, CollectorError> {
+    ) -> Result<(), CollectorError> {
         let bps = ConnectCharacterService::new(client, cid)
             .blueprints()
             .await
@@ -365,6 +362,33 @@ impl Character {
         let m_eff = bps.iter().map(|x| x.material_efficiency).collect::<Vec<_>>();
         let t_eff = bps.iter().map(|x| x.time_efficiency).collect::<Vec<_>>();
         let runs = bps.iter().map(|x| x.runs).collect::<Vec<_>>();
+        let type_ids = bps.iter().map(|x| *x.type_id).collect::<Vec<_>>();
+
+        // FIXME: the data may not exist yet
+        let type_ids_pre = sqlx::query!(r#"
+                SELECT
+                    b.type_id   AS "type_id!",
+                    bm.ptype_id AS "ptype_id!"
+                FROM blueprint b
+                JOIN blueprint_material bm
+                  ON b.id = bm.blueprint
+                WHERE b.type_id = ANY($1)
+                  AND bm.is_product = TRUE
+                  AND bm.activity != 1
+            "#,
+                &type_ids
+            )
+            .fetch_all(&self.pool)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|x| (x.type_id, x.ptype_id))
+            .collect::<HashMap<_, _>>();
+
+        let mut ptype_ids = Vec::new();
+        for type_id in type_ids.iter() {
+            ptype_ids.push(*type_ids_pre.get(type_id).unwrap());
+        }
 
         sqlx::query!("
             INSERT INTO asset_blueprint
@@ -376,14 +400,18 @@ impl Character {
                 quantity,
                 material_efficiency,
                 time_efficiency,
-                runs
+                runs,
+                type_id,
+                ptype_id
             )
             SELECT $1, * FROM UNNEST(
                 $2::BIGINT[],
                 $3::INTEGER[],
                 $4::INTEGER[],
                 $5::INTEGER[],
-                $6::INTEGER[]
+                $6::INTEGER[],
+                $7::INTEGER[],
+                $8::INTEGER[]
             )
         ",
             *cid,
@@ -392,22 +420,23 @@ impl Character {
             &m_eff,
             &t_eff,
             &runs,
+            &type_ids,
+            &ptype_ids
         )
-        .execute(&mut trans)
+        .execute(&self.pool)
         .await
         .map_err(CollectorError::InsertingCharacterBlueprints)?;
 
-        Ok(trans)
+        Ok(())
     }
 
     #[instrument]
-    async fn industry_jobs<'a>(
+    async fn industry_jobs(
         &self,
         client:    &EveAuthClient,
         char_id:   CharacterId,
         corp_id:   CorporationId,
-        mut trans: Transaction<'a, Postgres>
-    ) -> Result<Transaction<'a, Postgres>, CollectorError> {
+    ) -> Result<(), CollectorError> {
         let jobs = ConnectCharacterService::new(client, char_id)
             .industry_jobs(corp_id)
             .await
@@ -451,11 +480,11 @@ impl Character {
             &end_dates,
             &start_dates
         )
-        .execute(&mut trans)
+        .execute(&self.pool)
         .await
         .map_err(CollectorError::InsertingCharacterBlueprints)?;
 
-        Ok(trans)
+        Ok(())
     }
 }
 

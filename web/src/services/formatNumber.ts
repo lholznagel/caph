@@ -1,19 +1,26 @@
-export let formatNumber = (numberToFormat: number): string => {
-    const splitted = numberToFormat.toString().split('.');
+export let formatNumber = (numberToFormat: number, with_comma: boolean = false): string => {
+    const splitted = numberToFormat.toFixed(2).toString().split('.');
     const formatValue = splitted[0].split('').reverse().join('');
     const result: string[] = [];
     let count = 0;
 
     for (let i = 0; i < formatValue.length; i++) {
+      let val = formatValue.charAt(i);
+
+      if (val === '-' || val === '+') {
+        result.push(val);
+        continue
+      }
+
       if (count === 3) {
         result.push('.');
         count = 0;
       }
-      result.push(formatValue.charAt(i));
+      result.push(val);
       count += 1;
     }
 
-    if (splitted[1]) {
+    if (with_comma && splitted[1]) {
       return result.reverse().join('') + ',' + splitted[1];
     } else {
       return result.reverse().join('');

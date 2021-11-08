@@ -20,7 +20,7 @@
 )]
 #![feature(stmt_expr_attributes)]
 
-use caph_collector::{Character, ProcessStatus, Sde, Status, TaskState, Time, start_server};
+use caph_collector::{Character, Market, Sde, Time};
 use sqlx::postgres::PgPoolOptions;
 use std::sync::{Arc, Mutex};
 use tracing::Level;
@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing_subscriber::fmt()
         //.pretty()
-        .with_max_level(Level::INFO)
+        .with_max_level(Level::ERROR)
         .init();
 
     let pg_addr = std::env::var(DATABASE_URL)
@@ -44,9 +44,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .connect(&pg_addr)
         .await?;
 
-    let state = Arc::new(Mutex::new(TaskState::default()));
-
-    let state_copy = state.clone();
     let pool_copy = pool.clone();
     let sde = tokio::task::spawn(async move {
         let mut sde = Sde::new(pool_copy);
@@ -54,7 +51,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut last_ts = 0;
         let mut last_iso = String::new();
 
-        let mut status;
         let mut error = None;
 
         loop {
@@ -62,11 +58,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tracing::info!("SDE task started.");
             if let Err(e) = sde.run().await {
                 tracing::error!("Error running SDE task {:?}", e);
-                status = ProcessStatus::Error;
                 error = Some(e.to_string());
             } else {
                 tracing::info!("SDE task done.");
-                status = ProcessStatus::Ok;
             }
 
             let time = Time::default();
@@ -74,32 +68,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let next_iso = time.datetime_next_sde();
             let duration = timed.elapsed().as_secs();
 
-            let state = Status::new(
-                last_ts,
-                last_iso,
-
-                next_ts,
-                next_iso.to_string(),
-
-                duration,
-                status,
-
-                error.clone()
-            );
-
             last_ts = next_ts;
             last_iso = next_iso.to_string();
-            {
-                state_copy
-                    .lock()
-                    .unwrap()
-                    .sde_status(state);
-            }
             tokio::time::sleep(time.duration_next_sde()).await;
         }
     });
 
-    let state_copy = state.clone();
     let pool_copy = pool.clone();
     let character = tokio::task::spawn(async move {
         let mut character = Character::new(pool_copy);
@@ -107,19 +81,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut last_ts = 0;
         let mut last_iso = String::new();
 
-        let mut status;
         let mut error = None;
 
         loop {
             let timed = std::time::Instant::now();
-
             if let Err(e) = character.task().await {
                 tracing::error!("Error running character task {:?}", e);
-                status = ProcessStatus::Error;
                 error = Some(e.to_string());
             } else {
                 tracing::info!("Character task done.");
-                status = ProcessStatus::Ok;
             }
 
             let time = Time::default();
@@ -127,45 +97,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let next_iso = time.datetime_next_character();
             let duration = timed.elapsed().as_secs();
 
-            let state = Status::new(
-                last_ts,
-                last_iso,
-
-                next_ts,
-                next_iso.to_string(),
-
-                duration,
-                status,
-
-                error.clone()
-            );
-
             error = None;
             last_ts = next_ts;
             last_iso = next_iso.to_string();
-            {
-                state_copy
-                    .lock()
-                    .unwrap()
-                    .character_status(state);
-            }
             tokio::time::sleep(time.duration_next_character()).await;
         }
     });
 
     let pool_copy = pool.clone();
-    let state_copy = state.clone();
-    let server = tokio::task::spawn(async {
-        if let Err(_) = start_server(pool_copy, state_copy).await {
-            tracing::error!("Failed to start server");
+    let market = tokio::task::spawn(async move {
+        let mut market = Market::new(pool_copy);
+
+        let mut last_ts = 0;
+        let mut last_iso = String::new();
+
+        let mut error = None;
+
+        loop {
+            let timed = std::time::Instant::now();
+
+            if let Err(e) = market.task().await {
+                tracing::error!("Error running market task {:?}", e);
+                error = Some(e.to_string());
+            } else {
+                tracing::info!("market task done.");
+            }
+
+            let time = Time::default();
+            let next_ts = time.datetime_next_market().timestamp();
+            let next_iso = time.datetime_next_market();
+            let duration = timed.elapsed().as_secs();
+
+            error = None;
+            last_ts = next_ts;
+            last_iso = next_iso.to_string();
+            tokio::time::sleep(time.duration_next_market()).await;
         }
     });
 
     let _ = tokio::join!(
         character,
+        market,
         sde,
-
-        server
     );
 
     Ok(())

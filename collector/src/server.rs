@@ -134,6 +134,8 @@ pub enum HealthStatus {
 pub struct TaskState {
     /// Character task
     character: Option<Status>,
+    /// Market task
+    market:    Option<Status>,
     /// SDE task
     sde:       Option<Status>,
 }
@@ -147,6 +149,16 @@ impl TaskState {
     ///
     pub fn character_status(&mut self, status: Status) {
         self.character = Some(status);
+    }
+
+    /// Sets the status of the market task
+    ///
+    /// # Params
+    ///
+    /// * `status` -> New status
+    ///
+    pub fn market_status(&mut self, status: Status) {
+        self.market = Some(status);
     }
 
     /// Sets the status of the sde task

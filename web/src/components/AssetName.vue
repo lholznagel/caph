@@ -1,5 +1,5 @@
 <template>
-  <n-text>{{ name || 'Unknown ' + id }}</n-text>
+  <n-text>{{ name || 'Unknown ' + tid }}</n-text>
 </template>
 
 <script lang="ts">

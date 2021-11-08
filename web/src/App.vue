@@ -61,6 +61,9 @@ import {
 import { Options, Vue } from 'vue-class-component';
 import { h } from 'vue';
 import { RouterLink } from 'vue-router';
+import { ProjectService } from './project/service';
+import { events } from '@/main';
+import { PROJECT_CHANGE } from '@/event_bus';
 
 @Options({
   components: {
@@ -94,8 +97,11 @@ export default class App extends Vue {
     type:  'group',
     children: [
       this.app_link('industry_jobs', 'Jobs'),
-      this.app_link('industry_projects', 'Projects'),
     ]
+  }, {
+    label: 'Projects',
+    key:   'projects',
+    type:  'group'
   }, {
     label: 'Settings',
     key:   'settings',
@@ -103,10 +109,20 @@ export default class App extends Vue {
     children: [
       this.app_link('characters', 'Characters'),
       this.app_link('stations', 'Stations'),
+      this.app_link('corporation_blueprints', 'Corporation Blueprints'),
+    ]
+  }, {
+    label: 'Admin',
+    key:   'admin',
+    type:  'group',
+    children: [
+      this.app_link('admin_features', 'Features')
     ]
   }];
 
   public async created() {
+    events.$on(PROJECT_CHANGE, async () => await this.projects());
+
     const res = await (axios.get<ICharacter>('/api/auth/whoami'));
     if (res.status === 200) {
       this.whoami = res.data;
@@ -145,8 +161,10 @@ export default class App extends Vue {
             { default: () => view.name }
           ),
         key: 'assets_' + view.name,
-      })
+      });
     }
+
+    await this.projects();
   }
 
   public app_link(to: string, name: string) {
@@ -166,7 +184,7 @@ export default class App extends Vue {
   }
 
   public handleUpdateValue(key: string, _: string) {
-    if (!key.startsWith('assets')) {
+    if (!key.startsWith('assets') && !key.startsWith('projects')) {
       this.$router.push({ name: key });
     }
   }
@@ -178,6 +196,48 @@ export default class App extends Vue {
   public isLoggedIn() {
     // TODO: not very secure
     return this.whoami.character !== '';
+  }
+
+  private async projects() {
+    this.options[2].children = <any>[
+      {
+        label: () =>
+        h(
+          RouterLink,
+          {
+            to: {
+              name: 'projects_projects',
+            }
+          },
+          { default: () => 'All' }
+        ),
+        key: 'projects_projects',
+      },
+    ];
+
+    const projects = (await ProjectService
+      .get_all())
+      .filter(x => x.pinned);
+    if (this.options[2].children && this.options[2].children.length > 1) {
+      return;
+    }
+
+    for (let project of projects) {
+      (this.options[2].children || []).push(<any>{
+        label: () =>
+          h(
+            RouterLink,
+            {
+              to: {
+                name: 'projects',
+                params: { pid: project.id }
+              }
+            },
+            { default: () => project.name }
+          ),
+        key: 'projects_' + project.id,
+      });
+    }
   }
 }
 
