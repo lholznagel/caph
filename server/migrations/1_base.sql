@@ -1,11 +1,12 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-CREATE TYPE PROJECT_STATUS AS ENUM ('DONE', 'IN_PROGRESS', 'HALTED');
+CREATE TYPE PROJECT_STATUS          AS ENUM ('ABORTED', 'DONE', 'IN_PROGRESS', 'PAUSED');
+CREATE TYPE PROJECT_BUDGET_CATEGORY AS ENUM ('PURCHASE', 'SOLD', 'MANUFACTURE', 'RESEARCH', 'OTHER');
 
 --------------------------------------------------------------------------------
 --                  General static data
 --------------------------------------------------------------------------------
-CREATE TABLE IF NOT exists market_orders(
+CREATE TABLE IF NOT EXISTS market_orders(
     is_buy_order BOOLEAN          NOT NULL,
 
     type_id      INTEGER          NOT NULL,
@@ -31,18 +32,18 @@ CREATE INDEX IF NOT EXISTS market_orders_system_id ON market_orders(system_id);
 --------------------------------------------------------------------------------
 -- Contains all projects
 CREATE TABLE IF NOT EXISTS projects(
-    id         UUID           NOT NULL DEFAULT uuid_generate_v4(),
+    project     UUID           NOT NULL DEFAULT uuid_generate_v4(),
 
-    pinned     BOOLEAN        NOT NULL DEFAULT TRUE,
+    pinned      BOOLEAN        NOT NULL DEFAULT TRUE,
 
-    owner      INTEGER        NOT NULL,
-    name       VARCHAR        NOT NULL,
+    owner       INTEGER        NOT NULL,
+    name        VARCHAR        NOT NULL,
 
-    status     PROJECT_STATUS NOT NULL DEFAULT 'IN_PROGRESS',
+    description VARCHAR,
 
-    containers BIGINT[]       NOT NULL DEFAULT ARRAY[]::BIGINT[],
+    status      PROJECT_STATUS NOT NULL DEFAULT 'IN_PROGRESS',
 
-    PRIMARY KEY (id)
+    PRIMARY KEY (project)
 );
 
 -- List of items that should be produced in a project
@@ -55,28 +56,74 @@ CREATE TABLE IF NOT EXISTS project_products(
     PRIMARY KEY (project, type_id),
 
     FOREIGN KEY (project)
-        REFERENCES projects (id)
+        REFERENCES projects (project)
+        ON DELETE CASCADE
+);
+
+-- Virtual containers created within the project
+CREATE TABLE IF NOT EXISTS project_containers(
+    -- Id of the container
+    container UUID    NOT NULL DEFAULT uuid_generate_v4(),
+    -- Project id of the project this container lives in
+    project   UUID    NOT NULL,
+
+    name      VARCHAR NOT NULL,
+
+    PRIMARY KEY (project, container),
+
+    FOREIGN KEY (project)
+        REFERENCES projects (project)
+        ON DELETE CASCADE
+);
+
+-- Assets that are stored in a container
+CREATE TABLE IF NOT EXISTS project_assets(
+    project   UUID    NOT NULL,
+    container UUID    NOT NULL,
+
+    type_id   INTEGER NOT NULL,
+    amount    INTEGER NOT NULL,
+
+    -- material efficiency, only set if its a bp, bpc or formula
+    meff      INTEGER,
+    -- time efficiency, only set if its a bp, bpc or formula
+    teff      INTEGER,
+    -- remaining runs, only set if its a bpc
+    runs      INTEGER,
+
+    PRIMARY KEY (project, container),
+
+    FOREIGN KEY (project)
+        REFERENCES projects (project)
+        ON DELETE CASCADE,
+    FOREIGN KEY (project, container)
+        REFERENCES project_containers (project, container)
         ON DELETE CASCADE
 );
 
 -- Tracking of the cost for a project
-CREATE TABLE IF NOT EXISTS project_trackings(
-    id          UUID             NOT NULL DEFAULT uuid_generate_v4(),
-    project     UUID             NOT NULL,
-    character   INTEGER          NOT NULL,
-    amount      DOUBLE PRECISION NOT NULL,
-    description VARCHAR          NOT NULL,
+CREATE TABLE IF NOT EXISTS project_budget(
+    budget      UUID                    NOT NULL DEFAULT uuid_generate_v4(),
+    project     UUID                    NOT NULL,
 
-    created_at  TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
+    character   INTEGER                 NOT NULL,
+    amount      DOUBLE PRECISION        NOT NULL,
+    created_at  TIMESTAMPTZ             NOT NULL DEFAULT NOW(),
 
-    PRIMARY KEY (id, project),
+    category    PROJECT_BUDGET_CATEGORY NOT NULL,
+
+    description VARCHAR,
+
+    PRIMARY KEY (budget, project),
+
     FOREIGN KEY (project)
-        REFERENCES projects (id)
+        REFERENCES projects (project)
         ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS project_tracking_project ON project_trackings(project);
-CREATE INDEX IF NOT EXISTS project_products_product ON project_products(project);
+CREATE INDEX IF NOT EXISTS project_asset_project     ON project_assets(project);
+CREATE INDEX IF NOT EXISTS project_budget_project    ON project_budget(project);
+CREATE INDEX IF NOT EXISTS project_container_project ON project_containers(project);
 
 --------------------------------------------------------------------------------
 --                  General tables

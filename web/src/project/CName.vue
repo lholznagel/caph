@@ -31,7 +31,7 @@ export default class ProjectName extends Vue.with(Props) {
     this.$emit('update:busy', true);
 
     let project = await ProjectService.by_id(this.pid);
-    this.name = project.name;
+    this.name = project.info.name;
 
     this.$emit('update:busy', false);
   }

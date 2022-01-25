@@ -64,15 +64,6 @@ impl MarketService {
     ) -> Result<Vec<MarketItemPrice>, MarketError> {
         let tid = tid.into_iter().map(|x| *x).collect::<Vec<_>>();
         let entries = sqlx::query!(r#"
-                WITH AvgStd AS (
-                    SELECT
-                        AVG(mo.price) AS avgnum,
-                        STDDEV(mo.price) AS stdnum
-                    FROM market_orders mo
-                    WHERE mo.type_id = ANY($1)
-                      AND mo.system_id = $2
-                      AND mo.is_buy_order = false
-                )
                 SELECT
                     AVG(mo.price) AS "avg!",
                     MIN(mo.price) AS "min!",
@@ -80,14 +71,11 @@ impl MarketService {
                     mo.type_id    AS "type_id!",
                     i.name        AS "name!"
                 FROM market_orders mo
-                CROSS JOIN AvgStd
                 JOIN item i
                   ON i.type_id = mo.type_id
                 WHERE mo.type_id = ANY($1)
                   AND mo.system_id = $2
                   AND mo.is_buy_order = $3
-                  AND mo.price < (avgnum + stdnum)
-                  AND mo.price > (avgnum - stdnum)
                 GROUP BY mo.type_id, i.name, i.group_id
                 ORDER BY i.group_id ASC
             "#,

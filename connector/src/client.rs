@@ -437,6 +437,7 @@ impl EveAuthClient {
 
         let client = Client::builder()
             .user_agent(user_agent)
+            .pool_idle_timeout(None)
             .build()
             .map_err(ConnectError::CouldNotConstructClient)?;
 

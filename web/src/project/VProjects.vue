@@ -6,45 +6,78 @@
           Projects
         </h1>
       </template>
-
-      <template #extra>
-        <n-button
-          @click="show_modal = true"
-          type="primary"
-          ghost
-        >
-          New project
-        </n-button>
-      </template>
     </n-page-header>
 
     <n-card content-style="padding: 0">
       <n-skeleton text :repeat="5" v-if="busy" />
 
+      <n-space justify="end" style="margin: 10px;" v-if="!busy">
+        <n-button
+          :disabled="!selected_project"
+          @click="
+            $router.push({ name: 'projects_overview', params: {
+              pid: selected_project || ''
+            } })
+          "
+        >
+          View project
+        </n-button>
+
+        <n-button
+        :disabled="!selected_project"
+        @click="show_confirm = true"
+        >
+          Delete project
+        </n-button>
+
+        <n-button
+          @click="$router.push({ name: 'projects_new' })"
+          type="info"
+        >
+          New project
+        </n-button>
+      </n-space>
+
       <n-table v-if="!busy && projects.length > 0">
         <thead>
           <tr>
-            <th width="200px">Name</th>
-            <th width="100px">Status</th>
-            <th width="600px"></th>
-            <th width="50px"></th>
-            <th width="50px"></th>
+            <th width="10px"></th>
+            <th width="700px">Name</th>
+            <th width="700px">Status</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="project in projects" :key="project.id">
-            <td>{{ project.name }}</td>
+          <tr v-for="project in projects" :key="project.project">
             <td>
-              <n-tag v-if="project.status === 'HALTED'">Halted</n-tag>
+              <n-checkbox
+                :checked="selected_project"
+                :checked-value="project.project"
+                @update:checked="handle_project_select"
+                unchecked-value="undefined"
+                name="select_project"
+              >
+              </n-checkbox>
+            </td>
+            <td>
+              <n-button text type="info">
+                <router-link
+                  :to="
+                    {
+                      name: 'projects_overview',
+                      params: { pid: project.project }
+                    }
+                  "
+                  style="color: inherit; text-decoration: none"
+                >
+                  {{ project.name }}
+                </router-link>
+              </n-button>
+            </td>
+            <td>
+              <n-tag v-if="project.status === 'ABORTED'">Aborted</n-tag>
+              <n-tag v-else-if="project.status === 'PAUSED'">PAUSED</n-tag>
               <n-tag v-else-if="project.status === 'DONE'">Done</n-tag>
               <n-tag v-else>In Progress</n-tag>
-            </td>
-            <td></td>
-            <td>
-              <n-button @click="edit(project.id)">Edit</n-button>
-            </td>
-            <td>
-              <n-button @click="remove(project.id)" type="error" ghost>Delete</n-button>
             </td>
           </tr>
         </tbody>
@@ -52,109 +85,91 @@
 
       <n-empty
         v-if="!busy && projects.length === 0"
-        description="No porjects yet"
-      >
-        <template #extra>
-          <n-button @click="show_modal = true">New project</n-button>
-        </template>
-      </n-empty>
+        description="No projects yet" />
 
-      <p-project v-model:show="show_modal" :config="project" :is-edit="is_edit" />
-
-      <n-modal
+      <confirm-dialog
         v-model:show="show_confirm"
-        preset="dialog"
-        title="Dialog"
-        type="warning"
-        content="Are you sure you want to delete the project?"
-        positive-text="Submit"
-        @positive-click="confirm_delete"
-        @negative-click="show_confirm = false"
-        negative-text="Cancel"
-      />
+        :confirm="confirm_delete"
+        :resource="project_name()"
+      >
+        Are you sure you want to delete {{ project_name() }}?
+        This action will delete everything that is stored about this project.
+        This is not recoverable.
+        Please type in 'delete' to confirm.
+      </confirm-dialog>
     </n-card>
   </div>
 </template>
 
 <script lang="ts">
 import { Options, Vue } from 'vue-class-component';
-import { NButton, NCard, NEmpty, NDynamicInput, NInput, NInputNumber, NModal,
-NPageHeader, NSkeleton, NSpace, NTable, NTag } from 'naive-ui';
-import { ProjectService, IProject, ProjectId } from '@/project/service';
+import { NAlert, NButton, NCard, NCheckbox, NEmpty, NPageHeader, NSkeleton,
+NSpace, NTable, NTag } from 'naive-ui';
+import { ProjectService, IInfo } from '@/project/service';
 import { events } from '@/main';
-import { PROJECT_CHANGE } from '@/event_bus';
+import { PROJECT_ROUTE } from '@/event_bus';
 
-import PProject from '@/project/MProject.vue';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 
 @Options({
   components: {
+    NAlert,
     NButton,
     NCard,
-    NDynamicInput,
+    NCheckbox,
     NEmpty,
-    NInput,
-    NInputNumber,
-    NModal,
     NPageHeader,
     NSkeleton,
     NSpace,
     NTable,
     NTag,
 
-    PProject
+    ConfirmDialog,
   }
 })
-export default class ProjectTemplates extends Vue {
+export default class ProjectsView extends Vue {
   public busy: boolean         = false;
-  public show_modal: boolean   = false;
-
-  public projects: IProject[] = [];
-
-  public project: IProject = <IProject>{  };
-  public is_edit: boolean  = false;
-
   public show_confirm: boolean = false;
-  public delete_id: ProjectId = <ProjectId>'';
+
+  public selected_project: string | undefined = '';
+
+  public projects: IInfo[] = [];
 
   public async created() {
     this.busy = true;
-    await this.load_projects();
+    await this.load();
     this.busy = false;
 
-    // When the modal closes refresh
-    this.$watch('show_modal', () => this.show_modal ? {} : this.load_projects());
-  }
-
-  public edit(id: ProjectId | undefined) {
-    if (!id) { return; }
-
-    let project = this.projects.find(x => x.id === id);
-    if (!project) { return; }
-    this.project = project;
-    this.show_modal = true;
-    this.is_edit = true;
-  }
-
-  public async remove(id: ProjectId | undefined) {
-    if (!id) { return; }
-
-    this.delete_id = id;
-    this.show_confirm = true;
+    events.$emit(
+      PROJECT_ROUTE,
+      undefined
+    );
   }
 
   public async confirm_delete() {
-    if (!this.delete_id) { return; }
-    await ProjectService.remove(this.delete_id);
-    await this.load_projects();
+    if (!this.selected_project) { return; }
+    await ProjectService.remove(this.selected_project);
+    await this.load();
+    this.show_confirm = false;
   }
 
-  private async load_projects() {
-    this.is_edit = false;
-    this.project = <IProject>{};
+  public handle_project_select(pid: string) {
+    if (pid === 'undefined') {
+      this.selected_project = undefined;
+      return;
+    }
 
+    this.selected_project = pid;
+  }
+
+  public project_name(): string {
+    let info = this.projects
+      .find(x => x.project === this.selected_project) || <IInfo>{ name: '' };
+    return info.name;
+  }
+
+  private async load() {
     this.projects = await ProjectService.get_all();
-
-    events.$emit(PROJECT_CHANGE, {});
   }
 }
 </script>

@@ -3,7 +3,7 @@ import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
-    redirect: '/assets'
+    redirect: '/projects'
   },
   {
     path: '/assets',
@@ -30,11 +30,75 @@ const routes: Array<RouteRecordRaw> = [
     )
   },
   {
-    path: '/projects/:pid',
-    name: 'projects',
+    path: '/projects/new',
+    name: 'projects_new',
     component: () => import(
-      /* webpackChunkName: "projects" */
-      '@/project/VProject.vue'
+      /* webpackChunkName: "projects_new" */
+      '@/project/VNewProject.vue'
+    )
+  },
+  {
+    path: '/projects/:pid',
+    name: 'projects_overview',
+    component: () => import(
+      /* webpackChunkName: "projects_overview" */
+      '@/project/VOverview.vue'
+    )
+  },
+  {
+    path: '/projects/:pid/market',
+    name: 'projects_market',
+    component: () => import(
+      /* webpackChunkName: "projects_market" */
+      '@/project/VMarket.vue'
+    )
+  },
+  {
+    path: '/projects/:pid/budget',
+    name: 'projects_budget',
+    component: () => import(
+      /* webpackChunkName: "projects_budget" */
+      '@/project/VBudget.vue'
+    )
+  },
+  {
+    path: '/projects/:pid/budget/add',
+    name: 'projects_add_budget',
+    component: () => import(
+      /* webpackChunkName: "projects_add_budget" */
+      '@/project/VAddBudget.vue'
+    )
+  },
+  {
+    path: '/projects/:pid/blueprint',
+    name: 'projects_blueprint',
+    component: () => import(
+      /* webpackChunkName: "projects_blueprint" */
+      '@/project/VBlueprint.vue'
+    )
+  },
+  {
+    path: '/projects/:pid/material',
+    name: 'projects_raw_material',
+    component: () => import(
+      /* webpackChunkName: "projects_raw_material" */
+      '@/project/VMaterial.vue'
+    )
+  },
+  {
+    path: '/projects/:pid/buildsteps',
+    name: 'projects_buildstep',
+    component: () => import(
+      /* webpackChunkName: "projects_buildstep" */
+      '@/project/VBuildstep.vue'
+    )
+  },
+  {
+    path: '/projects/:pid/settings',
+    name: 'projects_setting',
+    component: () => import(
+      /* webpackChunkName: "projects_setting" */
+      '@/project/VSetting.vue'
     )
   },
   {

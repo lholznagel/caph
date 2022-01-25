@@ -5,8 +5,7 @@
         <th width="24"></th>
         <th width="34"></th>
         <th width="500">Name</th>
-        <th width="100">Runs</th>
-        <th width="100">Produces</th>
+        <th width="100">Probability</th>
         <th width="200">Time per run</th>
         <th width="200">Total time</th>
       </tr>
@@ -30,20 +29,18 @@
           </td>
           <td>
             <item-icon
-              type="icon"
+              type="bpc"
               :id="entry.type_id"
               :width="32"
             />
           </td>
           <td>{{ entry.name }}</td>
-          <td>{{ entry.runs }}</td>
-          <td>{{ entry.produces }}</td>
+          <td>{{ entry.probability }}</td>
           <td><format-number :value="entry.time_per_run" time /></td>
           <td><format-number :value="entry.time_total" time /></td>
         </tr>
         <tr v-if="entry.open">
-          <td></td>
-          <td colspan="6" style="padding-top: 0; padding-right: 0; padding-bottom: 0">
+          <td colspan="6">
             <n-table>
               <thead>
                 <th width="34"></th>
@@ -103,13 +100,13 @@ class Props {
     ItemIcon,
   }
 })
-export default class ProjectBuildstep extends Vue.with(Props) {
+export default class ProjectBuildstepInvention extends Vue.with(Props) {
   public buildsteps: IBuildstepEntry[] = [];
 
   public async created() {
     let project = await ProjectService.by_id(<ProjectId>this.$route.params.pid);
     await project.init();
-    this.buildsteps = project.buildsteps.manufacture || [];
+    this.buildsteps = project.buildsteps.inventions || [];
   }
 }
 </script>

@@ -1,0 +1,9 @@
+[package]
+name = "asset_test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+caph_connector = { path = "../connector" }
+tokio = { version = "1.15.0", features = ["full"] }
+uuid = { version = "0.8.2", features = ["v4"] }

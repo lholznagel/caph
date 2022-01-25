@@ -5,12 +5,10 @@ use axum::response::IntoResponse;
 use axum::{Json, Router};
 use axum::extract::{Extension, Path};
 use axum::routing::{get, put};
-use caph_connector::{CharacterId, ItemId, LocationId, SystemId, TypeId};
-use caph_core::{ProjectMarketItemPrice, ProjectBuildstep};
+use caph_connector::{SystemId, TypeId};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use uuid::Uuid;
 
 pub fn router() -> Router {
     Router::new()
@@ -20,9 +18,10 @@ pub fn router() -> Router {
             Router::new()
                 .route("/", get(by_id).put(edit).delete(delete))
                 .route("/blueprints/required", get(required_blueprints))
-                .route("/buildsteps/:activity", get(buildsteps))
-                .route("/cost/trackings", get(trackings).post(add_tracking))
-                .route("/cost/trackings/:tid", put(edit_tracking).delete(delete_tracking))
+                .route("/blueprints/info", get(info_blueprints))
+                .route("/buildsteps", get(buildsteps))
+                .route("/budget", get(trackings).post(add_budget_entry))
+                .route("/budget/:tid", put(edit_budget_entry).delete(delete_budget_entry))
                 .route("/market/:sid/buy", get(market_buy))
                 .route("/market/:sid/sell", get(market_sell))
                 .route("/materials/raw", get(raw_materials))
@@ -52,7 +51,7 @@ async fn by_id(
 async fn get_all(
     user:    AuthUser,
     service: Extension<caph_core::ProjectService>,
-) -> Result<Json<Vec<caph_core::ProjectInfo>>, ServerError> {
+) -> Result<Json<Vec<caph_core::Info>>, ServerError> {
     user.assert_access().await?;
 
     let cid = user.character_id().await?;
@@ -67,7 +66,7 @@ async fn get_all(
 async fn create(
     user:       AuthUser,
     service:    Extension<caph_core::ProjectService>,
-    Json(body): Json<caph_core::ProjectConfig>
+    Json(body): Json<caph_core::Config>
 ) -> Result<impl IntoResponse, ServerError> {
     user.assert_access().await?;
 
@@ -84,7 +83,7 @@ async fn edit(
     user:       AuthUser,
     service:    Extension<caph_core::ProjectService>,
     Path(pid):  Path<caph_core::ProjectId>,
-    Json(body): Json<caph_core::ProjectConfig>
+    Json(body): Json<caph_core::Config>
 ) -> Result<Json<caph_core::ProjectId>, ServerError> {
     user.assert_access().await?;
 
@@ -118,7 +117,7 @@ async fn raw_materials(
     user:      AuthUser,
     service:   Extension<caph_core::ProjectService>,
     Path(pid): Path<caph_core::ProjectId>
-) -> Result<Json<Vec<caph_core::ProjectMaterial>>, ServerError> {
+) -> Result<Json<Vec<caph_core::Material>>, ServerError> {
     user.assert_access().await?;
 
     service
@@ -133,7 +132,7 @@ async fn stored_materials(
     user:      AuthUser,
     service:   Extension<caph_core::ProjectService>,
     Path(pid): Path<caph_core::ProjectId>
-) -> Result<Json<Vec<caph_core::ProjectMaterial>>, ServerError> {
+) -> Result<Json<Vec<caph_core::Material>>, ServerError> {
     user.assert_access().await?;
 
     service
@@ -148,7 +147,7 @@ async fn required_blueprints(
     user:      AuthUser,
     service:   Extension<caph_core::ProjectService>,
     Path(pid): Path<caph_core::ProjectId>
-) -> Result<Json<Vec<caph_core::ProjectBlueprint>>, ServerError> {
+) -> Result<Json<Vec<caph_core::Blueprint>>, ServerError> {
     user.assert_access().await?;
 
     service
@@ -158,15 +157,30 @@ async fn required_blueprints(
         .map_err(ServerError::CaphCoreProject)
 }
 
-async fn buildsteps(
-    user:                  AuthUser,
-    service:               Extension<caph_core::ProjectService>,
-    Path((pid, activity)): Path<(caph_core::ProjectId, caph_core::Activity)>
-) -> Result<Json<Vec<caph_core::ProjectBuildstep>>, ServerError> {
+/// Gets all stored blueprints for a project
+async fn info_blueprints(
+    user:      AuthUser,
+    service:   Extension<caph_core::ProjectService>,
+    Path(pid): Path<caph_core::ProjectId>
+) -> Result<Json<Vec<caph_core::BlueprintInfo>>, ServerError> {
     user.assert_access().await?;
 
     service
-        .buildsteps(pid, activity)
+        .info_blueprints(pid)
+        .await
+        .map(Json)
+        .map_err(ServerError::CaphCoreProject)
+}
+
+async fn buildsteps(
+    user:      AuthUser,
+    service:   Extension<caph_core::ProjectService>,
+    Path(pid): Path<caph_core::ProjectId>
+) -> Result<Json<caph_core::Buildstep>, ServerError> {
+    user.assert_access().await?;
+
+    service
+        .buildsteps(pid)
         .await
         .map(Json)
         .map_err(ServerError::CaphCoreProject)
@@ -177,7 +191,7 @@ async fn market_buy(
     user:             AuthUser,
     service:          Extension<caph_core::ProjectService>,
     Path((pid, sid)): Path<(caph_core::ProjectId, SystemId)>
-) -> Result<Json<Vec<ProjectMarketItemPrice>>, ServerError> {
+) -> Result<Json<Vec<caph_core::ProjectMarketItemPrice>>, ServerError> {
     user.assert_access().await?;
 
     service
@@ -192,7 +206,7 @@ async fn market_sell(
     user:             AuthUser,
     service:          Extension<caph_core::ProjectService>,
     Path((pid, sid)): Path<(caph_core::ProjectId, SystemId)>
-) -> Result<Json<Vec<ProjectMarketItemPrice>>, ServerError> {
+) -> Result<Json<Vec<caph_core::ProjectMarketItemPrice>>, ServerError> {
     user.assert_access().await?;
 
     service
@@ -207,66 +221,62 @@ async fn trackings(
     user:      AuthUser,
     service:   Extension<caph_core::ProjectService>,
     Path(pid): Path<caph_core::ProjectId>
-) -> Result<Json<Vec<caph_core::ProjectCostTracking>>, ServerError> {
+) -> Result<Json<Vec<caph_core::BudgetEntry>>, ServerError> {
     user.assert_access().await?;
 
     service
-        .trackings(pid)
+        .budget(pid)
         .await
         .map(Json)
         .map_err(ServerError::CaphCoreProject)
 }
 
 /// Adds a new cost to the project
-async fn add_tracking(
+async fn add_budget_entry(
     user:       AuthUser,
     service:    Extension<caph_core::ProjectService>,
     Path(pid):  Path<caph_core::ProjectId>,
-    Json(body): Json<caph_core::ProjectAddCostTracking>
+    Json(body): Json<caph_core::AddBudgetEntry>
 ) -> Result<impl IntoResponse, ServerError> {
     user.assert_access().await?;
 
     service
-        .add_tracking(pid, body)
+        .add_budget_entry(pid, body)
         .await
         .map(|_| (StatusCode::CREATED, ""))
         .map_err(ServerError::CaphCoreProject)
 }
 
 /// Edits a tracking entry
-async fn edit_tracking(
+async fn edit_budget_entry(
     user:             AuthUser,
     service:          Extension<caph_core::ProjectService>,
-    Path((pid, tid)): Path<(caph_core::ProjectId, caph_core::TrackingId)>,
-    Json(body):       Json<caph_core::ProjectCostTracking>
+    Path((pid, tid)): Path<(caph_core::ProjectId, caph_core::BudgetId)>,
+    Json(body):       Json<caph_core::BudgetEntry>
 ) -> Result<impl IntoResponse, ServerError> {
     user.assert_access().await?;
 
     service
-        .edit_tracking(pid, tid, body)
+        .edit_budget_entry(pid, tid, body)
         .await
         .map(|_| (StatusCode::OK, ""))
         .map_err(ServerError::CaphCoreProject)
 }
 
 /// Deletes a tracking entry
-async fn delete_tracking(
+async fn delete_budget_entry(
     user:             AuthUser,
     service:          Extension<caph_core::ProjectService>,
-    Path((pid, tid)): Path<(caph_core::ProjectId, caph_core::TrackingId)>,
+    Path((pid, tid)): Path<(caph_core::ProjectId, caph_core::BudgetId)>,
 ) -> Result<impl IntoResponse, ServerError> {
     user.assert_access().await?;
 
     service
-        .delete_tracking(pid, tid)
+        .delete_budget_entry(pid, tid)
         .await
         .map(|_| (StatusCode::OK, ""))
         .map_err(ServerError::CaphCoreProject)
 }
-
-pub type ProjectId  = Uuid;
-pub type TemplateId = Uuid;
-pub type TrackingId = Uuid;
 
 #[derive(Clone)]
 pub struct ProjectService {
@@ -458,33 +468,6 @@ impl ProjectService {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Project {
-    pub id:         Uuid,
-    pub name:       String,
-    pub runs:       i32,
-    pub template:   Uuid,
-
-    pub containers: Vec<i64>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ProjectStoredMaterial {
-    pub item_id:      ItemId,
-    pub container_id: ItemId,
-    pub location_id:  LocationId,
-    pub type_id:      TypeId,
-    pub quantity:     i32,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ProjectSetting {
-    containers: Vec<i64>,
-    name:       String,
-    runs:       i32,
-    template:   Uuid,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 pub struct ProjectCost {
     pub products:                Vec<ProjectSubCost>,
     pub materials:               Vec<ProjectSubCost>,
@@ -507,57 +490,4 @@ pub struct ProjectSubCost {
     pub type_id:  TypeId,
     pub quantity: i32,
     pub price:    i32,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ProjectCostTracking {
-    pub amount:      f64,
-    pub description: String,
-
-    // All values are not set when the entry is created
-    #[serde(default)]
-    pub id:          Uuid,
-    #[serde(default)]
-    pub creator:     Option<CharacterId>,
-    #[serde(default)]
-    pub created_at:  i64,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Template {
-    pub id:         Uuid,
-    pub name:       String,
-
-    pub products:   Vec<TemplateProduct>
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TemplateSetting {
-    pub name:     String,
-
-    pub products: Vec<TemplateProduct>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TemplateRequiredBlueprint {
-    pub name:    String,
-    pub type_id: TypeId,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TemplateProduct {
-    pub type_id: TypeId,
-    pub count:   i32,
-
-    /// Only set in the response
-    #[serde(default)]
-    pub name:    String
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct BlueprintTree {
-    pub key:      TypeId,
-    pub label:    String,
-    pub quantity: i32,
-    pub children: Option<Vec<BlueprintTree>>
 }

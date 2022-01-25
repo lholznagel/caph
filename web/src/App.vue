@@ -1,11 +1,11 @@
 <template>
-  <n-config-provider :theme="dark">
+  <n-config-provider :theme="dark" :theme-overrides="theme_overrides">
     <n-global-style />
 
     <n-layout position="absolute">
       <n-layout-header class="header" bordered>
         <div class="nav-header-text">
-          Caph
+          {{ name() }}
         </div>
 
         <n-button
@@ -27,14 +27,21 @@
           v-if="isLoggedIn()"
         >
           <n-menu
-            @update:value="handleUpdateValue"
+            :value="current_route"
             :options="options"
-            default-expand-all
+            :expanded-keys="['projects_projects']"
+            :default-expanded-keys="['projects_projects']"
           />
         </n-layout-sider>
 
-        <n-layout content-style="padding: 24px;" :native-scrollbar="false">
-          <router-view :key="$route.fullPath" v-if="isLoggedIn()" />
+        <n-layout
+          content-style="padding-left: 24px; padding-right: 24px"
+          :native-scrollbar="false"
+        >
+          <router-view
+            :key="$route.fullPath"
+            v-if="isLoggedIn()"
+          />
 
           <n-result
             status="403"
@@ -55,15 +62,14 @@
 <script lang="ts">
 import axios from 'axios';
 import {
-  darkTheme, NAvatar, NButton, NConfigProvider, NGlobalStyle,
+  darkTheme, GlobalThemeOverrides, NAvatar, NButton, NConfigProvider, NGlobalStyle,
   NLayout, NLayoutHeader, NLayoutSider, NMenu, NResult
 } from 'naive-ui';
 import { Options, Vue } from 'vue-class-component';
 import { h } from 'vue';
 import { RouterLink } from 'vue-router';
-import { ProjectService } from './project/service';
 import { events } from '@/main';
-import { PROJECT_CHANGE } from '@/event_bus';
+import { PROJECT_ROUTE } from '@/event_bus';
 
 @Options({
   components: {
@@ -82,16 +88,31 @@ import { PROJECT_CHANGE } from '@/event_bus';
 })
 export default class App extends Vue {
   public dark = darkTheme;
-  public menuValue = '';
+
+  public theme_overrides: GlobalThemeOverrides = {
+    Button: {
+      borderRadiusMedium: '0'
+    },
+    Card: {
+      borderRadius: '0'
+    },
+    Menu: {
+      borderRadius: '0'
+    },
+    Table: {
+      borderRadius: '0'
+    },
+    Tag: {
+      borderRadius: '0'
+    }
+  };
 
   public whoami: ICharacter = DEFAULT_CHARACTER;
 
-  public options = [
-  {
-    label: 'Assets',
-    key:   'assets',
-    type:  'group',
-  }, {
+  public current_route: string = '';
+  public expand_keys: string[] = [];
+
+  public options = [{
     label: 'Industry',
     key:   'industry',
     type:  'group',
@@ -99,9 +120,16 @@ export default class App extends Vue {
       this.app_link('industry_jobs', 'Jobs'),
     ]
   }, {
-    label: 'Projects',
-    key:   'projects',
-    type:  'group'
+    label: () => h(
+      RouterLink,
+      {
+        to: {
+          name: 'projects_projects'
+        }
+      },
+      { default: () => 'Projects' }
+    ),
+    key:   'projects_projects',
   }, {
     label: 'Settings',
     key:   'settings',
@@ -121,7 +149,24 @@ export default class App extends Vue {
   }];
 
   public async created() {
-    events.$on(PROJECT_CHANGE, async () => await this.projects());
+    events.$on(PROJECT_ROUTE, (e: string) => {
+      if (e) {
+        let pid = <string>this.$route.params.pid;
+        this.options[1].children = [
+          this.project_link('projects_overview', 'Overview', pid),
+          this.project_link('projects_market', 'Market', pid),
+          this.project_link('projects_budget', 'Budget', pid),
+          this.project_link('projects_blueprint', 'Blueprint', pid),
+          this.project_link('projects_raw_material', 'Raw Materials', pid),
+          this.project_link('projects_buildstep', 'Buildsteps', pid),
+          this.project_link('projects_setting', 'Settings', pid),
+        ];
+        this.current_route = e;
+      } else {
+        this.current_route = 'projects_projects';
+        this.options[1].children = undefined;
+      }
+    });
 
     const res = await (axios.get<ICharacter>('/api/auth/whoami'));
     if (res.status === 200) {
@@ -129,42 +174,6 @@ export default class App extends Vue {
       let globalWindow: any = window;
       globalWindow.whoami = res.data;
     }
-
-    this.options[0].children = <any>[
-      {
-        label: () =>
-        h(
-          RouterLink,
-          {
-            to: {
-              name: 'assets',
-            }
-          },
-          { default: () => 'All' }
-        ),
-        key: 'assets',
-      },
-    ];
-
-    const views = (await axios.get<any>('/api/character/asset/views')).data;
-    for (let view of views) {
-      (this.options[0].children || []).push(<any>{
-        label: () =>
-          h(
-            RouterLink,
-            {
-              to: {
-                name: 'assets',
-                query: view.query
-              }
-            },
-            { default: () => view.name }
-          ),
-        key: 'assets_' + view.name,
-      });
-    }
-
-    await this.projects();
   }
 
   public app_link(to: string, name: string) {
@@ -183,10 +192,23 @@ export default class App extends Vue {
     };
   }
 
-  public handleUpdateValue(key: string, _: string) {
-    if (!key.startsWith('assets') && !key.startsWith('projects')) {
-      this.$router.push({ name: key });
-    }
+  public project_link(to: string, name: string, pid: string) {
+    return {
+      label: () =>
+        h(
+          RouterLink,
+          {
+            to: {
+              name: to,
+              params: {
+                pid
+              }
+            }
+          },
+          { default: () => name }
+        ),
+      key: to,
+    };
   }
 
   public redirectLogin() {
@@ -198,45 +220,11 @@ export default class App extends Vue {
     return this.whoami.character !== '';
   }
 
-  private async projects() {
-    this.options[2].children = <any>[
-      {
-        label: () =>
-        h(
-          RouterLink,
-          {
-            to: {
-              name: 'projects_projects',
-            }
-          },
-          { default: () => 'All' }
-        ),
-        key: 'projects_projects',
-      },
-    ];
-
-    const projects = (await ProjectService
-      .get_all())
-      .filter(x => x.pinned);
-    if (this.options[2].children && this.options[2].children.length > 1) {
-      return;
-    }
-
-    for (let project of projects) {
-      (this.options[2].children || []).push(<any>{
-        label: () =>
-          h(
-            RouterLink,
-            {
-              to: {
-                name: 'projects',
-                params: { pid: project.id }
-              }
-            },
-            { default: () => project.name }
-          ),
-        key: 'projects_' + project.id,
-      });
+  public name() {
+    if (window.location.origin === 'https://dev.caph.xyz') {
+      return 'Caph DEV';
+    } else {
+      return 'Caph';
     }
   }
 }

@@ -1,27 +1,29 @@
 <template>
   <div>
-    <n-table v-if="!busy && trackings.length > 0">
+    <n-table v-if="!busy && budget_entries.length > 0">
       <tbody>
         <tr>
           <th width="100" style="text-align: right">Amount</th>
+          <th width="100">Category</th>
           <th width="500">Description</th>
           <th width="100">Created at</th>
           <th width="32"></th>
           <th width="10"></th>
         </tr>
-        <tr v-for="tracking in trackings" :key="tracking.id">
+        <tr v-for="entry in budget_entries" :key="budget.budget">
           <td style="text-align: right">
             <format-number
-              :value="tracking.amount"
-              :type="tracking.amount > 0 ? 'success' : 'error'"
+              :value="entry.amount"
+              :type="entry.amount > 0 ? 'success' : 'error'"
             />
             ISK</td>
-          <td>{{ tracking.description }}</td>
-          <td>{{ format_date(tracking.created_at) }}</td>
-          <td><owner :id="tracking.character" /></td>
+          <td>{{ category(entry.category) }}</td>
+          <td>{{ entry.description }}</td>
+          <td>{{ format_date(entry.created_at) }}</td>
+          <td><owner :id="entry.character" /></td>
           <td>
             <n-button
-              @click="edit(tracking.id)"
+              @click="edit(entry.budget)"
               tertiary
               type="info"
             >
@@ -33,7 +35,7 @@
     </n-table>
 
     <n-empty
-      v-if="!busy && trackings.length === 0"
+      v-if="!busy && budget_entries.length === 0"
       description="No cost added yet"
     >
       <template #extra>
@@ -44,13 +46,6 @@
         >Add cost</n-button>
       </template>
     </n-empty>
-
-    <p-add-cost
-      v-model:show="show_modal"
-      :pid="pid"
-      :config="tracking"
-      :is-edit="true"
-    />
   </div>
 </template>
 
@@ -58,11 +53,10 @@
 import { Options, Vue, prop } from 'vue-class-component';
 import { NButton, NCard, NEmpty, NInput, NInputNumber, NModal, NSkeleton, NSpace,
 NTable, NPageHeader, NStatistic, NGrid, NGridItem } from 'naive-ui';
-import { ProjectService, IProjectCostTracking } from '@/project/service';
+import { ProjectService, IBudgetEntry } from '@/project/service';
 import { events } from '@/main';
 import { BUDGET_CHANGE } from '@/event_bus';
 
-import PAddCost from '@/project/MAddCost.vue';
 import FormatNumber from '@/components/FormatNumber.vue';
 import Owner from '@/components/Owner.vue';
 
@@ -91,7 +85,6 @@ class Props {
     NGrid,
     NGridItem,
 
-    PAddCost,
     FormatNumber,
     Owner
   }
@@ -104,8 +97,8 @@ export default class ProjectCostTracking extends Vue.with(Props) {
 
   public balance: number = 0;
 
-  public trackings: IProjectCostTracking[] = [];
-  public tracking: IProjectCostTracking    = <IProjectCostTracking>{};
+  public budget_entries: IBudgetEntry[] = [];
+  public budget: IBudgetEntry           = <IBudgetEntry>{};
 
   public async created() {
     this.busy = true;
@@ -119,15 +112,15 @@ export default class ProjectCostTracking extends Vue.with(Props) {
   }
 
   public async load() {
-    this.trackings = (await ProjectService.trackings(this.pid)).reverse();
+    this.budget_entries = (await ProjectService.budget_entries(this.pid)).reverse();
 
-    this.balance = this.trackings
+    this.balance = this.budget_entries
       .map(x => x.amount)
       .reduce((acc, curr) => acc + curr, 0);
   }
 
   public async edit(id: string) {
-    this.tracking = <IProjectCostTracking>this.trackings.find(x => <string>x.id === id);
+    this.budget = <IBudgetEntry>this.budget_entries.find(x => <string>x.budget === id);
     this.is_edit = true;
     this.show_modal = true;
   }
@@ -145,6 +138,12 @@ export default class ProjectCostTracking extends Vue.with(Props) {
     const minutes = preZero(date.getUTCMinutes());
 
     return `${day}.${month}.${year} ${hours}:${minutes}`;
+  }
+
+  public category(c: string): string {
+    let last = c.slice(1);
+    last = last.toLowerCase();
+    return c.slice(0, 1) + last;
   }
 }
 </script>

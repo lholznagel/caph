@@ -27,7 +27,6 @@ pub fn router() -> Router {
         .route("/:iid/blueprint/material", get(asset_blueprint_material))
         .route("/:iid/blueprint/flat", get(asset_blueprint_flat))
         .route("/:iid/blueprint/tree", get(asset_blueprint_tree))
-        .route("/:iid/blueprint/raw", get(asset_blueprint_raw))
 }
 
 /// Gets a single asset by its id
@@ -74,14 +73,6 @@ async fn asset_blueprint_tree(
     Path(tid):     Path<TypeId>
 ) -> Result<impl IntoResponse, ServerError> {
     let tree = asset_service.blueprint_tree(tid).await?;
-    Ok((StatusCode::OK, Json(tree)))
-}
-
-async fn asset_blueprint_raw(
-    asset_service: Extension<AssetService>,
-    Path(tid):     Path<TypeId>
-) -> Result<impl IntoResponse, ServerError> {
-    let tree = asset_service.blueprint_raw(tid).await?;
     Ok((StatusCode::OK, Json(tree)))
 }
 

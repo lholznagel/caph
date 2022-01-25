@@ -5,6 +5,7 @@ Cargo.lock
 pkg/
 dist/
 node_modules
-sde*
 skillplans.out.json
 evemon_to_json/skillplans/*
+sde_parser/output
+sde_parser/input

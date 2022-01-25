@@ -2,8 +2,8 @@ use crate::MarketService;
 
 use caph_connector::{CharacterId, GroupId, TypeId, SystemId};
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
-use std::collections::{HashMap, VecDeque};
+use sqlx::{PgPool, Executor, Statement};
+use std::collections::HashMap;
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -19,6 +19,7 @@ pub type ProjectId   = Uuid;
 pub struct ProjectService {
     /// Database pool
     pool:   PgPool,
+
     /// [MarketService] for handling market requests
     market: MarketService
 }
@@ -534,7 +535,7 @@ impl ProjectService {
     ) -> Result<Vec<Material>, ProjectError> {
         let mut materials = HashMap::new();
 
-        self.buildstep_manufacturing(pid)
+        self.buildstep_manufacturing(pid, Activity::All)
             .await?
             .into_iter()
             .for_each(|b| {
@@ -547,11 +548,10 @@ impl ProjectService {
                             .or_insert(m);
                     });
             });
-        let mut materials = materials
+        let materials = materials
             .into_iter()
             .map(|(_, x)| x)
             .collect::<Vec<_>>();
-        materials.sort_by_key(|x| x.group_id);
         Ok(materials)
     }
 
@@ -684,7 +684,12 @@ impl ProjectService {
         pid:      ProjectId,
     ) -> Result<Buildstep, ProjectError> {
         let buildstep = Buildstep {
-            manufacture: self.buildstep_manufacturing(pid).await?,
+            manufacture: self.buildstep_manufacturing(
+                pid, Activity::Manufacture
+            ).await?,
+            reactions:   self.buildstep_manufacturing(
+                pid, Activity::Reaction
+            ).await?,
             inventions:  self.buildstep_invention(pid).await?
         };
         Ok(buildstep)
@@ -708,35 +713,32 @@ impl ProjectService {
     async fn buildstep_manufacturing(
         &self,
         pid:      ProjectId,
+        activity: Activity
     ) -> Result<Vec<BuildstepEntry>, ProjectError> {
-        let start = std::time::Instant::now();
+        dbg!("##########################");
 
-        // 1. Get the base items and calculate the number of runs
+        let mut steps = HashMap::new();
         let mut products = HashMap::new();
         sqlx::query!(r#"
                 SELECT
-                    bmc.ptype_id,
-                    bmc.quantity AS product_quantity,
-                    bmc.time,
-                    bmc.reaction,
-                    CEIL(
-                        pp.count::FLOAT / bmc.quantity::FLOAT
-                    )::INTEGER   AS "runs!",
-                    i.name       AS product_name,
-                    i.group_id   AS produt_group_id,
+                    bman.ptype_id,
+                    bman.time,
+                    CEIL(pp.count::FLOAT / bman.quantity::FLOAT)::INTEGER as "runs!",
+                    bman.quantity AS product_quantity,
+                    i_bman.name   AS product_name,
                     bm.mtype_id,
-                    bm.quantity  AS material_quantity,
-                    ii.name      AS material_name,
-                    ii.group_id  AS material_group_id
+                    bm.quantity   AS material_quantity,
+                    i_bm.name     AS material_name,
+                    i_bm.group_id AS material_group_id
                 FROM project_products pp
-                JOIN blueprint_manufacture bmc
-                  ON bmc.ptype_id = pp.type_id
+                JOIN blueprint_manufacture bman
+                  ON bman.ptype_id = pp.type_id
                 JOIN blueprint_materials bm
-                  ON bm.bp_id = bmc.bp_id
-                JOIN item i
-                  ON i.type_id = bmc.ptype_id
-                JOIN item ii
-                  ON ii.type_id = bm.mtype_id
+                  ON bm.bp_id = bman.bp_id
+                JOIN item i_bman
+                  ON i_bman.type_id = bman.ptype_id
+                JOIN item i_bm
+                  ON i_bm.type_id = bm.mtype_id
                 WHERE pp.project = $1
             "#,
                 pid
@@ -751,6 +753,7 @@ impl ProjectService {
                     name:     x.material_name,
                     group_id: x.material_group_id.into()
                 };
+
                 products
                     .entry(x.ptype_id)
                     .and_modify(|x: &mut BuildstepEntry| x.materials.push(material.clone()))
@@ -765,26 +768,10 @@ impl ProjectService {
                     });
             });
         let products = products
-            .values()
-            .cloned()
+            .into_iter()
+            .map(|(_, x)| x)
             .collect::<Vec<_>>();
-        dbg!("1", start.elapsed().as_millis());
 
-        // 2. Resolve the required materials and calculate the number of
-        // required materials.
-        let mut materials = HashMap::new();
-        for product in products.iter() {
-            let a = self.no_clue(product.type_id, product.produces).await?;
-            for (t, q) in a {
-                materials
-                    .entry(t)
-                    .and_modify(|x: &mut i32| *x += q)
-                    .or_insert(q);
-            }
-        }
-        dbg!("2", start.elapsed().as_millis());
-
-        // 3. Collect all components together and join them with the required amount
         let mut component_materials = HashMap::new();
         sqlx::query!(r#"
                 SELECT
@@ -820,15 +807,9 @@ impl ProjectService {
             .await?
             .into_iter()
             .for_each(|x| {
-                let quantity = materials
-                    .get(&x.ptype_id.into())
-                    .cloned()
-                    .unwrap_or_default();
-                let runs = (quantity as f32 / x.produces as f32).ceil() as i32;
-
                 let material = Material {
                     type_id:  x.mtype_id.into(),
-                    quantity: runs * x.required,
+                    quantity: x.required,
                     name:     x.material_name,
                     group_id: x.material_group_id.into()
                 };
@@ -841,32 +822,92 @@ impl ProjectService {
                     .or_insert(BuildstepEntry {
                         type_id:      x.ptype_id.into(),
                         name:         x.product_name,
+                        produces:     x.produces,
                         time_per_run: x.time,
                         materials:    vec![material],
-                        time_total:   runs * x.time,
-                        produces:     runs * x.produces,
-                        runs:         runs,
+                        // Only placeholder entries
+                        time_total:   0,
+                        runs:         0,
                     });
-           });
-        dbg!("3", start.elapsed().as_millis());
+            });
 
-        let unordered = component_materials
-            .values()
-            .into_iter()
-            .map(|x| {
-                let materials = x.materials
-                    .iter()
-                    .map(|x| x.type_id)
-                    .collect::<Vec<_>>();
-                (x.type_id, materials)
-            })
-            .collect::<Vec<_>>();
+        let mut unordered = Vec::new();
+        for product in products.iter() {
+            let material_type_ids = product
+                .materials
+                .iter()
+                .map(|x| *x.type_id)
+                .collect::<Vec<_>>();
+            let components = sqlx::query!(r#"
+                    SELECT
+                        bman.ptype_id  AS "ptype_id!",
+                        bmat.quantity  AS "quantity!",
+                        bmat.mtype_id  AS "mtype_id!",
+                        i.name         AS "name!",
+                        i.group_id     AS "group_id!"
+                    FROM blueprint_manufacture_components bman
+                    JOIN blueprint_materials bmat
+                      ON bmat.bp_id = bman.bp_id
+                    JOIN item i
+                      ON i.type_id = bmat.mtype_id
+                    WHERE bman.ptype_id = $1
+                "#,
+                    *product.type_id,
+                    //&material_type_ids
+                )
+                .fetch_all(&self.pool)
+                .await?
+                .into_iter()
+                .map(|x| {
+                    /*let quantity = product.materials
+                        .iter()
+                        .find(|e| e.type_id == x.ptype_id.into())
+                        .map(|x| x.quantity)
+                        .unwrap_or_default();*/
+
+                     (x.ptype_id, Material {
+                        type_id:  x.mtype_id.into(),
+                        quantity: x.quantity,
+                        name:     x.name,
+                        group_id: x.group_id.into()
+                     })
+                })
+                .collect::<Vec<_>>();
+
+            // TODO: take a look at the excel and cry
+            for (ptype_id, component) in components.iter() {
+                if let Some(x) = component_materials.get(&component.type_id) {
+                    dbg!(&component);
+                    let mut entry = x.clone();
+                    let runs = (
+                        component.quantity as f32 / entry.produces as f32
+                    )
+                    .ceil();
+
+                    entry.runs = runs as i32;
+                    entry.time_total = entry.time_per_run * runs as i32;
+                    dbg!(entry.runs);
+
+                    for material in entry.materials.iter_mut() {
+                        material.quantity *= entry.runs;
+                    }
+
+                    steps.insert(*entry.type_id, entry.clone());
+                    let materials = entry
+                        .materials
+                        .iter()
+                        .map(|x| x.type_id)
+                        .collect::<Vec<_>>();
+                    unordered.push((entry.type_id, materials));
+                }
+            }
+        }
+
         let mut sorted_steps = Vec::new();
         let order = ManufactureOrder(unordered).sort();
-        dbg!("4", start.elapsed().as_millis());
 
         for tid in order {
-            let entry = if let Some(x) = component_materials.get(&tid) {
+            let entry = if let Some(x) = steps.get(&tid) {
                 x.clone()
             } else {
                 continue;
@@ -874,48 +915,8 @@ impl ProjectService {
             sorted_steps.push(entry);
         }
         sorted_steps.extend(products);
-        dbg!("5", start.elapsed().as_millis());
+
         Ok(sorted_steps)
-    }
-
-    async fn no_clue(
-        &self,
-        ptype_id: TypeId,
-        required: i32
-    ) -> Result<HashMap<TypeId, i32>, ProjectError> {
-        let mut quantities = HashMap::new();
-
-        let mut queue: VecDeque<(i32, i32)> = VecDeque::new();
-        queue.push_back((*ptype_id, required));
-        while let Some((t, q)) = queue.pop_front() {
-            sqlx::query!(r#"
-                    SELECT
-                        bm.mtype_id,
-                        bm.quantity,
-                        CEIL(
-                            $2::FLOAT / bman.quantity::FLOAT
-                        )::INTEGER * bm.quantity AS "required!"
-                    FROM blueprint_manufacture bman
-                    JOIN blueprint_materials bm
-                      ON bm.bp_id = bman.bp_id
-                    WHERE bman.ptype_id = $1
-                "#,
-                    t,
-                    q as f64
-                )
-                .fetch_all(&self.pool)
-                .await?
-                .into_iter()
-                .for_each(|x| {
-                    queue.push_back((x.mtype_id, x.required));
-                    quantities
-                        .entry(x.mtype_id.into())
-                        .and_modify(|e: &mut i32| *e += x.required)
-                        .or_insert(x.required);
-                });
-        }
-
-        Ok(quantities)
     }
 
     /// Creates a list of all inventions that are required for a the given
@@ -1498,11 +1499,40 @@ pub struct BlueprintTree {
     pub children: Option<Vec<BlueprintTree>>
 }
 
+/// Contains all valid activities
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Activity {
+    /// Includes Manufacturing and Reactions
+    All,
+    /// Manufacture activity
+    Manufacture,
+    /// Reaction activity
+    Reaction
+}
+
+impl Activity {
+    /// Every activity has an specific number.
+    ///
+    /// # Returns
+    ///
+    /// Number value of the activity
+    pub fn as_i16(&self) -> i16 {
+        match self {
+            Self::All         => 0i16,
+            Self::Manufacture => 2i16,
+            Self::Reaction    => 3i16
+        }
+    }
+}
+
 /// Represents a single buildstep
 #[derive(Debug, Serialize)]
 pub struct Buildstep {
     /// Contains all required manufactures
     pub manufacture: Vec<BuildstepEntry>,
+    /// Contains all required reactions
+    pub reactions: Vec<BuildstepEntry>,
     /// Contains all required inventions
     pub inventions:  Vec<BuildstepEntryInvention>
 }
@@ -1622,3 +1652,21 @@ impl ManufactureOrder {
     }
 }
 
+#[cfg(test)]
+mod project_tests {
+    use sqlx::PgPool;
+    use sqlx::postgres::PgPoolOptions;
+
+    async fn pq_con() -> Result<PgPool, Box<dyn std::error::Error>> {
+        PgPoolOptions::new()
+            .max_connections(10)
+            .connect("postgresql://postgres:postgres@virgo:5432/caph_dev")
+            .await
+            .map_err(Into::into)
+    }
+
+    #[tokio::test]
+    async fn get_buildsteps() {
+        dotenv::dotenv().ok();
+    }
+}

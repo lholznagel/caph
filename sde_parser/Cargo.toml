@@ -1,0 +1,11 @@
+[package]
+name = "sde_parser"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0.134", features = ["derive"] }
+serde_yaml = "0.8.23"
+tracing = "0.1.29"
+tracing-subscriber =  { version = "0.3.6", features = ["env-filter"] }
+uuid = { version = "0.8.2", features = ["v4"] }

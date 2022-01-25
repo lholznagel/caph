@@ -194,13 +194,14 @@ impl<'a> ConnectCharacterService<'a> {
         cid: CorporationId
     ) -> Result<Vec<IndustryJob>, ConnectError> {
         let path = format!("latest/characters/{}/industry/jobs", self.cid);
-        let mut character = self
+        let character = self
             .client
             .fetch::<Vec<IndustryJob>>(&path)
             .await
             .map_err(Into::into)?;
 
-        let path = format!("latest/corporations/{}/industry/jobs", cid);
+        // FIXME:
+        /*let path = format!("latest/corporations/{}/industry/jobs", cid);
         let corporation = self
             .client
             .fetch::<Vec<IndustryJob>>(&path)
@@ -214,7 +215,7 @@ impl<'a> ConnectCharacterService<'a> {
         } else {
             Vec::new()
         };
-        character.extend(corporation);
+        character.extend(corporation);*/
         Ok(character)
     }
 }
@@ -231,7 +232,7 @@ pub struct CharacterInfo {
 }
 
 /// Represents a single character asset
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub struct CharacterAssetEntry {
     /// Unique ID of the asset
     pub item_id:       ItemId,

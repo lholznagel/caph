@@ -13,7 +13,7 @@ class Props {
     required: true
   });
 
-  isTime = prop({
+  time = prop({
     type:     Boolean,
     required: false,
   });
@@ -38,7 +38,7 @@ class Props {
 })
 export default class FormatNumber extends Vue.with(Props) {
   public format(): string {
-    if (this.isTime) {
+    if (this.time) {
       return formatTime(this.value);
     } else {
       return formatNumber(this.value, this.withComma);
