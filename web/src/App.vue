@@ -38,10 +38,12 @@
           content-style="padding-left: 24px; padding-right: 24px"
           :native-scrollbar="false"
         >
-          <router-view
-            :key="$route.fullPath"
-            v-if="isLoggedIn()"
-          />
+          <n-message-provider>
+            <router-view
+              :key="$route.fullPath"
+              v-if="isLoggedIn()"
+            />
+          </n-message-provider>
 
           <n-result
             status="403"
@@ -63,7 +65,7 @@
 import axios from 'axios';
 import {
   darkTheme, GlobalThemeOverrides, NAvatar, NButton, NConfigProvider, NGlobalStyle,
-  NLayout, NLayoutHeader, NLayoutSider, NMenu, NResult
+  NLayout, NLayoutHeader, NLayoutSider, NMenu, NMessageProvider, NResult
 } from 'naive-ui';
 import { Options, Vue } from 'vue-class-component';
 import { h } from 'vue';
@@ -81,6 +83,7 @@ import { PROJECT_ROUTE } from '@/event_bus';
     NLayoutHeader,
     NLayoutSider,
     NMenu,
+    NMessageProvider,
     NResult,
 
     RouterLink
@@ -137,7 +140,6 @@ export default class App extends Vue {
     children: [
       this.app_link('characters', 'Characters'),
       this.app_link('stations', 'Stations'),
-      this.app_link('corporation_blueprints', 'Corporation Blueprints'),
     ]
   }, {
     label: 'Admin',

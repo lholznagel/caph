@@ -43,10 +43,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let eve_client = EveClient::new().map_err(ServerError::ConnectError)?;
     let market_service = MarketService::new(pool.clone(), eve_client.clone());
-    let project_service2 = caph_core::ProjectService::new(
+    let mut project_service2 = caph_core::ProjectService::new(
         pool.clone(),
         market_service.clone()
     );
+    project_service2.populate_cache().await?;
 
     let (tx, rx) = tokio::sync::mpsc::channel(5);
     let market_task = MarketTask::new(market_service, rx);

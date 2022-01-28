@@ -1,9 +1,10 @@
-use axum::body::{Bytes, Full, BoxBody};
+use axum::body::BoxBody;
 use axum::http::StatusCode;
 use axum::Json;
 use axum::response::IntoResponse;
+use hmac::digest::InvalidLength;
 use serde_json::json;
-use std::convert::Infallible;
+use std::env::VarError;
 use std::error::Error;
 use std::fmt;
 
@@ -36,6 +37,10 @@ pub enum ServerError {
 
     CaphCoreProject(caph_core::ProjectError),
     CaphCoreMarket(caph_core::MarketError),
+
+    MissingEnvSecretKey(VarError),
+    HmacInitError(InvalidLength),
+    InvalidBase64(base64::DecodeError)
 }
 
 impl Error for ServerError {}

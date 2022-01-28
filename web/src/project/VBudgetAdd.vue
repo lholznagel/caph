@@ -71,7 +71,7 @@
 <script lang="ts">
 import { Options, Vue } from 'vue-class-component';
 import { NButton, NCard, NDynamicInput, NInput, NInputNumber, NPageHeader, NSelect, NSpace, NText } from 'naive-ui';
-import { ProjectService, IBudgetEntry } from '@/project/service';
+import { ProjectService2, IBudgetEntry } from '@/project/service';
 
 import CharacterSelector from '@/components/CharacterSelector.vue';
 
@@ -121,7 +121,7 @@ export default class AddBudgetView extends Vue {
       .map(x => x.cost)
       .reduce((prev, curr) => (prev ? prev : 0) + (curr ? curr : 0), 0);
 
-    await ProjectService.budget_add_entry(<string>this.$route.params.pid, this.budget);
+    await ProjectService2.budget_add_entry(<string>this.$route.params.pid, this.budget);
     this.$router.push({
       name: 'projects_budget',
       params: {

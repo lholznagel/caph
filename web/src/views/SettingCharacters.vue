@@ -50,6 +50,7 @@
 
 <script lang="ts">
 import {CharacterService, ICharacter} from '@/services/character';
+import axios from 'axios';
 import { NButton, NCard, NImage, NGrid, NGridItem, NSkeleton, NSpace,
 NPageHeader } from 'naive-ui';
 import { Options, Vue } from 'vue-class-component';
@@ -85,10 +86,12 @@ export default class Settings extends Vue {
     window.location.href = `/api/auth/login/alt`;
   }
 
-  public refresh(cid: number) {
+  public async refresh(cid: number) {
     this.refresh_map[cid] = true;
 
-    setTimeout(() => { this.refresh_map[cid] = false }, 5000);
+    await axios.get(`/api/character/${cid}/refresh`);
+
+    this.refresh_map[cid] = false;
   }
 
   public async remove(cid: number) {

@@ -10,13 +10,15 @@
     >
       <item-export
         :csv-name="pid"
-        :format-list="data_fields"
-        :format-csv="data_fields_csv"
+        :format-list="dataFields"
+        :format-csv="dataFieldsCsv"
         :items="data"
       />
 
       <template #action>
-        <n-button @click="close">Close</n-button>
+        <n-space justify="end">
+          <n-button @click="close">Close</n-button>
+        </n-space>
       </template>
     </n-card>
   </n-modal>
@@ -24,7 +26,7 @@
 
 <script lang="ts">
 import { Options, Vue, prop } from 'vue-class-component';
-import { NButton, NCard, NModal } from 'naive-ui';
+import { NButton, NCard, NModal, NSpace } from 'naive-ui';
 
 import ItemExport from '@/components/ItemExport.vue';
 
@@ -34,13 +36,13 @@ class Props {
     required: true,
   });
 
-  data_fields = prop({
+  dataFields = prop({
     type:     Array,
     required: false,
     default:  () => ['name', 'quantity']
   });
 
-  data_fields_csv = prop({
+  dataFieldsCsv = prop({
     type:     Array,
     required: false,
     default:  () => ['type_id', 'name', 'quantity']
@@ -62,11 +64,12 @@ class Props {
     NButton,
     NCard,
     NModal,
+    NSpace,
 
     ItemExport,
   }
 })
-export default class ProjectExportMaterial extends Vue.with(Props) {
+export default class ProjectExport extends Vue.with(Props) {
   public close() {
     this.$emit('update:show', false);
   }

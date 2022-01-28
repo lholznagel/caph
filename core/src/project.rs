@@ -1,6 +1,6 @@
 use crate::MarketService;
 
-use caph_connector::{CharacterId, GroupId, TypeId, SystemId};
+use caph_connector::{CharacterId, GroupId, TypeId, SystemId, AllianceId, CorporationId};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::collections::{HashMap, VecDeque};
@@ -14,13 +14,43 @@ pub type ContainerId = Uuid;
 /// A project id is just a UUID, this type is just for clarification
 pub type ProjectId   = Uuid;
 
+#[derive(Clone, Debug)]
+struct ManufactureCacheEntry {
+    quantity_manufacture: i64,
+    mtype_id:             TypeId,
+    quantity_material:    i64,
+}
+
+impl ManufactureCacheEntry {
+    /// Calculates the number of required runs.
+    /// 
+    /// # Params
+    /// 
+    /// * `quantity` -> Required quantity of the item
+    /// 
+    /// # Returns
+    /// 
+    /// Number of runs requuired to fullfil the quantity.
+    /// 
+    pub fn required(&self, quantity: i64) -> i64 {
+        (
+            (
+                quantity as f32 / self.quantity_manufacture as f32
+            ) * self.quantity_material as f32
+        ).ceil() as i64
+    }
+}
+
 /// Wrapper for managing projects
+/// TODO: split file into multiple files
 #[derive(Clone)]
 pub struct ProjectService {
     /// Database pool
     pool:   PgPool,
     /// [MarketService] for handling market requests
-    market: MarketService
+    market: MarketService,
+    /// Cache for all blueprints
+    cache: HashMap<TypeId, Vec<ManufactureCacheEntry>>
 }
 
 impl ProjectService {
@@ -40,8 +70,48 @@ impl ProjectService {
     ) -> Self {
         Self {
             pool,
-            market
+            market,
+            cache: HashMap::new()
         }
+    }
+
+    /// Populates the blueprint manufacture cache.
+    /// 
+    /// # Errors
+    /// 
+    /// If there is a problem with accessing the database.
+    /// 
+    /// # Returns
+    /// 
+    /// Nothing
+    pub async fn populate_cache(&mut self) -> Result<(), ProjectError> {
+        sqlx::query!(r#"
+                SELECT
+                    bman.ptype_id AS "ptype_id!",
+                    bman.quantity AS "quantity_manufacture!",
+                    bm.mtype_id   AS "mtype_id!",
+                    bm.quantity   AS "quantity_material!"
+                FROM blueprint_manufacture bman
+                JOIN blueprint_materials bm
+                  ON bm.bp_id = bman.bp_id
+            "#)
+            .fetch_all(&self.pool)
+            .await?
+            .into_iter()
+            .for_each(|x| {
+                let entry = ManufactureCacheEntry {
+                    quantity_manufacture: x.quantity_manufacture,
+                    mtype_id:             x.mtype_id.into(),
+                    quantity_material:    x.quantity_material,
+                };
+
+                self.cache
+                    .entry(x.ptype_id.into())
+                    .and_modify(|e| e.push(entry.clone()))
+                    .or_insert(vec![entry]);
+            });
+
+        Ok(())
     }
 
     /// Fetches an project by its identifier.
@@ -69,7 +139,7 @@ impl ProjectService {
                     p.owner,
                     p.name,
                     p.pinned,
-                    p.status      AS "status: Status",
+                    p.status AS "status: Status",
                     p.description
                 FROM projects p
                 JOIN project_products pp
@@ -121,12 +191,15 @@ impl ProjectService {
     ) -> Result<Vec<Info>, ProjectError> {
         let entries = sqlx::query!(r#"
                 SELECT
-                    project,
-                    name,
-                    pinned,
-                    status   AS "status: Status"
-                FROM projects
-                WHERE owner = $1
+                    p.project,
+                    p.name,
+                    p.pinned,
+                    p.owner,
+                    p.status   AS "status: Status"
+                FROM project_members pm
+                JOIN projects p
+                  ON p.project = pm.project
+                WHERE character_id = $1
                 ORDER BY name
             "#,
                 *cid
@@ -138,6 +211,7 @@ impl ProjectService {
                 project: x.project,
                 name:    x.name,
                 pinned:  x.pinned,
+                owner:   x.owner.into(),
                 status:  x.status
             })
             .collect::<Vec<_>>();
@@ -180,6 +254,20 @@ impl ProjectService {
             .fetch_one(&self.pool)
             .await
             .map(|x| x.project)?;
+
+        sqlx::query!("
+                INSERT INTO project_members
+                (
+                    project,
+                    character_id
+                )
+                VALUES($1, $2)
+            ",
+                pid,
+                *cid
+            )
+            .execute(&self.pool)
+            .await?;
 
         self.insert_products(pid, cfg.products).await?;
         Ok(pid)
@@ -295,7 +383,7 @@ impl ProjectService {
                 .map(|x| {
                     Material {
                         type_id:  x.type_id.into(),
-                        quantity: x.quantity as i32,
+                        quantity: x.quantity as i64,
                         name:     x.name,
                         group_id: x.group_id.into(),
                     }
@@ -317,7 +405,7 @@ impl ProjectService {
     /// # Returns
     ///
     /// List of all blueprints that are required for the project.
-    ///
+    /// TODO: review, blueprint_flat and blueprint_material are deprecated
     #[instrument(err)]
     pub async fn required_blueprints(
         &self,
@@ -426,8 +514,7 @@ impl ProjectService {
     /// # Returns
     ///
     /// List of all stored blueprints for the project and additional information.
-    ///
-    /// FIXME: This aint gonna work anymore
+    /// TODO: review, blueprint, blueprint_flat and blueprint_material are deprecated
     #[instrument(err)]
     pub async fn info_blueprints(
         &self,
@@ -588,7 +675,7 @@ impl ProjectService {
             .map_err(ProjectError::MarketError)?
             .into_iter()
             .map(|x| {
-                let count = raw_materials
+                let count: i64 = raw_materials
                     .iter()
                     .filter(|y| y.type_id == x.type_id)
                     .map(|x| x.quantity)
@@ -643,10 +730,10 @@ impl ProjectService {
             .map_err(ProjectError::MarketError)?
             .into_iter()
             .map(|x| {
-                let count = products
+                let count: i64 = products
                     .iter()
                     .filter(|y| y.type_id == x.type_id)
-                    .map(|x| x.count)
+                    .map(|x| x.count as i64)
                     .sum();
 
                 ProjectMarketItemPrice {
@@ -704,7 +791,7 @@ impl ProjectService {
     /// # Returns
     ///
     /// List of the buildsteps.
-    ///
+    /// TODO: extract and refactor to seperate function
     async fn buildstep_manufacturing(
         &self,
         pid:      ProjectId,
@@ -747,7 +834,7 @@ impl ProjectService {
             .for_each(|x| {
                 let material = Material {
                     type_id:  x.mtype_id.into(),
-                    quantity: x.runs * x.material_quantity,
+                    quantity: x.runs as i64 * x.material_quantity,
                     name:     x.material_name,
                     group_id: x.material_group_id.into()
                 };
@@ -760,7 +847,7 @@ impl ProjectService {
                         time_per_run: x.time,
                         runs:         x.runs,
                         time_total:   x.runs * x.time,
-                        produces:     x.runs * x.product_quantity,
+                        produces:     x.runs as i64 * x.product_quantity,
                         materials:    vec![material],
                     });
             });
@@ -768,7 +855,6 @@ impl ProjectService {
             .values()
             .cloned()
             .collect::<Vec<_>>();
-        dbg!("1", start.elapsed().as_millis());
 
         // 2. Resolve the required materials and calculate the number of
         // required materials.
@@ -778,11 +864,10 @@ impl ProjectService {
             for (t, q) in a {
                 materials
                     .entry(t)
-                    .and_modify(|x: &mut i32| *x += q)
+                    .and_modify(|x: &mut i64| *x += q)
                     .or_insert(q);
             }
         }
-        dbg!("2", start.elapsed().as_millis());
 
         // 3. Collect all components together and join them with the required amount
         let mut component_materials = HashMap::new();
@@ -828,7 +913,7 @@ impl ProjectService {
 
                 let material = Material {
                     type_id:  x.mtype_id.into(),
-                    quantity: runs * x.required,
+                    quantity: runs as i64 * x.required,
                     name:     x.material_name,
                     group_id: x.material_group_id.into()
                 };
@@ -844,11 +929,10 @@ impl ProjectService {
                         time_per_run: x.time,
                         materials:    vec![material],
                         time_total:   runs * x.time,
-                        produces:     runs * x.produces,
+                        produces:     runs as i64 * x.produces,
                         runs:         runs,
                     });
            });
-        dbg!("3", start.elapsed().as_millis());
 
         let unordered = component_materials
             .values()
@@ -863,7 +947,6 @@ impl ProjectService {
             .collect::<Vec<_>>();
         let mut sorted_steps = Vec::new();
         let order = ManufactureOrder(unordered).sort();
-        dbg!("4", start.elapsed().as_millis());
 
         for tid in order {
             let entry = if let Some(x) = component_materials.get(&tid) {
@@ -874,21 +957,32 @@ impl ProjectService {
             sorted_steps.push(entry);
         }
         sorted_steps.extend(products);
-        dbg!("5", start.elapsed().as_millis());
         Ok(sorted_steps)
     }
 
+    /// TODO: proper name, refactor, implement caching
     async fn no_clue(
         &self,
         ptype_id: TypeId,
-        required: i32
-    ) -> Result<HashMap<TypeId, i32>, ProjectError> {
+        required: i64
+    ) -> Result<HashMap<TypeId, i64>, ProjectError> {
         let mut quantities = HashMap::new();
 
-        let mut queue: VecDeque<(i32, i32)> = VecDeque::new();
+        let mut queue: VecDeque<(i32, i64)> = VecDeque::new();
         queue.push_back((*ptype_id, required));
         while let Some((t, q)) = queue.pop_front() {
-            sqlx::query!(r#"
+            if let Some(x) = self.cache.get(&t.into()) {
+                for y in x {
+                    let required = y.required(q);
+                    queue.push_back((*y.mtype_id, required));
+                    quantities
+                        .entry(y.mtype_id)
+                        .and_modify(|e: &mut i64| *e += required)
+                        .or_insert(required);
+                }
+            }
+
+            /*sqlx::query!(r#"
                     SELECT
                         bm.mtype_id,
                         bm.quantity,
@@ -912,7 +1006,7 @@ impl ProjectService {
                         .entry(x.mtype_id.into())
                         .and_modify(|e: &mut i32| *e += x.required)
                         .or_insert(x.required);
-                });
+                });*/
         }
 
         Ok(quantities)
@@ -1053,6 +1147,60 @@ impl ProjectService {
         Ok(entries)
     }
 
+    /// Gets a single budget entry.
+    ///
+    /// # Params
+    ///
+    /// * `pid` -> Id of the project
+    /// * `bid` -> Id of the budget
+    ///
+    /// # Errors
+    ///
+    /// When the database access fails
+    ///
+    /// # Returns
+    ///
+    /// Single budget entry
+    ///
+    #[instrument(err)]
+    pub async fn budget_entry(
+        &self,
+        pid: ProjectId,
+        bid: BudgetId,
+    ) -> Result<Option<BudgetEntry>, ProjectError> {
+        let entries = sqlx::query!(r#"
+                SELECT
+                    budget,
+                    project,
+                    character,
+                    amount,
+                    created_at,
+                    category    AS "category: BudgetCategory",
+                    description
+                FROM project_budget
+                WHERE project = $1
+                  AND budget = $2
+                ORDER BY created_at ASC
+            "#,
+                pid,
+                bid
+            )
+            .fetch_optional(&self.pool)
+            .await?
+            .map(|x| {
+                BudgetEntry {
+                    budget:      x.budget,
+                    character:   x.character.into(),
+                    amount:      x.amount,
+                    category:    x.category,
+                    created_at:  x.created_at.timestamp_millis(),
+
+                    description: x.description,
+                }
+            });
+        Ok(entries)
+    }
+
     /// Adds a new tracking entry.
     ///
     /// # Params
@@ -1172,6 +1320,131 @@ impl ProjectService {
         Ok(())
     }
 
+    /// Fetches all members of a project
+    ///
+    /// # Params
+    ///
+    /// * `pid` -> [ProjectId] of the project to fetch the products for
+    ///
+    /// # Errors
+    ///
+    /// When the database connection fails.
+    ///
+    /// # Returns
+    ///
+    /// List of all memebers that are part of the project
+    ///
+    #[instrument(err)]
+    pub async fn members(
+        &self,
+        pid: ProjectId
+    ) -> Result<Vec<Member>, ProjectError> {
+        sqlx::query!("
+                SELECT
+                    c.character_id,
+                    c.character_name,
+                    c.corporation_id,
+                    c.corporation_name,
+                    c.alliance_id,
+                    c.alliance_name
+                FROM project_members pm
+                JOIN character c
+                  ON c.character_id = pm.character_id
+                WHERE pm.project = $1
+            ",
+                pid
+            )
+            .fetch_all(&self.pool)
+            .await
+            .map_err(Into::into)
+            .map(|x| {
+                x.into_iter()
+                    .map(|x| Member {
+                        character_id:     x.character_id.into(),
+                        character_name:   x.character_name,
+                        corporation_id:   x.corporation_id.into(),
+                        corporation_name: x.corporation_name,
+                        alliance_id:      x.alliance_id.map(|x| x.into()),
+                        alliance_name:    x.alliance_name,
+                    })
+                    .collect::<Vec<_>>()
+            })
+    }
+
+    /// Adds a character to a project.
+    ///
+    /// # Params
+    ///
+    /// * `pid` -> [ProjectId] of the project
+    /// * `cid` -> [CharacterId] of the new character
+    ///
+    /// # Errors
+    ///
+    /// When the database connection fails.
+    ///
+    /// # Returns
+    ///
+    /// Nothing
+    ///
+    #[instrument(err)]
+    pub async fn add_member(
+        &self,
+        pid: ProjectId,
+        cid: CharacterId
+    ) -> Result<(), ProjectError> {
+        sqlx::query!("
+                INSERT INTO project_members
+                (
+                    project,
+                    character_id
+                )
+                VALUES ($1, $2)
+                ON CONFLICT DO NOTHING
+            ",
+                pid,
+                *cid
+            )
+            .execute(&self.pool)
+            .await
+            .map(drop)
+            .map_err(Into::into)
+    }
+
+    /// Kicks a member from a project.
+    ///
+    /// # Params
+    ///
+    /// * `pid` -> [ProjectId] of the project
+    /// * `cid` -> [CharacterId] of the character to kick
+    ///
+    /// # Errors
+    ///
+    /// When the database connection fails.
+    ///
+    /// # Returns
+    ///
+    /// Nothing
+    ///
+    #[instrument(err)]
+    pub async fn kick_member(
+        &self,
+        pid: ProjectId,
+        cid: CharacterId
+    ) -> Result<(), ProjectError> {
+        sqlx::query!("
+                DELETE FROM project_members
+                WHERE project = $1
+                  AND character_id = $2
+            ",
+                pid,
+                *cid
+            )
+            .execute(&self.pool)
+            .await
+            .map(drop)
+            .map_err(Into::into)
+    }
+
     /// Fetches all products for a project.
     ///
     /// # Params
@@ -1275,7 +1548,6 @@ impl ProjectService {
             .map(drop)
             .map_err(ProjectError::DatabaseError)
     }
-
 }
 
 impl std::fmt::Debug for ProjectService {
@@ -1328,6 +1600,8 @@ pub struct Info {
     pub name:    String,
     /// Determines if the project is shown in the sidebar or not
     pub pinned:  bool,
+    /// Owner of the project
+    pub owner:   CharacterId,
     /// Current project status
     pub status:  Status
 }
@@ -1396,7 +1670,7 @@ pub struct Material {
     /// [TypeId] of the item that is stored
     pub type_id:  TypeId,
     /// Number of items that are stored in this container
-    pub quantity:  i32,
+    pub quantity:  i64,
     /// Name of the item that is stored
     pub name:     String,
     /// Group of the item
@@ -1460,7 +1734,7 @@ pub struct ProjectMarketItemPrice {
     /// Cost of a single item calculated with the avg value
     s_avg:   f64,
     /// Required amount
-    count:   i32,
+    count:   i64,
     /// Id of the item
     type_id: TypeId,
     /// Name of the item
@@ -1521,7 +1795,7 @@ pub struct BuildstepEntry {
     /// Number of runs
     pub runs:         i32,
     /// Count of item that is produced by all runs
-    pub produces:     i32,
+    pub produces:     i64,
     /// Cores that are required for invention
     pub materials:    Vec<Material>
 }
@@ -1622,3 +1896,19 @@ impl ManufactureOrder {
     }
 }
 
+/// Represents a member of a project
+#[derive(Clone, Debug, Serialize)]
+pub struct Member {
+    /// ID of the character
+    pub character_id:     CharacterId,
+    /// Name of the character
+    pub character_name:   String,
+    /// If of the character corporation
+    pub corporation_id:   CorporationId,
+    /// Name of the character corporation
+    pub corporation_name: String,
+    /// Id of the alliance the corporation is in
+    pub alliance_id:      Option<AllianceId>,
+    /// Name of the alliance
+    pub alliance_name:    Option<String>,
+}

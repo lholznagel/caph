@@ -2,10 +2,11 @@
 /target
 **/*.rs.bk
 Cargo.lock
+
 pkg/
 dist/
 node_modules
-skillplans.out.json
-evemon_to_json/skillplans/*
+
 sde_parser/output
 sde_parser/input
+sde_parser/sde

@@ -26,7 +26,7 @@ export class CharacterService {
     if (this.character_names[cid]) {
       return this.character_names[cid];
     } else if (this.character_name_req) {
-      return this.character_name_req;
+      return this.character_name_req.then((x: any) => x.data);
     } else {
       this.character_name_req = axios.get(`/api/character/${cid}/name`);
       this.character_names[cid] = (await this.character_name_req).data;

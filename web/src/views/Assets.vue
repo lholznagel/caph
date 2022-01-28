@@ -119,7 +119,7 @@ export default class Assets extends Vue {
         template: (val: string): VNode => {
           return h(
             Owner,
-            { id: Number(val), withText: true }
+            { id: Number(val), withText: true, onlyText: false }
            )
         }
       }

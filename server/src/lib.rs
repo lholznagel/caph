@@ -9,6 +9,7 @@ mod item;
 mod project;
 mod server;
 mod universe;
+mod utils;
 
 mod market_task;
 mod task_service;

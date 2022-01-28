@@ -1,15 +1,14 @@
 use async_trait::*;
 use axum::extract::{Extension, FromRequest, RequestParts, TypedHeader};
 use caph_connector::{CharacterId, EveAuthClient};
+use caph_core::ProjectId;
 use headers::Cookie;
-use std::str::FromStr;
-use uuid::Uuid;
 
 use crate::{AuthService, ServerError};
 
 /// Represents a logged in character.
 pub struct AuthUser {
-    token:        Uuid,
+    token:        String,
     auth_service: AuthService,
 }
 
@@ -26,7 +25,7 @@ impl AuthUser {
     /// New user instance.
     ///
     pub fn new(
-        token:        Uuid,
+        token:        String,
         auth_service: AuthService
     ) -> Self {
         Self {
@@ -49,7 +48,6 @@ impl AuthUser {
     pub async fn eve_auth_client(&self) -> Result<EveAuthClient, ServerError> {
         let refresh_token = self.auth_service.refresh_token(
             &self.character_id().await?,
-            &self.token
         )
         .await?;
 
@@ -94,7 +92,7 @@ impl AuthUser {
         }
     }
 
-    /// Validates that the requesting user has access to the resource
+    /// Validates that the requesting user has access to the project
     /// 
     /// # Errors
     /// 
@@ -103,10 +101,21 @@ impl AuthUser {
     /// # Returns
     /// 
     /// `Ok(())` if the user has access and `Err([ServerError::Unauthorized])`
-    /// if the user is not allowed to access that resource.
+    /// if the user is not allowed to access that project.
     /// 
-    pub async fn assert_access(&self) -> Result<(), ServerError> {
-        Ok(())
+    pub async fn assert_project_access(
+        &self,
+        pid: ProjectId
+    ) -> Result<(), ServerError> {
+        let res = self.auth_service
+            .has_project_access(&self.token, pid)
+            .await?;
+
+        if !res {
+            Err(ServerError::Unauthorized)
+        } else {
+            Ok(())
+        }
     }
 
     /// Gets all logged in alts for a character.
@@ -137,17 +146,24 @@ where
     type Rejection = ServerError;
 
     async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
-        let token = TypedHeader::<Cookie>::from_request(req)
+        let token: String = TypedHeader::<Cookie>::from_request(req)
             .await
             .map_err(|x| ServerError::GenericError(x.to_string()))?
             .get("token")
-            .map(Uuid::from_str)
             .ok_or(ServerError::BadRequest)?
-            .map_err(|_| ServerError::BadRequest)?;
+            .into();
         let Extension(auth_service) = Extension::<AuthService>::from_request(req)
             .await
             .map_err(ServerError::FromReqestError)?;
 
-        Ok(Self::new(token, auth_service))
+        let hashed = crate::utils::recreate_secure_token(token)?;
+        if auth_service
+            .is_permitted(hashed.clone())
+            .await
+            .map_err(|_| ServerError::InvalidUser)? {
+            Ok(Self::new(hashed, auth_service))
+        } else {
+            Err(ServerError::InvalidUser)
+        }
     }
 }

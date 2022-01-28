@@ -198,8 +198,36 @@ impl CharacterService {
         &self,
         cid: CharacterId
     ) -> Result<(), ServerError> {
-        let uri = std::env::var("COLLECTOR_ADDR").unwrap();
-        reqwest::get(format!("{}/api/character/{}", uri, cid)).await.unwrap();
+        let code = sqlx::query!("
+                SELECT
+                    refresh_token
+                FROM login
+                WHERE character_id = $1
+            ",
+                * cid
+            )
+            .fetch_one(&self.pool)
+            .await?;
+        if let Some(x) = code.refresh_token {
+            let client = EveAuthClient::new(x)?;
+            let character = self.eve_character_info(client, cid).await?;
+
+            let main = sqlx::query!("
+                    SELECT
+                        character_main
+                    FROM character
+                    WHERE character_id = $1
+                ",
+                    *cid
+                )
+                .fetch_one(&self.pool)
+                .await?;
+            if let Some(x) = main.character_main {
+                self.save(&character, Some(x.into())).await?;
+            } else {
+                self.save(&character, None).await?;
+            }
+        }
 
         Ok(())
     }
@@ -225,6 +253,12 @@ impl CharacterService {
                     character_main
                 )
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
+                ON CONFLICT (character_id)
+                DO UPDATE SET
+                    alliance_id      = $1,
+                    alliance_name    = $2,
+                    corporation_id   = $5,
+                    corporation_name = $6
             ",
             character.alliance_id.map(|x| *x),
             character.alliance,

@@ -7,12 +7,9 @@ panic = 'abort'
 
 [workspace]
 members = [
-  'asset_test',
-
   'core',
   'collector',
   'connector',
-  'evemon_to_json',
-  'sde_parser',
   'server',
+  'sde_parser'
 ]

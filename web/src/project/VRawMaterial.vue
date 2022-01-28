@@ -15,8 +15,7 @@
             <n-card content-style="padding: 0">
               <n-space justify="end" style="margin: 10px">
                 <n-button
-                  @click=""
-                  type="info"
+                  @click="show_export = true"
                 >
                   Export
                 </n-button>
@@ -59,6 +58,12 @@
                 </tbody>
               </n-table>
             </n-card>
+
+            <p-export
+              v-model:show="show_export"
+              :data="project.required_materials(filter.key)"
+              :pid="$route.params.pid"
+            />
           </n-tab-pane>
         </template>
       </n-tabs>
@@ -77,6 +82,7 @@ import { IRequiredMaterial } from './service';
 import FormatNumber from '@/components/FormatNumber.vue';
 import ItemIcon from '@/components/ItemIcon.vue';
 
+import PExport from '@/project/MExport.vue';
 import PHeader from '@/project/CHeader.vue';
 import WProject from '@/project/WProject.vue';
 
@@ -93,11 +99,14 @@ import WProject from '@/project/WProject.vue';
     FormatNumber,
     ItemIcon,
 
+    PExport,
     PHeader,
     WProject,
   }
 })
 export default class ProjectMaterialView extends Vue {
+  public show_export: boolean = false;
+
   public filters: { label: string, key: ItemGroup[] }[] = [{
     label: 'All',
     key:   [ItemGroup.All]

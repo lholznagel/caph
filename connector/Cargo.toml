@@ -13,3 +13,9 @@ serde_yaml = "0.8.23"
 tracing = "0.1.29"
 url = "2.2.2"
 zip = "0.5.13"
+
+sqlx = { version = "0.5.10", optional = true}
+
+[features]
+default = []
+sqlx_types = ["sqlx"]

@@ -77,7 +77,7 @@
 import { Options, Vue, prop } from 'vue-class-component';
 import { NIcon, NSkeleton, NTable } from 'naive-ui';
 import { AngleDown, AngleRight } from '@vicons/fa';
-import { ProjectId, ProjectService, IBuildstepEntry } from '@/project/service';
+import { ProjectId, ProjectService2, IBuildstepEntry } from '@/project/service';
 
 import FormatNumber from '@/components/FormatNumber.vue';
 import ItemIcon from '@/components/ItemIcon.vue';
@@ -107,7 +107,7 @@ export default class ProjectBuildstep extends Vue.with(Props) {
   public buildsteps: IBuildstepEntry[] = [];
 
   public async created() {
-    let project = await ProjectService.by_id(<ProjectId>this.$route.params.pid);
+    let project = await ProjectService2.by_id(<ProjectId>this.$route.params.pid);
     await project.init();
     this.buildsteps = project.buildsteps.manufacture || [];
   }

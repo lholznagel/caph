@@ -65,7 +65,7 @@ import { Options, Vue } from 'vue-class-component';
 import { NButton, NCard, NDynamicInput, NInput, NInputNumber,
 NPageHeader, NSelect, NSpace, NText, SelectOption } from 'naive-ui';
 
-import {IConfig, ProjectService} from '@/project/service';
+import {IConfig, ProjectService2} from '@/project/service';
 import {AssetService} from '@/services/asset';
 
 import AssetSelector from '@/components/AssetSelector.vue';
@@ -104,7 +104,7 @@ export default class ProjectNew extends Vue {
 
   public async create_project() {
     // The selector adds it as an object, we want it as an array
-    let pid = await ProjectService.create(this.config);
+    let pid = await ProjectService2.create(this.config);
     this.$router.push({
       name: 'projects_overview',
       params: {

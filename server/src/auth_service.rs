@@ -3,8 +3,9 @@ use crate::error::ServerError;
 use async_trait::*;
 use axum::{extract::{FromRequest, Extension, RequestParts}, http::Uri};
 use caph_connector::{CharacterId, EveAuthClient, EveOAuthToken};
+use caph_core::ProjectId;
 use sqlx::PgPool;
-use uuid::Uuid;
+use tracing::instrument;
 
 /// Scope for a normal character without any features actived
 /*const EVE_DEFAULT_SCOPE: &[&'static str] = &[
@@ -14,12 +15,12 @@ use uuid::Uuid;
 #[deprecated]
 const EVE_SCOPE: &[&'static str] = &[
     "publicData",
-    "esi-assets.read_assets.v1",
+    //"esi-assets.read_assets.v1",
     //"esi-characters.read_agents_research.v1",
-    "esi-characters.read_blueprints.v1",
-    "esi-characterstats.read.v1",
-    "esi-industry.read_character_jobs.v1",
-    "esi-industry.read_corporation_jobs.v1",
+    //"esi-characters.read_blueprints.v1",
+    //"esi-characterstats.read.v1",
+    //"esi-industry.read_character_jobs.v1",
+    //"esi-industry.read_corporation_jobs.v1",
     //"esi-industry.read_character_mining.v1",
     //"esi-markets.read_character_orders.v1",
     //"esi-markets.structure_markets.v1",
@@ -35,7 +36,7 @@ const EVE_SCOPE: &[&'static str] = &[
 ///
 /// The authentication is connected with the official EVE-API.
 /// Authorisation is configured and handled by this application.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AuthService {
     pool: PgPool
 }
@@ -75,15 +76,18 @@ impl AuthService {
     /// Returns a token that should be used as a cookie and should be send
     /// with every request as value in the header with the key `token`.
     ///
+    #[instrument(err)]
     pub async fn auth(
         &self,
         code:  &str,
-        token: Uuid
-    ) -> Result<Option<Uuid>, ServerError> {
-        let character = EveAuthClient::access_token(&code).await?;
-        self.save_login(&token, character).await?;
+        state: String
+    ) -> Result<Option<String>, ServerError> {
+        let (token, hash) = crate::utils::generate_secure_token()?;
 
-        if self.is_alt(&token).await? {
+        let character = EveAuthClient::access_token(&code).await?;
+        self.save_login(&hash, &state, character).await?;
+
+        if self.is_alt(&hash).await? {
             Ok(None)
         } else {
             Ok(Some(token))
@@ -105,16 +109,19 @@ impl AuthService {
     /// 
     /// Redirect URI to the EVE-Login page.
     /// 
+    #[instrument(err)]
     pub async fn login(&self) -> Result<Uri, ServerError> {
-        let token = sqlx::query!(
-            "INSERT INTO login DEFAULT VALUES RETURNING token"
+        let (_, hash) = crate::utils::generate_secure_token()?;
+
+        sqlx::query!(
+            "INSERT INTO login (token) VALUES ($1)",
+            &hash
         )
-        .fetch_one(&self.pool)
-        .await?
-        .token;
+        .execute(&self.pool)
+        .await?;
 
         EveAuthClient::auth_uri(
-                &token.to_string(),
+                &hash,
                 Some(&EVE_SCOPE.join(" "))
             )?
             .to_string()
@@ -132,21 +139,24 @@ impl AuthService {
     ///
     /// Uri to the eve auth server
     ///
+    #[instrument(err)]
     pub async fn login_alt(
         &self,
         cid: CharacterId
     ) -> Result<Uri, ServerError> {
-        let token = sqlx::query!("
-                INSERT INTO login (character_main)
-                VALUES ($1)
-                RETURNING token
-            ", *cid)
-            .fetch_one(&self.pool)
-            .await?
-            .token;
+        let (_, hash) = crate::utils::generate_secure_token()?;
+        sqlx::query!("
+                INSERT INTO login (character_main, token)
+                VALUES ($1, $2)
+            ",
+                *cid,
+                &hash
+            )
+            .execute(&self.pool)
+            .await?;
 
         EveAuthClient::auth_uri(
-                &token.to_string(),
+                &hash,
                 Some(&EVE_SCOPE.join(" "))
             )?
             .to_string()
@@ -164,6 +174,7 @@ impl AuthService {
     ///
     /// List of [CharacterId] inculding the main and all alts
     ///
+    #[instrument(err)]
     pub async fn alts(
         &self,
         cid: CharacterId
@@ -183,17 +194,18 @@ impl AuthService {
         Ok(alts)
     }
 
+    #[instrument(err)]
     pub async fn refresh_token(
         &self,
-        cid:   &CharacterId,
-        token: &Uuid,
+        cid: &CharacterId,
     ) -> Result<String, ServerError> {
         let refresh_token = sqlx::query!("
                 SELECT refresh_token
                 FROM login
                 WHERE character_id = $1
-                  AND token        = $2
-            ", **cid, token)
+            ",
+                **cid
+            )
             .fetch_one(&self.pool)
             .await
             .map_err(|_| ServerError::InvalidUser)?
@@ -202,6 +214,7 @@ impl AuthService {
         Ok(refresh_token)
     }
 
+    #[instrument(err)]
     pub async fn is_admin(
         &self,
         cid: CharacterId
@@ -232,9 +245,10 @@ impl AuthService {
     ///
     /// Character id of the logged in character
     ///
+    #[instrument(err)]
     pub async fn character_id(
         &self,
-        token: &Uuid
+        token: &str
     ) -> Result<CharacterId, ServerError> {
         let character = sqlx::query!("
                 SELECT character_id
@@ -257,6 +271,50 @@ impl AuthService {
         }
     }
 
+    #[instrument(err)]
+    pub async fn has_project_access(
+        &self,
+        token: &str,
+        pid:   ProjectId,
+    ) -> Result<bool, ServerError> {
+        let result = sqlx::query!("
+                SELECT character_id
+                FROM project_members
+                WHERE project = $1
+                  AND character_id = (
+                      SELECT character_id
+                      FROM login
+                      WHERE token = $2
+                )
+            ",
+                pid,
+                token
+            )
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(result.is_some())
+    }
+
+    pub async fn is_permitted(
+        &self,
+        token: String
+    ) -> Result<bool, ServerError> {
+        let result = sqlx::query!("
+                SELECT character_id
+                FROM login
+                WHERE token = $1
+            ",
+                token
+            )
+            .fetch_optional(&self.pool)
+            .await?;
+        if result.is_some() {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Saves the main character in the database
     ///
     /// # Params
@@ -264,9 +322,11 @@ impl AuthService {
     /// `token`     -> Token for identifying the character
     /// `character` -> Character with access_token and refresh_token
     ///
+    #[instrument(err)]
     async fn save_login(
         &self,
-        token:     &Uuid,
+        token:     &str,
+        state:     &str,
         character: EveOAuthToken
     ) -> Result<(), ServerError> {
         let character_id = character.character_id()?;
@@ -283,13 +343,15 @@ impl AuthService {
                     character_id = $1,
                     access_token = $2,
                     refresh_token = $3,
-                    expire_date = NOW() + interval '1199' second
-                WHERE token = $4
+                    expire_date = NOW() + interval '1199' second,
+                    token = $4
+                WHERE token = $5
             ",
             *character_id,
             character.access_token,
             character.refresh_token,
-            token
+            token,
+            state
         )
         .execute(&self.pool)
         .await
@@ -309,15 +371,18 @@ impl AuthService {
     /// * `true`  -> The character is an alt
     /// * `false` -> The character is not an alt
     ///
+    #[instrument(err)]
     async fn is_alt(
         &self,
-        token: &Uuid
+        token: &str
     ) -> Result<bool, ServerError> {
         let is_alt = sqlx::query!("
                 SELECT character_main
                 FROM login
                 WHERE token = $1
-            ", token)
+            ",
+                token
+            )
             .fetch_one(&self.pool)
             .await?
             .character_main

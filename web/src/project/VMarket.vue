@@ -10,6 +10,14 @@
           :key="filter.key"
         >
           <n-card content-style="padding: 0">
+            <n-space justify="end" style="margin: 10px">
+              <n-button
+                @click="show_export = true"
+              >
+                Export
+              </n-button>
+            </n-space>
+
             <n-table v-if="!busy">
               <tbody>
                 <tr>
@@ -65,6 +73,14 @@
               </tbody>
             </n-table>
           </n-card>
+
+          <p-export
+            v-model:show="show_export"
+            :data="project.market_info(filter.key, sid)"
+            :data-fields="['name', 'count', 's_min', 'a_min', 's_avg', 'a_avg', 's_max', 'a_max']"
+            :data-fields-csv="['type_id', 'name', 'count', 's_min', 'a_min', 's_avg', 'a_avg', 's_max', 'a_max']"
+            :pid="$route.params.pid"
+          />
         </n-tab-pane>
       </n-tabs>
     </template>
@@ -73,7 +89,7 @@
 
 <script lang="ts">
 import { Options, Vue } from 'vue-class-component';
-import { NCard, NSpace, NTable, NTabs, NTabPane } from 'naive-ui';
+import { NButton, NCard, NSpace, NTable, NTabs, NTabPane } from 'naive-ui';
 import { events } from '@/main';
 import { SystemId } from '@/utils';
 import { PROJECT_ROUTE } from '@/event_bus';
@@ -81,11 +97,13 @@ import { PROJECT_ROUTE } from '@/event_bus';
 import FormatNumber from '@/components/FormatNumber.vue';
 import ItemIcon from '@/components/ItemIcon.vue';
 
+import PExport from '@/project/MExport.vue';
 import PHeader from '@/project/CHeader.vue';
 import WProject from '@/project/WProject.vue';
 
 @Options({
   components: {
+    NButton,
     NCard,
     NSpace,
     NTable,
@@ -95,11 +113,14 @@ import WProject from '@/project/WProject.vue';
     FormatNumber,
     ItemIcon,
 
+    PExport,
     PHeader,
     WProject,
   }
 })
 export default class ProjectMarketView extends Vue {
+  public show_export: boolean = false;
+
   public sid: SystemId = 30000142; // Jita
 
   public filters: { label: string, key: string }[] = [{

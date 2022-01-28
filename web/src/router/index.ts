@@ -63,10 +63,18 @@ const routes: Array<RouteRecordRaw> = [
   },
   {
     path: '/projects/:pid/budget/add',
-    name: 'projects_add_budget',
+    name: 'projects_budget_add',
     component: () => import(
-      /* webpackChunkName: "projects_add_budget" */
-      '@/project/VAddBudget.vue'
+      /* webpackChunkName: "projects_budget_add" */
+      '@/project/VBudgetAdd.vue'
+    )
+  },
+  {
+    path: '/projects/:pid/budget/edit/:bid',
+    name: 'projects_budget_edit',
+    component: () => import(
+      /* webpackChunkName: "projects_budget_edit" */
+      '@/project/VBudgetEdit.vue'
     )
   },
   {
@@ -78,11 +86,11 @@ const routes: Array<RouteRecordRaw> = [
     )
   },
   {
-    path: '/projects/:pid/material',
+    path: '/projects/:pid/material/raw',
     name: 'projects_raw_material',
     component: () => import(
-      /* webpackChunkName: "projects_raw_material" */
-      '@/project/VMaterial.vue'
+      /* webpackChunkName: "projects_material_raw" */
+      '@/project/VRawMaterial.vue'
     )
   },
   {
@@ -102,6 +110,14 @@ const routes: Array<RouteRecordRaw> = [
     )
   },
   {
+    path: '/projects/:pid/invite',
+    name: 'projects_invite',
+    component: () => import(
+      /* webpackChunkName: "projects_invite" */
+      '@/project/VInvite.vue'
+    )
+  },
+  {
     path: '/settings/characters',
     name: 'characters',
     component: () => import(
@@ -115,14 +131,6 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import(
       /* webpackChunkName: "settings_stations" */
       '@/views/SettingStations.vue'
-    )
-  },
-  {
-    path: '/settings/corporation/blueprints',
-    name: 'corporation_blueprints',
-    component: () => import(
-      /* webpackChunkName: "settings_corporation_blueprints" */
-      '@/views/SettingCorporationBlueprints.vue'
     )
   }, {
     path: '/admin/features',

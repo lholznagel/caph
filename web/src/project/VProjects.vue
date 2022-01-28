@@ -24,8 +24,8 @@
         </n-button>
 
         <n-button
-        :disabled="!selected_project"
-        @click="show_confirm = true"
+          @click="show_confirm = true"
+          :disabled="!selected_project"
         >
           Delete project
         </n-button>
@@ -44,6 +44,7 @@
             <th width="10px"></th>
             <th width="700px">Name</th>
             <th width="700px">Status</th>
+            <th width="300px">Owner</th>
           </tr>
         </thead>
         <tbody>
@@ -79,6 +80,9 @@
               <n-tag v-else-if="project.status === 'DONE'">Done</n-tag>
               <n-tag v-else>In Progress</n-tag>
             </td>
+            <td>
+              <character :id="project.owner" with-text />
+            </td>
           </tr>
         </tbody>
       </n-table>
@@ -94,7 +98,7 @@
       >
         Are you sure you want to delete {{ project_name() }}?
         This action will delete everything that is stored about this project.
-        This is not recoverable.
+        This is not be undone.<br>
         Please type in 'delete' to confirm.
       </confirm-dialog>
     </n-card>
@@ -105,10 +109,11 @@
 import { Options, Vue } from 'vue-class-component';
 import { NAlert, NButton, NCard, NCheckbox, NEmpty, NPageHeader, NSkeleton,
 NSpace, NTable, NTag } from 'naive-ui';
-import { ProjectService, IInfo } from '@/project/service';
+import { ProjectService2, IInfo } from '@/project/service';
 import { events } from '@/main';
 import { PROJECT_ROUTE } from '@/event_bus';
 
+import Character from '@/components/Character.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 
 @Options({
@@ -124,6 +129,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
     NTable,
     NTag,
 
+    Character,
     ConfirmDialog,
   }
 })
@@ -148,8 +154,11 @@ export default class ProjectsView extends Vue {
 
   public async confirm_delete() {
     if (!this.selected_project) { return; }
-    await ProjectService.remove(this.selected_project);
+
+    await ProjectService2.remove(this.selected_project);
     await this.load();
+
+    this.selected_project = undefined;
     this.show_confirm = false;
   }
 
@@ -169,7 +178,7 @@ export default class ProjectsView extends Vue {
   }
 
   private async load() {
-    this.projects = await ProjectService.get_all();
+    this.projects = await ProjectService2.get_all();
   }
 }
 </script>

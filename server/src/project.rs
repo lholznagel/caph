@@ -4,8 +4,8 @@ use crate::error::ServerError;
 use axum::response::IntoResponse;
 use axum::{Json, Router};
 use axum::extract::{Extension, Path};
-use axum::routing::{get, put};
-use caph_connector::{SystemId, TypeId};
+use axum::routing::{delete, get, put};
+use caph_connector::{SystemId, TypeId, CharacterId};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
@@ -16,17 +16,44 @@ pub fn router() -> Router {
         .nest(
             "/:pid",
             Router::new()
-                .route("/", get(by_id).put(edit).delete(delete))
+                .route("/", get(by_id).put(edit).delete(delete_project))
+                .route("/name", get(name))
                 .route("/blueprints/required", get(required_blueprints))
                 .route("/blueprints/info", get(info_blueprints))
                 .route("/buildsteps", get(buildsteps))
-                .route("/budget", get(trackings).post(add_budget_entry))
-                .route("/budget/:tid", put(edit_budget_entry).delete(delete_budget_entry))
+                .route("/budget", get(budget_entries).post(add_budget_entry))
+                .route("/budget/:bid", get(budget_entry).put(edit_budget_entry).delete(delete_budget_entry))
                 .route("/market/:sid/buy", get(market_buy))
                 .route("/market/:sid/sell", get(market_sell))
                 .route("/materials/raw", get(raw_materials))
                 .route("/materials/stored", get(stored_materials))
+                .route("/members", get(members).post(add_member))
+                .route("/members/:cid", delete(kick_member))
         )
+}
+
+/// Gets a specific project name
+async fn name(
+    service:   Extension<caph_core::ProjectService>,
+    Path(pid): Path<caph_core::ProjectId>
+) -> Result<impl IntoResponse, ServerError> {
+    let entry = service
+        .by_id(pid)
+        .await?;
+    if let Some(x) = entry {
+        #[derive(Serialize)]
+        struct R {
+            name:  String,
+            owner: CharacterId,
+        }
+
+        Ok(Json(R {
+            name:  x.name,
+            owner: x.owner
+        }))
+    } else {
+        Err(ServerError::NotFound)
+    }
 }
 
 /// Gets a specific project by its id
@@ -35,7 +62,7 @@ async fn by_id(
     service:   Extension<caph_core::ProjectService>,
     Path(pid): Path<caph_core::ProjectId>
 ) -> Result<Json<caph_core::Project>, ServerError> {
-    user.assert_access().await?;
+    user.assert_project_access(pid).await?;
 
     let entry = service
         .by_id(pid)
@@ -52,8 +79,6 @@ async fn get_all(
     user:    AuthUser,
     service: Extension<caph_core::ProjectService>,
 ) -> Result<Json<Vec<caph_core::Info>>, ServerError> {
-    user.assert_access().await?;
-
     let cid = user.character_id().await?;
     service
         .all(cid)
@@ -68,8 +93,6 @@ async fn create(
     service:    Extension<caph_core::ProjectService>,
     Json(body): Json<caph_core::Config>
 ) -> Result<impl IntoResponse, ServerError> {
-    user.assert_access().await?;
-
     let cid = user.character_id().await?;
     service
         .create(cid, body)
@@ -85,7 +108,7 @@ async fn edit(
     Path(pid):  Path<caph_core::ProjectId>,
     Json(body): Json<caph_core::Config>
 ) -> Result<Json<caph_core::ProjectId>, ServerError> {
-    user.assert_access().await?;
+    user.assert_project_access(pid).await?;
 
     service
         .edit(pid, body)
@@ -95,12 +118,12 @@ async fn edit(
 }
 
 /// Deletes the given project
-async fn delete(
+async fn delete_project(
     user:      AuthUser,
     service:   Extension<caph_core::ProjectService>,
     Path(pid): Path<caph_core::ProjectId>,
 ) -> Result<Json<caph_core::ProjectId>, ServerError> {
-    user.assert_access().await?;
+    user.assert_project_access(pid).await?;
 
     let entry = service
         .delete(pid)
@@ -118,7 +141,7 @@ async fn raw_materials(
     service:   Extension<caph_core::ProjectService>,
     Path(pid): Path<caph_core::ProjectId>
 ) -> Result<Json<Vec<caph_core::Material>>, ServerError> {
-    user.assert_access().await?;
+    user.assert_project_access(pid).await?;
 
     service
         .raw_materials(pid)
@@ -133,7 +156,7 @@ async fn stored_materials(
     service:   Extension<caph_core::ProjectService>,
     Path(pid): Path<caph_core::ProjectId>
 ) -> Result<Json<Vec<caph_core::Material>>, ServerError> {
-    user.assert_access().await?;
+    user.assert_project_access(pid).await?;
 
     service
         .stored_materials(pid)
@@ -148,7 +171,7 @@ async fn required_blueprints(
     service:   Extension<caph_core::ProjectService>,
     Path(pid): Path<caph_core::ProjectId>
 ) -> Result<Json<Vec<caph_core::Blueprint>>, ServerError> {
-    user.assert_access().await?;
+    user.assert_project_access(pid).await?;
 
     service
         .required_blueprints(pid)
@@ -163,7 +186,7 @@ async fn info_blueprints(
     service:   Extension<caph_core::ProjectService>,
     Path(pid): Path<caph_core::ProjectId>
 ) -> Result<Json<Vec<caph_core::BlueprintInfo>>, ServerError> {
-    user.assert_access().await?;
+    user.assert_project_access(pid).await?;
 
     service
         .info_blueprints(pid)
@@ -177,7 +200,7 @@ async fn buildsteps(
     service:   Extension<caph_core::ProjectService>,
     Path(pid): Path<caph_core::ProjectId>
 ) -> Result<Json<caph_core::Buildstep>, ServerError> {
-    user.assert_access().await?;
+    user.assert_project_access(pid).await?;
 
     service
         .buildsteps(pid)
@@ -192,7 +215,7 @@ async fn market_buy(
     service:          Extension<caph_core::ProjectService>,
     Path((pid, sid)): Path<(caph_core::ProjectId, SystemId)>
 ) -> Result<Json<Vec<caph_core::ProjectMarketItemPrice>>, ServerError> {
-    user.assert_access().await?;
+    user.assert_project_access(pid).await?;
 
     service
         .market_buy_price(pid, sid)
@@ -207,7 +230,7 @@ async fn market_sell(
     service:          Extension<caph_core::ProjectService>,
     Path((pid, sid)): Path<(caph_core::ProjectId, SystemId)>
 ) -> Result<Json<Vec<caph_core::ProjectMarketItemPrice>>, ServerError> {
-    user.assert_access().await?;
+    user.assert_project_access(pid).await?;
 
     service
         .market_sell_price(pid, sid)
@@ -217,12 +240,12 @@ async fn market_sell(
 }
 
 /// Fetches all costs that where added to the project
-async fn trackings(
+async fn budget_entries(
     user:      AuthUser,
     service:   Extension<caph_core::ProjectService>,
     Path(pid): Path<caph_core::ProjectId>
 ) -> Result<Json<Vec<caph_core::BudgetEntry>>, ServerError> {
-    user.assert_access().await?;
+    user.assert_project_access(pid).await?;
 
     service
         .budget(pid)
@@ -238,7 +261,7 @@ async fn add_budget_entry(
     Path(pid):  Path<caph_core::ProjectId>,
     Json(body): Json<caph_core::AddBudgetEntry>
 ) -> Result<impl IntoResponse, ServerError> {
-    user.assert_access().await?;
+    user.assert_project_access(pid).await?;
 
     service
         .add_budget_entry(pid, body)
@@ -247,17 +270,32 @@ async fn add_budget_entry(
         .map_err(ServerError::CaphCoreProject)
 }
 
+/// Gets a specific budget entry
+async fn budget_entry(
+    user:             AuthUser,
+    service:          Extension<caph_core::ProjectService>,
+    Path((pid, bid)): Path<(caph_core::ProjectId, caph_core::BudgetId)>
+) -> Result<impl IntoResponse, ServerError> {
+    user.assert_project_access(pid).await?;
+
+    service
+        .budget_entry(pid, bid)
+        .await
+        .map(Json)
+        .map_err(ServerError::CaphCoreProject)
+}
+
 /// Edits a tracking entry
 async fn edit_budget_entry(
     user:             AuthUser,
     service:          Extension<caph_core::ProjectService>,
-    Path((pid, tid)): Path<(caph_core::ProjectId, caph_core::BudgetId)>,
+    Path((pid, bid)): Path<(caph_core::ProjectId, caph_core::BudgetId)>,
     Json(body):       Json<caph_core::BudgetEntry>
 ) -> Result<impl IntoResponse, ServerError> {
-    user.assert_access().await?;
+    user.assert_project_access(pid).await?;
 
     service
-        .edit_budget_entry(pid, tid, body)
+        .edit_budget_entry(pid, bid, body)
         .await
         .map(|_| (StatusCode::OK, ""))
         .map_err(ServerError::CaphCoreProject)
@@ -267,12 +305,56 @@ async fn edit_budget_entry(
 async fn delete_budget_entry(
     user:             AuthUser,
     service:          Extension<caph_core::ProjectService>,
-    Path((pid, tid)): Path<(caph_core::ProjectId, caph_core::BudgetId)>,
+    Path((pid, bid)): Path<(caph_core::ProjectId, caph_core::BudgetId)>,
 ) -> Result<impl IntoResponse, ServerError> {
-    user.assert_access().await?;
+    user.assert_project_access(pid).await?;
 
     service
-        .delete_budget_entry(pid, tid)
+        .delete_budget_entry(pid, bid)
+        .await
+        .map(|_| (StatusCode::OK, ""))
+        .map_err(ServerError::CaphCoreProject)
+}
+
+/// Gets a list of members
+async fn members(
+    user:       AuthUser,
+    service:    Extension<caph_core::ProjectService>,
+    Path(pid):  Path<caph_core::ProjectId>,
+) -> Result<impl IntoResponse, ServerError> {
+    user.assert_project_access(pid).await?;
+
+    service
+        .members(pid)
+        .await
+        .map(Json)
+        .map_err(ServerError::CaphCoreProject)
+}
+
+/// Adds a member to a project
+async fn add_member(
+    user:       AuthUser,
+    service:    Extension<caph_core::ProjectService>,
+    Path(pid):  Path<caph_core::ProjectId>,
+) -> Result<impl IntoResponse, ServerError> {
+    let cid = user.character_id().await?;
+    service
+        .add_member(pid, cid)
+        .await
+        .map(|_| (StatusCode::OK, ""))
+        .map_err(ServerError::CaphCoreProject)
+}
+
+/// Kicks a member from a project
+async fn kick_member(
+    user:             AuthUser,
+    service:          Extension<caph_core::ProjectService>,
+    Path((pid, cid)): Path<(caph_core::ProjectId, CharacterId)>,
+) -> Result<impl IntoResponse, ServerError> {
+    user.assert_project_access(pid).await?;
+
+    service
+        .kick_member(pid, cid)
         .await
         .map(|_| (StatusCode::OK, ""))
         .map_err(ServerError::CaphCoreProject)

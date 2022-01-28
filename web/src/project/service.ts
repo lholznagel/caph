@@ -7,10 +7,11 @@ const BASE_ADDR = '/api/v1/projects';
 export class Project {
   private load_promise: Promise<void> | null = null;
 
-  public info: IProject                  = <IProject>{  };
-  public raw: IMaterial[]         = [];
+  public info: IProject = <IProject>{  };
+  public raw: IMaterial[] = [];
   public buildsteps: IBuildstep = <IBuildstep>{  };
-  public stored: IMaterial[]      = [];
+  public stored: IMaterial[] = [];
+  public members: IMember[] = [];
 
   public market: Map<String, IProjectMarket[]> = new Map();
 
@@ -163,22 +164,29 @@ export class Project {
       .reduce((acc, x) => acc += x, 0);
   }
 
+  public async kick_member(cid: number) {
+    await axios.delete(`${BASE_ADDR}/${this.pid}/members/${cid}`)
+    this.members = (await axios.get(`${BASE_ADDR}/${this.pid}/members`)).data;
+  }
+
   private async by_id(): Promise<void> {
     let sid = 30000142; // Jita
 
     // TODO: refactor
-    let info = axios.get(`${BASE_ADDR}/${this.pid}`)
-      .then(x => this.info = x.data);
-    let stored = axios.get(`${BASE_ADDR}/${this.pid}/materials/stored`)
-      .then(x => this.stored = x.data);
-    let raw = axios.get(`${BASE_ADDR}/${this.pid}/materials/raw`)
-      .then(x => this.raw = x.data);
-    let buildsteps = axios.get(`${BASE_ADDR}/${this.pid}/buildsteps`)
-      .then(x => this.buildsteps = x.data);
-    let buy = ProjectService.market_buy(this.pid, sid)
-      .then(x => this.market.set('BUY' + sid, x));
-    let sell = ProjectService.market_sell(this.pid, sid)
-      .then(x => this.market.set('SELL' + sid, x));
+    await axios.get(`${BASE_ADDR}/${this.pid}`)
+      .then(x => this.info = x.data)
+      .then(_ => axios.get(`${BASE_ADDR}/${this.pid}/materials/stored`))
+      .then(x => this.stored = x.data)
+      .then(_ => axios.get(`${BASE_ADDR}/${this.pid}/materials/raw`))
+      .then(x => this.raw = x.data)
+      .then(_ => axios.get(`${BASE_ADDR}/${this.pid}/buildsteps`))
+      .then(x => this.buildsteps = x.data)
+      .then(_ => axios.get(`${BASE_ADDR}/${this.pid}/members`))
+      .then(x => this.members = x.data)
+      .then(_ => ProjectService2.market_buy(this.pid, sid))
+      .then(x => this.market.set('BUY' + sid, x))
+      .then(_ => ProjectService2.market_sell(this.pid, sid))
+      .then(x => this.market.set('SELL' + sid, x))
 
     let blueprint_info = (await axios.get(`${BASE_ADDR}/${this.pid}/blueprints/info`)).data;
     this.blueprints = (await axios.get(`${BASE_ADDR}/${this.pid}/blueprints/required`))
@@ -189,15 +197,16 @@ export class Project {
         return new Blueprint(x, info);
       });
 
-    await Promise.all([
+    /*await Promise.all([
       info,
       stored,
       raw,
       buildsteps,
+      members,
       buy,
       sell
     ])
-    .then(_ => console.log('Loaded shit \'n stuff'));
+    .then(_ => console.log('Loaded shit \'n stuff'));*/
 
     this.load_promise = null;
     return;
@@ -206,8 +215,8 @@ export class Project {
 
 export class Blueprint {
   constructor(
-    private blueprint: IBlueprint,
-    private info:      IBlueprintInfo | undefined
+    public blueprint: IBlueprint,
+    public info:      IBlueprintInfo | undefined
   ){  }
 
   public name(): string {
@@ -273,7 +282,7 @@ export class Blueprint {
   }
 }
 
-export class ProjectService {
+export class ProjectService2 {
   public static cache: Map<string, Project> = new Map();
 
   // Gets a specific project by its id.
@@ -344,6 +353,13 @@ export class ProjectService {
     return (await axios.get(`${BASE_ADDR}/${pid}/budget`)).data;
   }
 
+  public static async budget_entry(
+    pid: string,
+    bid: string
+  ): Promise<IBudgetEntry> {
+    return (await axios.get(`${BASE_ADDR}/${pid}/budget/${bid}`)).data;
+  }
+
   public static async budget_add_entry(pid: string, data: IAddBudgetEntry): Promise<void> {
     return (await axios.post(`${BASE_ADDR}/${pid}/budget`, data));
   }
@@ -362,6 +378,10 @@ export class ProjectService {
   public static async budget_remove_entry(pid: string, tid: BudgetId): Promise<void> {
     return await axios.delete(`${BASE_ADDR}/${pid}/budget/${tid}`);
   }
+
+   public static async add_member(pid: string): Promise<void> {
+     return await axios.post(`${BASE_ADDR}/${pid}/members`);
+   }
 }
 
 export type ProjectId   = Uuid;
@@ -382,6 +402,7 @@ export interface IInfo {
   name:    string;
   pinned:  boolean;
   status:  string;
+  owner:   number;
 }
 
 export interface IConfig {
@@ -486,3 +507,11 @@ export interface IBuildstepMaterial {
   quantity: number;
 }
 
+export interface IMember {
+  character_id:     number,
+  character_name:   string,
+  corporation_id:   number,
+  corporation_name: string,
+  alliance_id?:     number,
+  alliance_name?:   string,
+}

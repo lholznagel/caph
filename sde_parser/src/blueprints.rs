@@ -76,7 +76,7 @@ CREATE TABLE blueprint_raw(
     btype_id INTEGER NOT NULL, -- Blueprint Type Id
     ptype_id INTEGER NOT NULL, -- Product Type Id
 
-    quantity INTEGER NOT NULL, -- Quantity that is produced with each run
+    quantity BIGINT  NOT NULL, -- Quantity that is produced with each run
 
     PRIMARY KEY (bp_id)
 );
@@ -87,11 +87,11 @@ CREATE TABLE blueprint_manufacture (
     btype_id INTEGER NOT NULL, -- Blueprint TypeId
     ptype_id INTEGER NOT NULL, -- Product TypeId
 
-    quantity INTEGER NOT NULL, -- Quantity that is produced with each run
-
     time     INTEGER NOT NULL, -- Time it takes to produce a single unit
 
     reaction BOOLEAN NOT NULL, -- Determines if this is a reaction
+
+    quantity BIGINT  NOT NULL, -- Quantity that is produced with each run
 
     PRIMARY KEY (bp_id)
 );
@@ -102,7 +102,7 @@ CREATE TABLE blueprint_manufacture_components (
     btype_id INTEGER NOT NULL, -- Blueprint TypeId
     ptype_id INTEGER NOT NULL, -- Product TypeId
 
-    quantity INTEGER NOT NULL, -- Quantity that is produced with each run
+    quantity BIGINT  NOT NULL, -- Quantity that is produced with each run
 
     PRIMARY KEY (bp_id)
 );
@@ -134,9 +134,9 @@ CREATE TABLE blueprint_research (
 
 CREATE TABLE blueprint_materials (
     bp_id    UUID    NOT NULL, -- Unqiue id that references to either blueprint_manufacture or blueprint_inventions
-    quantity INTEGER NOT NULL, -- Required quantity
     mtype_id INTEGER NOT NULL, -- Material TypeId
-    produces INTEGER NOT NULL  -- Quantity that is prodiuced by the process
+    produces INTEGER NOT NULL, -- Quantity that is prodiuced by the process
+    quantity BIGINT  NOT NULL  -- Required quantity
 );"#.into()
 }
 
@@ -572,9 +572,9 @@ impl BlueprintManufacture {
             self.bp_id,
             self.btype_id,
             self.ptype_id,
-            self.quantity,
             self.time,
             self.reaction,
+            self.quantity,
         )
     }
 }
@@ -717,9 +717,9 @@ impl BlueprintMaterial {
         format!(
             "('{}', {}, {}, {})",
             self.bp_id,
-            self.quantity,
             self.mtype_id,
-            self.produces
+            self.produces,
+            self.quantity,
         )
     }
 }

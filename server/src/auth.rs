@@ -36,5 +36,5 @@ async fn login_alt(
 #[derive(Debug, Deserialize)]
 pub struct EveAuthQuery {
     pub code:  String,
-    pub state: Uuid,
+    pub state: String,
 }

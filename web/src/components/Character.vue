@@ -32,7 +32,7 @@ class Props {
   onlyText = prop({
     type: Boolean,
     required: false,
-  })
+  });
 }
 
 @Options({
@@ -42,8 +42,12 @@ class Props {
     NImage
   }
 })
-export default class Owner extends Vue.with(Props) {
+export default class Character extends Vue.with(Props) {
   public name: string = '';
+
+  public created() {
+    this.loadName();
+  }
 
   public async loadName() {
     const name = await CharacterService.character_name(this.id);
@@ -51,7 +55,6 @@ export default class Owner extends Vue.with(Props) {
   }
 
   public getCharacterPortrait(): string {
-    this.loadName();
     return `${BASE_URL_CHAR}/${this.id}/portrait?size=1024`;
   }
 }

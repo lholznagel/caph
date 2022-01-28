@@ -23,6 +23,8 @@ macro_rules! eve_id {
             Deserialize, Serialize,
          )]
         #[serde(transparent)]
+        #[cfg_attr(feature = "sqlx_types", derive(sqlx::Type))]
+        #[cfg_attr(feature = "sqlx_types", sqlx(transparent))]
         pub struct $name(pub $typ);
 
         impl From<$typ> for $name {

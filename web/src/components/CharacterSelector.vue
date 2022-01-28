@@ -14,13 +14,13 @@ import { Options, Vue } from 'vue-class-component';
 import { CharacterService } from '@/services/character';
 import { h } from 'vue';
 
-import Owner from '@/components/Owner.vue';
+import Character from '@/components/Character.vue';
 
 @Options({
   components: {
     NSelect,
 
-    Owner
+    Character
   }
 })
 export default class CharacterSelector extends Vue {
@@ -58,9 +58,10 @@ export default class CharacterSelector extends Vue {
         }
       },
       [
-        h(Owner, {
+        h(Character, {
           id: option.value,
           withText: false,
+          onlyText: false,
           style: {
             marginTop:   '2px',
             marginRight: '10px'
