@@ -4,6 +4,26 @@ import axios from 'axios';
 // Base path that is used for all requests
 const BASE_ADDR = '/api/v1/projects';
 
+export const BUDGET_CATEGORIES: {
+  label: string;
+  value: string;
+}[] = [{
+  label: 'Purchase',
+  value: 'PURCHASE'
+}, {
+  label: 'Sold',
+  value: 'SOLD'
+}, {
+  label: 'Manufacture',
+  value: 'MANUFACTURE'
+}, {
+  label: 'Research',
+  value: 'RESEARCH'
+}, {
+  label: 'Other',
+  value: 'OTHER'
+}]
+
 export class Project {
   private load_promise: Promise<void> | null = null;
 

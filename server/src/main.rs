@@ -36,10 +36,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let asset_service     = AssetService::new(pool.clone());
     let auth_service      = AuthService::new(pool.clone());
     let character_service = CharacterService::new(pool.clone());
-    let industry_service  = IndustryService::new(pool.clone());
     let item_service      = ItemService::new(pool.clone());
-    let project_service   = ProjectService::new(pool.clone(), asset_service.clone());
-    let universe_service  = UniverseService::new(pool.clone());
+    let project_service = ProjectService {  };
 
     let eve_client = EveClient::new().map_err(ServerError::ConnectError)?;
     let market_service = MarketService::new(pool.clone(), eve_client.clone());
@@ -58,14 +56,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::task::spawn(async move { task_service.task().await });
 
     start(
-        pool,
         asset_service,
         auth_service,
         character_service,
-        industry_service,
         item_service,
         project_service,
-        universe_service,
 
         project_service2
     )

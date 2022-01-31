@@ -69,29 +69,6 @@ impl AuthUser {
         self.auth_service.character_id(&self.token).await
     }
 
-    /// Validates that the requesting user is an admin in the system.
-    /// 
-    /// # Errors
-    /// 
-    /// None
-    /// 
-    /// # Returns
-    /// 
-    /// `Ok(())` if the user is an admin and `Err([ServerError::Unauthorized])`
-    /// if the user is not an admin.
-    /// 
-    pub async fn assert_admin(&self) -> Result<(), ServerError> {
-        let cid = self.character_id().await?;
-        let is_admin = self.auth_service
-            .is_admin(cid)
-            .await?;
-        if is_admin {
-            Ok(())
-        } else {
-            Err(ServerError::Unauthorized)
-        }
-    }
-
     /// Validates that the requesting user has access to the project
     /// 
     /// # Errors

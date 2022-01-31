@@ -1,14 +1,13 @@
-use crate::{AssetService, AuthUser};
+use crate::AuthUser;
 use crate::error::ServerError;
 
 use axum::response::IntoResponse;
 use axum::{Json, Router};
 use axum::extract::{Extension, Path};
-use axum::routing::{delete, get, put};
+use axum::routing::{delete, get};
 use caph_connector::{SystemId, TypeId, CharacterId};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
 
 pub fn router() -> Router {
     Router::new()
@@ -361,25 +360,9 @@ async fn kick_member(
 }
 
 #[derive(Clone)]
-pub struct ProjectService {
-    pool:  PgPool,
-
-    asset: AssetService
-}
+pub struct ProjectService {  }
 
 impl ProjectService {
-    pub fn new(
-        pool:  PgPool,
-
-        asset: AssetService
-    ) -> Self {
-        Self {
-            pool,
-
-            asset
-        }
-    }
-
     /*pub async fn project_cost(
         &self,
         cid: CharacterId,

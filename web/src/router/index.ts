@@ -6,22 +6,6 @@ const routes: Array<RouteRecordRaw> = [
     redirect: '/projects'
   },
   {
-    path: '/assets',
-    name: 'assets',
-    component: () => import(
-      /* webpackChunkName: "assets" */
-      '@/views/Assets.vue'
-    )
-  },
-  {
-    path: '/industry/jobs',
-    name: 'industry_jobs',
-    component: () => import(
-      /* webpackChunkName: "industry_jobs" */
-      '@/views/Jobs.vue'
-    )
-  },
-  {
     path: '/projects',
     name: 'projects_projects',
     component: () => import(
@@ -119,25 +103,10 @@ const routes: Array<RouteRecordRaw> = [
   },
   {
     path: '/settings/characters',
-    name: 'characters',
+    name: 'settings_characters',
     component: () => import(
       /* webpackChunkName: "settings_characters" */
       '@/views/SettingCharacters.vue'
-    )
-  },
-  {
-    path: '/settings/stations',
-    name: 'stations',
-    component: () => import(
-      /* webpackChunkName: "settings_stations" */
-      '@/views/SettingStations.vue'
-    )
-  }, {
-    path: '/admin/features',
-    name: 'admin_features',
-    component: () => import(
-      /* webpackChunkName: "admin_features" */
-      '@/views/AdminFeatures.vue'
     )
   }
 ]

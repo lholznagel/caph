@@ -33,70 +33,6 @@ impl<'a> ConnectCharacterService<'a> {
         }
     }
 
-    /// Gets a list of all player owned assets
-    ///
-    /// # Errors
-    ///
-    /// Fails when the server returns an error or parsing the response fails
-    ///
-    /// # Returns
-    ///
-    /// List of all assets
-    ///
-    pub async fn assets(
-        &self,
-    ) -> Result<Vec<CharacterAssetEntry>, ConnectError> {
-        let path = format!("latest/characters/{}/assets", self.cid);
-        self
-            .client
-            .fetch_page::<CharacterAssetEntry>(&path)
-            .await
-            .map_err(Into::into)
-    }
-
-    /// Fetches all item names of an character
-    ///
-    /// # Errors
-    ///
-    /// Fails when the server returns an error or parsing the response fails
-    ///
-    /// # Returns
-    ///
-    /// List of all assets
-    ///
-    pub async fn asset_name(
-        &self,
-        iids: Vec<ItemId>
-    ) -> Result<Vec<CharacterAssetName>, ConnectError> {
-        let path = format!("latest/characters/{}/assets/names", self.cid);
-        self
-            .client
-            .post::<_, Vec<CharacterAssetName>>(iids, &path)
-            .await
-            .map_err(Into::into)
-    }
-
-    /// Gets a list of all player owned bluepritns
-    ///
-    /// # Errors
-    ///
-    /// Fails when the server returns an error or parsing the response fails
-    ///
-    /// # Returns
-    ///
-    /// List of all blueprints
-    ///
-    pub async fn blueprints(
-        &self,
-    ) -> Result<Vec<CharacterBlueprintEntry>, ConnectError> {
-        let path = format!("latest/characters/{}/blueprints", self.cid);
-        self
-            .client
-            .fetch_page::<CharacterBlueprintEntry>(&path)
-            .await
-            .map_err(Into::into)
-    }
-
     /// Gets general information about the character
     ///
     /// # Errors
@@ -176,47 +112,6 @@ impl<'a> ConnectCharacterService<'a> {
             .await
             .map(|x| x.name)
             .map_err(Into::into)
-    }
-
-    /// Gets a list of all jobs that an character started
-    ///
-    /// # Errors
-    ///
-    /// Fails when the server returns an error or parsing the response fails
-    ///
-    /// # Returns
-    ///
-    /// List of all industry jobs including those made with corporation
-    /// blueprints.
-    ///
-    pub async fn industry_jobs(
-        &self,
-        cid: CorporationId
-    ) -> Result<Vec<IndustryJob>, ConnectError> {
-        let path = format!("latest/characters/{}/industry/jobs", self.cid);
-        let character = self
-            .client
-            .fetch::<Vec<IndustryJob>>(&path)
-            .await
-            .map_err(Into::into)?;
-
-        // FIXME:
-        /*let path = format!("latest/corporations/{}/industry/jobs", cid);
-        let corporation = self
-            .client
-            .fetch::<Vec<IndustryJob>>(&path)
-            .await;
-        // The character may not have the permission
-        let corporation = if let Ok(x) = corporation {
-            x
-                .into_iter()
-                .filter(|x| x.character_id == self.cid)
-                .collect::<Vec<_>>()
-        } else {
-            Vec::new()
-        };
-        character.extend(corporation);*/
-        Ok(character)
     }
 }
 

@@ -25,10 +25,6 @@
 )]
 #![feature(stmt_expr_attributes)]
 
-/// Module for handling assets
-mod asset;
-/// Module for handling blueprints
-mod blueprint;
 /// Module for handling characters
 mod character;
 /// Module containing clients to the EVE-API
@@ -37,46 +33,15 @@ mod client;
 mod error;
 /// Module containing all macros
 mod macros;
-/// Module for handling market requests
-mod market;
-/// Module for handling reprocessing information
-mod reprocess;
-/// Module for handling schematics
-mod schematic;
-/// Module for handling stations
-mod station;
-/// Module for handling systems
-mod system;
-/// Module for handling unique names
-mod unique_name;
-/// Module contains the wrapper for managing the SDE.zip
-mod zip;
 
 /// Collects all services under one import
 pub mod services {
-    pub use crate::asset::ConnectAssetService;
-    pub use crate::blueprint::ConnectBlueprintService;
     pub use crate::character::ConnectCharacterService;
-    pub use crate::market::ConnectMarketService;
-    pub use crate::reprocess::ConnectReprocessService;
-    pub use crate::schematic::ConnectSchematicService;
-    pub use crate::station::ConnectStationService;
-    pub use crate::system::ConnectSystemService;
-    pub use crate::unique_name::ConnectUniqueNameService;
 }
 
-pub use self::asset::*;
-pub use self::blueprint::*;
 pub use self::character::*;
 pub use self::client::*;
 pub use self::error::*;
-pub use self::market::*;
-pub use self::reprocess::*;
-pub use self::schematic::*;
-pub use self::station::*;
-pub use self::system::*;
-pub use self::unique_name::*;
-pub use self::zip::*;
 
 use serde::{Deserialize, Serialize};
 

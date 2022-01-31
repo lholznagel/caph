@@ -71,7 +71,7 @@ impl MarketService {
                     mo.type_id    AS "type_id!",
                     i.name        AS "name!"
                 FROM market_orders mo
-                JOIN item i
+                JOIN items i
                   ON i.type_id = mo.type_id
                 WHERE mo.type_id = ANY($1)
                   AND mo.system_id = $2

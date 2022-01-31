@@ -35,71 +35,11 @@ export class CharacterService {
     }
   }
 
-  public static async itemLocation(id: number): Promise<IItemLocation> {
-    const localItems: IItemLocation[] = this.load();
-
-    // check if the id is stored
-    const item = localItems.find((x: IItemLocation) => x.id === id);
-    if (item) {
-      return item;
-    }
-
-    let location = (await axios.get(`/api/character/location/${id}`)).data;
-    localItems.push({ id, ...location });
-    this.save(localItems);
-    return { id, ...location };
-  }
-
-  public static itemLocationByName(name: string): IItemLocation | undefined {
-    const localItems: IItemLocation[] = this.load();
-    return localItems.find((x: IItemLocation) => x.name === name);
-  }
-
   public static async refreshCharacter(cid: number): Promise<void> {
     return await axios.get(`/api/character/${cid}/refresh`);
   }
-
-  private static load(): IItemLocation[] {
-    const localItems = localStorage.getItem(KV_NAME) || '[]';
-    return JSON.parse(localItems);
-  }
-
-  private static save(kv: IItemLocation[]) {
-    localStorage.setItem(KV_NAME, JSON.stringify(kv));
-  }
 }
 
-export interface ICharacterBlueprint {
-  type_id:             number;
-  item_id:             number;
-  location_id:         number;
-  owners:              number[];
-  material_efficiency: number;
-  time_efficiency:     number;
-  quantity:            number;
-  runs:                number;
-  count:               number;
-  name:                string;
-}
-
-export interface ICharacterAsset {
-  type_id:             number;
-  item_id:             number;
-  location_id:         number;
-  owners:              number[];
-  quantity:            number;
-  count:               number;
-  name:                string;
-}
-
-export interface IItemLocation {
-  // Added by us
-  id?:       number;
-  name:      string;
-  owner_id:  number;
-  system_id: number;
-  type_id:   number;
-}
 
 export interface ICharacter {
   character:        string;

@@ -32,7 +32,7 @@
         </n-dynamic-input>
 
         <n-text>Category</n-text>
-        <n-select v-model:value="budget.category" :options="budget_categories" />
+        <n-select v-model:value="budget.category" :options="categories" />
 
         <n-text>Cost by</n-text>
         <character-selector v-model:value="budget.character" />
@@ -71,7 +71,7 @@
 <script lang="ts">
 import { Options, Vue } from 'vue-class-component';
 import { NButton, NCard, NDynamicInput, NInput, NInputNumber, NPageHeader, NSelect, NSpace, NText } from 'naive-ui';
-import { ProjectService2, IBudgetEntry } from '@/project/service';
+import { ProjectService2, IBudgetEntry,BUDGET_CATEGORIES } from '@/project/service';
 
 import CharacterSelector from '@/components/CharacterSelector.vue';
 
@@ -91,26 +91,11 @@ import CharacterSelector from '@/components/CharacterSelector.vue';
   }
 })
 export default class AddBudgetView extends Vue {
+  public categories = BUDGET_CATEGORIES;
+
   public costs: { cost: number  | undefined }[] = [{ cost: undefined }];
 
   public budget: IBudgetEntry = <IBudgetEntry>{};
-
-  public budget_categories = [{
-    label: 'Purchase',
-    value: 'PURCHASE'
-  }, {
-    label: 'Sold',
-    value: 'SOLD'
-  }, {
-    label: 'Manufacture',
-    value: 'MANUFACTURE'
-  }, {
-    label: 'Research',
-    value: 'RESEARCH'
-  }, {
-    label: 'Other',
-    value: 'OTHER'
-  }];
 
   public default_cost() {
     return { cost: undefined };
@@ -127,7 +112,7 @@ export default class AddBudgetView extends Vue {
       params: {
         pid: this.$route.params.pid
       }
-    })
+    });
   }
 }
 </script>

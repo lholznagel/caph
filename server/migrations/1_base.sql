@@ -4,6 +4,47 @@ CREATE TYPE PROJECT_STATUS          AS ENUM ('ABORTED', 'DONE', 'IN_PROGRESS', '
 CREATE TYPE PROJECT_BUDGET_CATEGORY AS ENUM ('PURCHASE', 'SOLD', 'MANUFACTURE', 'RESEARCH', 'OTHER');
 
 --------------------------------------------------------------------------------
+--                  General tables
+--------------------------------------------------------------------------------
+
+-- Contains every character that ever tried to login, if the login was not
+-- successful and the user tried again, the user will be here multiple times
+CREATE TABLE IF NOT EXISTS logins(
+    expire_date             TIMESTAMPTZ,
+
+    character_id            INTEGER,
+    character_main          INTEGER,
+
+    -- token so that we can verify the user
+    token                   VARCHAR,
+    -- EVE tokens
+    refresh_token           VARCHAR,
+    access_token            VARCHAR,
+
+    PRIMARY KEY(token)
+);
+
+-- Contains all characters that successfully logged in
+CREATE TABLE IF NOT EXISTS characters(
+    character_id            INTEGER     NOT NULL,
+    corporation_id          INTEGER     NOT NULL,
+
+    character_main          INTEGER,
+
+    character_name          VARCHAR(50) NOT NULL,
+    corporation_name        VARCHAR(50) NOT NULL,
+
+    alliance_id             INTEGER,
+    alliance_name           VARCHAR(50),
+
+    PRIMARY KEY (character_id),
+
+    FOREIGN KEY (character_main)
+        REFERENCES characters (character_id)
+        ON DELETE CASCADE
+);
+
+--------------------------------------------------------------------------------
 --                  General static data
 --------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS market_orders(
@@ -24,7 +65,7 @@ CREATE TABLE IF NOT EXISTS market_prices(
     PRIMARY KEY(type_id)
 );
 
-CREATE INDEX IF NOT EXISTS market_orders_type_id ON market_orders(type_id);
+CREATE INDEX IF NOT EXISTS market_orders_type_id   ON market_orders(type_id);
 CREATE INDEX IF NOT EXISTS market_orders_system_id ON market_orders(system_id);
 
 --------------------------------------------------------------------------------
@@ -34,12 +75,8 @@ CREATE INDEX IF NOT EXISTS market_orders_system_id ON market_orders(system_id);
 CREATE TABLE IF NOT EXISTS projects(
     project     UUID           NOT NULL DEFAULT uuid_generate_v4(),
 
-    pinned      BOOLEAN        NOT NULL DEFAULT TRUE,
-
     owner       INTEGER        NOT NULL,
     name        VARCHAR        NOT NULL,
-
-    description VARCHAR,
 
     status      PROJECT_STATUS NOT NULL DEFAULT 'IN_PROGRESS',
 
@@ -60,29 +97,9 @@ CREATE TABLE IF NOT EXISTS project_products(
         ON DELETE CASCADE
 );
 
--- Virtual containers created within the project
-CREATE TABLE IF NOT EXISTS project_containers(
-    -- Id of the container
-    container UUID    NOT NULL DEFAULT uuid_generate_v4(),
-    -- Project id of the project this container lives in
-    project   UUID    NOT NULL,
-
-    name      VARCHAR NOT NULL,
-
-    PRIMARY KEY (project, container),
-
-    FOREIGN KEY (project)
-        REFERENCES projects (project)
-        ON DELETE CASCADE
-);
-
 -- Assets that are stored in a container
 CREATE TABLE IF NOT EXISTS project_assets(
     project   UUID    NOT NULL,
-    container UUID    NOT NULL,
-
-    type_id   INTEGER NOT NULL,
-    amount    INTEGER NOT NULL,
 
     -- material efficiency, only set if its a bp, bpc or formula
     meff      INTEGER,
@@ -91,13 +108,13 @@ CREATE TABLE IF NOT EXISTS project_assets(
     -- remaining runs, only set if its a bpc
     runs      INTEGER,
 
-    PRIMARY KEY (project, container),
+    type_id   INTEGER NOT NULL,
+    quantity  BIGINT  NOT NULL,
+
+    PRIMARY KEY (project, type_id),
 
     FOREIGN KEY (project)
         REFERENCES projects (project)
-        ON DELETE CASCADE,
-    FOREIGN KEY (project, container)
-        REFERENCES project_containers (project, container)
         ON DELETE CASCADE
 );
 
@@ -121,26 +138,23 @@ CREATE TABLE IF NOT EXISTS project_budget(
         ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS project_members (
+  project      UUID NOT NULL,
+
+  character_id INTEGER NOT NULL,
+
+  PRIMARY KEY (project, character_id),
+
+  FOREIGN KEY (project)
+    REFERENCES projects (project)
+    ON DELETE CASCADE,
+
+  FOREIGN KEY (character_id)
+    REFERENCES characters (character_id)
+    ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS project_asset_project     ON project_assets(project);
 CREATE INDEX IF NOT EXISTS project_budget_project    ON project_budget(project);
-CREATE INDEX IF NOT EXISTS project_container_project ON project_containers(project);
-
---------------------------------------------------------------------------------
---                  General tables
---------------------------------------------------------------------------------
-
--- Contains every character that ever tried to login, if the login was not
--- successful and the user tried again, the user will be here multiple times
-CREATE TABLE IF NOT EXISTS login(
-    token                   UUID NOT NULL DEFAULT uuid_generate_v4(),
-
-    expire_date             TIMESTAMPTZ,
-
-    character_id            INTEGER,
-    character_main          INTEGER,
-
-    access_token            VARCHAR,
-    refresh_token           VARCHAR,
-
-    PRIMARY KEY(token)
-);
+CREATE INDEX IF NOT EXISTS project_members_project   ON project_members(project);
+CREATE INDEX IF NOT EXISTS project_products_project  ON project_products(project);

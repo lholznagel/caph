@@ -8,7 +8,6 @@ panic = 'abort'
 [workspace]
 members = [
   'core',
-  'collector',
   'connector',
   'server',
   'sde_parser'

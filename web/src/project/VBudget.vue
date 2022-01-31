@@ -14,7 +14,7 @@
                 @click="
                   $router.push({ name: 'projects_budget_edit', params: {
                     pid: $route.params.pid,
-                    bid: selected_project || '',
+                    bid: selected_budget || '',
                   } })
                 "
                 :disabled="!selected_budget"
@@ -49,7 +49,6 @@
                   <th width="500">Description</th>
                   <th width="100">Created at</th>
                   <th width="32"></th>
-                  <th width="10"></th>
                 </tr>
                 <tr v-for="entry in budget_entries" :key="entry.budget">
                   <td>
@@ -72,15 +71,6 @@
                   <td>{{ entry.description }}</td>
                   <td>{{ format_date(entry.created_at) }}</td>
                   <td><character :id="entry.character" /></td>
-                  <td>
-                    <n-button
-                      @click="edit(entry.budget)"
-                      tertiary
-                      type="info"
-                    >
-                      Edit
-                    </n-button>
-                  </td>
                 </tr>
               </tbody>
             </n-table>

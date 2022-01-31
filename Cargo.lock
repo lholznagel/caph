@@ -181,25 +181,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "caph_collector"
-version = "0.1.0"
-dependencies = [
- "axum",
- "caph_connector",
- "chrono",
- "dotenv",
- "futures",
- "log",
- "serde",
- "serde_json",
- "sqlx",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "caph_connector"
 version = "0.1.0"
 dependencies = [

@@ -71,7 +71,7 @@ import { Options, Vue } from 'vue-class-component';
 import { h } from 'vue';
 import { RouterLink } from 'vue-router';
 import { events } from '@/main';
-import { PROJECT_ROUTE } from '@/event_bus';
+import { ROUTE, PROJECT_ROUTE } from '@/event_bus';
 
 @Options({
   components: {
@@ -116,13 +116,6 @@ export default class App extends Vue {
   public expand_keys: string[] = [];
 
   public options = [{
-    label: 'Industry',
-    key:   'industry',
-    type:  'group',
-    children: [
-      this.app_link('industry_jobs', 'Jobs'),
-    ]
-  }, {
     label: () => h(
       RouterLink,
       {
@@ -138,15 +131,7 @@ export default class App extends Vue {
     key:   'settings',
     type:  'group',
     children: [
-      this.app_link('characters', 'Characters'),
-      this.app_link('stations', 'Stations'),
-    ]
-  }, {
-    label: 'Admin',
-    key:   'admin',
-    type:  'group',
-    children: [
-      this.app_link('admin_features', 'Features')
+      this.app_link('settings_characters', 'Characters'),
     ]
   }];
 
@@ -154,7 +139,7 @@ export default class App extends Vue {
     events.$on(PROJECT_ROUTE, (e: string) => {
       if (e) {
         let pid = <string>this.$route.params.pid;
-        this.options[1].children = [
+        this.options[0].children = [
           this.project_link('projects_overview', 'Overview', pid),
           this.project_link('projects_market', 'Market', pid),
           this.project_link('projects_budget', 'Budget', pid),
@@ -166,7 +151,7 @@ export default class App extends Vue {
         this.current_route = e;
       } else {
         this.current_route = 'projects_projects';
-        this.options[1].children = undefined;
+        this.options[0].children = undefined;
       }
     });
 
@@ -176,6 +161,8 @@ export default class App extends Vue {
       let globalWindow: any = window;
       globalWindow.whoami = res.data;
     }
+
+    events.$on(ROUTE, (e: string) => this.current_route = e);
   }
 
   public app_link(to: string, name: string) {

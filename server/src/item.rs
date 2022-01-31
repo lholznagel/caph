@@ -21,7 +21,7 @@ impl ItemService {
     ) -> Result<String, ServerError> {
         let entry = sqlx::query!("
                 SELECT name
-                FROM item
+                FROM items
                 WHERE type_id = $1
             ",
                 *tid

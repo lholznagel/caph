@@ -138,9 +138,7 @@ impl ProjectService {
                     p.project,
                     p.owner,
                     p.name,
-                    p.pinned,
-                    p.status AS "status: Status",
-                    p.description
+                    p.status AS "status: Status"
                 FROM projects p
                 JOIN project_products pp
                   ON p.project = pp.project
@@ -155,9 +153,7 @@ impl ProjectService {
                     project:     x.project,
                     owner:       x.owner.into(),
                     name:        x.name,
-                    pinned:      x.pinned,
                     status:      x.status,
-                    description: x.description,
                     products:    Vec::new(),
                 }
             });
@@ -193,9 +189,8 @@ impl ProjectService {
                 SELECT
                     p.project,
                     p.name,
-                    p.pinned,
                     p.owner,
-                    p.status   AS "status: Status"
+                    p.status AS "status: Status"
                 FROM project_members pm
                 JOIN projects p
                   ON p.project = pm.project
@@ -210,7 +205,6 @@ impl ProjectService {
             .map(|x| Info {
                 project: x.project,
                 name:    x.name,
-                pinned:  x.pinned,
                 owner:   x.owner.into(),
                 status:  x.status
             })
@@ -297,13 +291,11 @@ impl ProjectService {
         sqlx::query!("
                 UPDATE projects
                    SET name = $2,
-                       pinned = $3,
-                       status = $4
+                       status = $3
                 WHERE project = $1
             ",
                 pid,
                 cfg.name,
-                cfg.pinned,
                 cfg.status as _
             )
             .execute(&self.pool)
@@ -370,7 +362,7 @@ impl ProjectService {
                         i.name,
                         i.group_id
                     FROM project_assets pa
-                    JOIN item i
+                    JOIN items i
                       ON i.type_id = pa.type_id
                     WHERE pa.project = $1
                     ORDER BY i.name
@@ -411,94 +403,35 @@ impl ProjectService {
         &self,
         pid: ProjectId
     ) -> Result<Vec<Blueprint>, ProjectError> {
-        let sub_products = sqlx::query!(r#"
+        let steps = self
+            .buildstep_manufacturing(pid)
+            .await?
+            .into_iter()
+            .map(|x| *x.type_id)
+            .collect::<Vec<_>>();
+        let bps = sqlx::query!(r#"
                 SELECT
-                    b.type_id                 AS "type_id!",
-                    CEIL(
-                        SUM(bf.quantity)::FLOAT *
-                        pp.count::FLOAT /
-                        bf.produces::FLOAT
-                    )::INTEGER                AS "iters!",
-                    b.reaction    IS NOT NULL AS "is_reaction!",
-                    b.manufacture IS NOT NULL AS "is_manufacture!",
-                    i.name
-                FROM project_products pp
-                JOIN blueprint_flat bf
-                  ON bf.type_id = pp.type_id
-                JOIN blueprint_material bm
-                  ON bm.ptype_id = bf.mtype_id
-                JOIN blueprint b
-                  ON b.id = bm.blueprint
-                JOIN item i
-                  ON i.type_id = b.type_id
-                WHERE pp.project = $1
-                  AND bm.is_product = TRUE
-                GROUP BY
-                    b.type_id,
-                    b.reaction,
-                    b.manufacture,
-                    i.name,
-                    bf.produces,
-                    bf.quantity,
-                    pp.count
+                    bman.btype_id AS "btype_id!",
+                    i.name        AS "name!"
+                FROM blueprint_manufacture bman
+                JOIN items i
+                  ON i.type_id = bman.btype_id
+                WHERE bman.ptype_id = ANY($1)
             "#,
-                pid,
+                &steps
             )
             .fetch_all(&self.pool)
             .await?
             .into_iter()
             .map(|x| Blueprint {
-                type_id:        x.type_id.into(),
+                type_id:        x.btype_id.into(),
                 name:           x.name,
-                iters:          x.iters,
-                is_reaction:    x.is_reaction,
-                is_manufacture: x.is_manufacture
+                is_reaction:    true,
+                is_manufacture: true,
+                iters:          0
             })
             .collect::<Vec<_>>();
-
-        let mut products = sqlx::query!(r#"
-                SELECT
-                    b.type_id                 AS "type_id!",
-                    CEIL(
-                        pp.count::FLOAT /
-                        bm.quantity::FLOAT
-                    )::INTEGER                AS "iters!",
-                    b.reaction    IS NOT NULL AS "is_reaction!",
-                    b.manufacture IS NOT NULL AS "is_manufacture!",
-                    i.name
-                FROM project_products pp
-                JOIN blueprint_material bm
-                  ON bm.ptype_id = pp.type_id
-                JOIN blueprint b
-                  ON b.id = bm.blueprint
-                JOIN item i
-                  ON i.type_id = b.type_id
-                WHERE pp.project = $1
-                  AND bm.is_product = TRUE
-                GROUP BY
-                    b.type_id,
-                    b.reaction,
-                    b.manufacture,
-                    i.name,
-                    bm.quantity,
-                    pp.count
-            "#,
-                pid,
-            )
-            .fetch_all(&self.pool)
-            .await?
-            .into_iter()
-            .map(|x| Blueprint {
-                type_id:        x.type_id.into(),
-                name:           x.name,
-                iters:          x.iters,
-                is_reaction:    x.is_reaction,
-                is_manufacture: x.is_manufacture
-            })
-            .collect::<Vec<_>>();
-        products.extend(sub_products);
-
-        Ok(products)
+        Ok(bps)
     }
 
     /// Fetches a list of all required blueprints and checks if they are stored.
@@ -514,90 +447,13 @@ impl ProjectService {
     /// # Returns
     ///
     /// List of all stored blueprints for the project and additional information.
-    /// TODO: review, blueprint, blueprint_flat and blueprint_material are deprecated
+    /// TODO: reimplement when storage is done
     #[instrument(err)]
     pub async fn info_blueprints(
         &self,
         pid: ProjectId
     ) -> Result<Vec<BlueprintInfo>, ProjectError> {
-        let sub_products = sqlx::query!(r#"
-                SELECT
-                    b.type_id,
-                    ab.runs = -1            AS "original!",
-                    ab.runs,
-                    ab.material_efficiency,
-                    ab.time_efficiency
-                FROM projects p
-                JOIN project_products pp
-                  ON pp.project = p.project
-                JOIN project_assets pa
-                  ON pa.project = p.project
-                JOIN blueprint_flat bf
-                  ON bf.type_id = pp.type_id
-                JOIN blueprint_material bm
-                  ON bm.type_id = bf.mtype_id
-                JOIN blueprint b
-                  ON b.id = bm.blueprint
-                JOIN asset a
-                  ON a.type_id = b.type_id
-                JOIN asset_blueprint ab
-                  ON ab.item_id = a.item_id
-                WHERE p.project = $1
-                  AND bm.is_product = TRUE
-            "#,
-                pid,
-            )
-            .fetch_all(&self.pool)
-            .await?
-            .into_iter()
-            .map(|x| BlueprintInfo {
-                type_id:      x.type_id.into(),
-                original:     x.original,
-                runs:         x.runs,
-                material_eff: x.material_efficiency,
-                time_eff:     x.time_efficiency,
-            })
-            .collect::<Vec<_>>();
-
-        let mut products = sqlx::query!(r#"
-                SELECT
-                    b.type_id,
-                    ab.runs = -1            AS "original!",
-                    ab.runs,
-                    ab.material_efficiency,
-                    ab.time_efficiency
-                FROM projects p
-                JOIN project_products pp
-                  ON pp.project = p.project
-                JOIN project_assets pa
-                  ON pa.project = p.project
-                JOIN blueprint_material bm
-                  ON bm.type_id = pp.type_id
-                JOIN blueprint b
-                  ON b.id = bm.blueprint
-                JOIN asset a
-                  ON a.type_id = b.type_id
-                JOIN asset_blueprint ab
-                  ON ab.item_id = a.item_id
-                WHERE p.project = $1
-                  AND bm.is_product = TRUE
-            "#,
-                pid,
-            )
-            .fetch_all(&self.pool)
-            .await?
-            .into_iter()
-            .map(|x| BlueprintInfo {
-                type_id:      x.type_id.into(),
-                original:     x.original,
-                runs:         x.runs,
-                material_eff: x.material_efficiency,
-                time_eff:     x.time_efficiency,
-            })
-            .collect::<Vec<_>>();
-        products.extend(sub_products);
-
-        Ok(products)
+        Ok(Vec::new())
     }
 
     /// Gets the raw required materials.
@@ -796,8 +652,6 @@ impl ProjectService {
         &self,
         pid:      ProjectId,
     ) -> Result<Vec<BuildstepEntry>, ProjectError> {
-        let start = std::time::Instant::now();
-
         // 1. Get the base items and calculate the number of runs
         let mut products = HashMap::new();
         sqlx::query!(r#"
@@ -820,9 +674,9 @@ impl ProjectService {
                   ON bmc.ptype_id = pp.type_id
                 JOIN blueprint_materials bm
                   ON bm.bp_id = bmc.bp_id
-                JOIN item i
+                JOIN items i
                   ON i.type_id = bmc.ptype_id
-                JOIN item ii
+                JOIN items ii
                   ON ii.type_id = bm.mtype_id
                 WHERE pp.project = $1
             "#,
@@ -884,9 +738,9 @@ impl ProjectService {
                 FROM blueprint_manufacture bman
                 JOIN blueprint_materials bmat
                   ON bmat.bp_id = bman.bp_id
-                JOIN item i
+                JOIN items i
                   ON i.type_id = bman.ptype_id
-                JOIN item ii
+                JOIN items ii
                   ON ii.type_id = bmat.mtype_id
                 WHERE bman.ptype_id = ANY(
                     SELECT bmatc.mtype_id
@@ -981,32 +835,6 @@ impl ProjectService {
                         .or_insert(required);
                 }
             }
-
-            /*sqlx::query!(r#"
-                    SELECT
-                        bm.mtype_id,
-                        bm.quantity,
-                        CEIL(
-                            $2::FLOAT / bman.quantity::FLOAT
-                        )::INTEGER * bm.quantity AS "required!"
-                    FROM blueprint_manufacture bman
-                    JOIN blueprint_materials bm
-                      ON bm.bp_id = bman.bp_id
-                    WHERE bman.ptype_id = $1
-                "#,
-                    t,
-                    q as f64
-                )
-                .fetch_all(&self.pool)
-                .await?
-                .into_iter()
-                .for_each(|x| {
-                    queue.push_back((x.mtype_id, x.required));
-                    quantities
-                        .entry(x.mtype_id.into())
-                        .and_modify(|e: &mut i32| *e += x.required)
-                        .or_insert(x.required);
-                });*/
         }
 
         Ok(quantities)
@@ -1048,9 +876,9 @@ impl ProjectService {
                   ON bi.ttype_id = pp.type_id
                 JOIN blueprint_materials bim
                   ON bim.bp_id = bi.bp_id
-                JOIN item i
+                JOIN items i
                   ON i.type_id = bi.itype_id
-                JOIN item ii
+                JOIN items ii
                   ON ii.type_id = bim.mtype_id
                 WHERE pp.project = $1
             ",
@@ -1348,7 +1176,7 @@ impl ProjectService {
                     c.alliance_id,
                     c.alliance_name
                 FROM project_members pm
-                JOIN character c
+                JOIN characters c
                   ON c.character_id = pm.character_id
                 WHERE pm.project = $1
             ",
@@ -1467,7 +1295,7 @@ impl ProjectService {
         let entries = sqlx::query!("
                 SELECT pp.*, i.name
                 FROM project_products pp
-                JOIN item i
+                JOIN items i
                   ON pp.type_id = i.type_id
                 WHERE pp.project = $1
             ",
@@ -1576,8 +1404,6 @@ crate::error_derive!(ProjectError);
 pub struct Project {
     /// Unique identifier for the project
     pub project:     ProjectId,
-    /// Determines if the projects is pinned to the sidebar or not
-    pub pinned:      bool,
     /// Every project belongs to exactly one person
     pub owner:       CharacterId,
     /// Name of the project
@@ -1586,9 +1412,6 @@ pub struct Project {
     pub status:      Status,
     /// All projects that should be produced in this project
     pub products:    Vec<Product>,
-
-    /// Optional description of the project
-    pub description: Option<String>,
 }
 
 /// Represents basic information about a project
@@ -1598,8 +1421,6 @@ pub struct Info {
     pub project: ProjectId,
     /// Project name
     pub name:    String,
-    /// Determines if the project is shown in the sidebar or not
-    pub pinned:  bool,
     /// Owner of the project
     pub owner:   CharacterId,
     /// Current project status
@@ -1613,8 +1434,6 @@ pub struct Config {
     pub name:       String,
     /// List of all products that should be build
     pub products:   Vec<ProductConfig>,
-    /// Determines if the project is pinned or not
-    pub pinned:     Option<bool>,
     /// Status of the project
     pub status:     Option<Status>
 }

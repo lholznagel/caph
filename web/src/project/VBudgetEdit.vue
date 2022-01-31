@@ -32,15 +32,15 @@
         </n-dynamic-input>
 
         <n-text>Category</n-text>
-        <n-select v-model:value="budget.category" :options="budget_categories" />
+        <n-select v-model:value="entry.category" :options="categories" />
 
         <n-text>Cost by</n-text>
-        <character-selector v-model:value="budget.character" />
+        <character-selector v-model:value="entry.character" />
 
         <n-text>Description</n-text>
         <n-input
           placeholder="Cost description"
-          v-model:value="budget.description"
+          v-model:value="entry.description"
         />
       </n-space>
 
@@ -54,13 +54,13 @@
           <n-button
             :disabled="
               costs.length == 0 ||
-              !budget.category  ||
-              !budget.character ||
-              !budget.description"
-            @click="add"
+              !entry.category  ||
+              !entry.character ||
+              !entry.description"
+            @click="edit"
             type="info"
           >
-            Add
+            Edit
           </n-button>
         </n-space>
       </template>
@@ -71,7 +71,7 @@
 <script lang="ts">
 import { Options, Vue } from 'vue-class-component';
 import { NButton, NCard, NDynamicInput, NInput, NInputNumber, NPageHeader, NSelect, NSpace, NText } from 'naive-ui';
-import { ProjectService2, IBudgetEntry } from '@/project/service';
+import { ProjectService2, IBudgetEntry, BUDGET_CATEGORIES } from '@/project/service';
 
 import CharacterSelector from '@/components/CharacterSelector.vue';
 
@@ -91,52 +91,42 @@ import CharacterSelector from '@/components/CharacterSelector.vue';
   }
 })
 export default class AddBudgetView extends Vue {
+  public categories = BUDGET_CATEGORIES;
+
   public costs: { cost: number  | undefined }[] = [{ cost: undefined }];
 
   public entry: IBudgetEntry = <IBudgetEntry>{};
-
-  public budget_categories = [{
-    label: 'Purchase',
-    value: 'PURCHASE'
-  }, {
-    label: 'Sold',
-    value: 'SOLD'
-  }, {
-    label: 'Manufacture',
-    value: 'MANUFACTURE'
-  }, {
-    label: 'Research',
-    value: 'RESEARCH'
-  }, {
-    label: 'Other',
-    value: 'OTHER'
-  }];
 
   public async created() {
     this.entry = await ProjectService2.budget_entry(
       <string>this.$route.params.pid,
       <string>this.$route.params.bid
-    )
+    );
+
+    this.costs = [{ cost: this.entry.amount }];
   }
 
   public default_cost() {
     return { cost: undefined };
   }
 
-  /*public async add() {
-    this.budget.amount = <number>this.costs
+  public async edit() {
+    this.entry.amount = <number>this.costs
       .map(x => x.cost)
       .reduce((prev, curr) => (prev ? prev : 0) + (curr ? curr : 0), 0);
 
-    await ProjectService2.budget_add_entry(<string>this.$route.params.pid, this.budget);
+    ProjectService2.budget_edit_entry(
+      <string>this.$route.params.pid,
+      <string>this.$route.params.bid,
+      this.entry
+    );
+
     this.$router.push({
       name: 'projects_budget',
       params: {
         pid: this.$route.params.pid
       }
-    })
-  }*/
-
-  public async add() {}
+    });
+  }
 }
 </script>

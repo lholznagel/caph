@@ -29,19 +29,6 @@ DROP TABLE IF EXISTS system CASCADE;
 
 -- Provided by SDE
 --
--- Contains all items that are in the game
-CREATE TABLE item(
-    type_id                INTEGER NOT NULL,
-    category_id            INTEGER NOT NULL,
-    group_id               INTEGER NOT NULL,
-    volume                 REAL    NOT NULL,
-    name                   VARCHAR NOT NULL,
-
-    PRIMARY KEY(type_id)
-);
-
--- Provided by SDE
---
 -- Breakdown of all items that can be reprocess, their return if reprocessing
 -- was 100%
 CREATE TABLE reprocess(
@@ -206,27 +193,6 @@ CREATE TABLE industry_system (
 --------------------------------------------------------------------------------
 --                  Character specific tables
 --------------------------------------------------------------------------------
-
--- Contains all characters that successfully logged in
-CREATE TABLE character(
-    alliance_id             INTEGER,
-    character_id            INTEGER     NOT NULL,
-    corporation_id          INTEGER     NOT NULL,
-
-    character_main          INTEGER,
-
-    alliance_name           VARCHAR(50),
-    character_name          VARCHAR(50) NOT NULL,
-    corporation_name        VARCHAR(50) NOT NULL,
-
-    admin                   BOOLEAN     NOT NULL DEFAULT FALSE,
-
-    PRIMARY KEY (character_id),
-
-    FOREIGN KEY (character_main)
-        REFERENCES character (character_id)
-        ON DELETE CASCADE
-);
 
 -- All assets that the character has
 CREATE TABLE asset(

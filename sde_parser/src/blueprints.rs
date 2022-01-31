@@ -879,10 +879,6 @@ struct Activity {
     /// nothing is produced by this activity
     #[serde(default)]
     products:  Vec<Material>,
-    /// Skills that are required for this activity, will be an empty Vec if
-    /// no skills are required
-    #[serde(default)]
-    skills:    Vec<Skill>
 }
 
 /// Represents a material required for an activity
@@ -897,14 +893,4 @@ struct Material {
     /// This field is only set when the activity is an invention and there only
     /// for products
     probability: Option<f32>,
-}
-
-/// Represents a skill
-#[derive(Clone, Debug, Deserialize)]
-struct Skill {
-    /// Required level
-    level:   i32,
-    /// TypeId of the skill
-    #[serde(rename = "typeID")]
-    type_id: TypeId,
 }

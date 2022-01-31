@@ -32,7 +32,7 @@ impl CharacterService {
     ) -> Result<Character, ServerError> {
         let character = sqlx::query!("
                 SELECT *
-                FROM character
+                FROM characters
                 WHERE character_id = $1
             ", *cid as i32)
             .fetch_optional(&self.pool)
@@ -74,7 +74,7 @@ impl CharacterService {
     ) -> Result<Vec<i32>, ServerError> {
         let ids = sqlx::query!("
                 SELECT character_id
-                FROM   character
+                FROM   characters
                 WHERE  character_id = $1 OR character_main = $1
             ", *cid as i32)
             .fetch_all(&self.pool)
@@ -102,7 +102,7 @@ impl CharacterService {
     ) -> Result<Vec<Character>, ServerError> {
         let alts = sqlx::query!("
                 SELECT DISTINCT character_id
-                FROM login
+                FROM logins
                 WHERE character_main = $1 AND character_id IS NOT NULL
             ", *cid as i32)
             .fetch_all(&self.pool)
@@ -127,14 +127,14 @@ impl CharacterService {
         cid: CharacterId
     ) -> Result<(), ServerError> {
         sqlx::query!("
-                DELETE FROM character WHERE character_id = $1
+                DELETE FROM characters WHERE character_id = $1
             ",
                 *cid
             )
             .execute(&self.pool)
             .await?;
         sqlx::query!("
-                DELETE FROM login
+                DELETE FROM logins
                 WHERE character_id = $1
             ",
                 *cid
@@ -169,8 +169,8 @@ impl CharacterService {
                 c.character_name,
                 c.corporation_id,
                 c.corporation_name
-            FROM login l
-            JOIN character c
+            FROM logins l
+            JOIN characters c
             ON l.character_id = c.character_id
             WHERE c.character_id = $1;
         ", *cid as i32)
@@ -201,7 +201,7 @@ impl CharacterService {
         let code = sqlx::query!("
                 SELECT
                     refresh_token
-                FROM login
+                FROM logins
                 WHERE character_id = $1
             ",
                 * cid
@@ -215,7 +215,7 @@ impl CharacterService {
             let main = sqlx::query!("
                     SELECT
                         character_main
-                    FROM character
+                    FROM characters
                     WHERE character_id = $1
                 ",
                     *cid
@@ -245,7 +245,7 @@ impl CharacterService {
         main:      Option<CharacterId>
     ) -> Result<(), ServerError> {
         sqlx::query!("
-                INSERT INTO character
+                INSERT INTO characters
                 (
                     alliance_id, alliance_name,
                     character_id, character_name,

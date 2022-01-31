@@ -5,7 +5,6 @@ use axum::Router;
 use axum::response::{IntoResponse, Redirect};
 use axum::routing::get;
 use serde::Deserialize;
-use uuid::Uuid;
 
 pub fn router() -> Router {
     Router::new()

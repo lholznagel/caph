@@ -1,5 +1,5 @@
-export const BUDGET_CHANGE  = 'budget_change';
 export const PROJECT_ROUTE  = 'project_route';
+export const ROUTE_CHANGE   = 'route';
 
 export class Events {
   private events: any = {};

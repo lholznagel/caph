@@ -22,6 +22,8 @@
 
 /// Module for creating the blueprints SQL-Code
 mod blueprints;
+/// Module for creating the items SQL-Code
+mod items;
 
 use std::io::prelude::*;
 use std::{path::Path, fs::File};
@@ -54,13 +56,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let blueprints = blueprints::run()?;
-
     let mut fs = File::create(format!(
-            "{}/{}/out.sql",
+            "{}/{}/blueprints.sql",
             current_dir.to_str().unwrap_or_default(),
             FOLDER_OUTPUT
     ))?;
     fs.write_all(blueprints.as_bytes())?;
+
+    let items = items::run()?;
+    let mut fs = File::create(format!(
+        "{}/{}/items.sql",
+        current_dir.to_str().unwrap_or_default(),
+        FOLDER_OUTPUT
+    ))?;
+    fs.write_all(items.as_bytes())?;
 
     Ok(())
 }

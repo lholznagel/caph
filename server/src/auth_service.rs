@@ -7,29 +7,8 @@ use caph_core::ProjectId;
 use sqlx::PgPool;
 use tracing::instrument;
 
-/// Scope for a normal character without any features actived
-/*const EVE_DEFAULT_SCOPE: &[&'static str] = &[
+const EVE_DEFAULT_SCOPE: &[&'static str] = &[
     "publicData",
-];*/
-
-#[deprecated]
-const EVE_SCOPE: &[&'static str] = &[
-    "publicData",
-    //"esi-assets.read_assets.v1",
-    //"esi-characters.read_agents_research.v1",
-    //"esi-characters.read_blueprints.v1",
-    //"esi-characterstats.read.v1",
-    //"esi-industry.read_character_jobs.v1",
-    //"esi-industry.read_corporation_jobs.v1",
-    //"esi-industry.read_character_mining.v1",
-    //"esi-markets.read_character_orders.v1",
-    //"esi-markets.structure_markets.v1",
-    //"esi-planets.manage_planets.v1",
-    //"esi-search.search_structures.v1",
-    //"esi-skills.read_skillqueue.v1",
-    //"esi-skills.read_skills.v1",
-    //"esi-universe.read_structures.v1",
-    //"esi-wallet.read_character_wallet.v1",
 ];
 
 /// Handles authentication and authorisation.
@@ -114,7 +93,7 @@ impl AuthService {
         let (_, hash) = crate::utils::generate_secure_token()?;
 
         sqlx::query!(
-            "INSERT INTO login (token) VALUES ($1)",
+            "INSERT INTO logins (token) VALUES ($1)",
             &hash
         )
         .execute(&self.pool)
@@ -122,7 +101,7 @@ impl AuthService {
 
         EveAuthClient::auth_uri(
                 &hash,
-                Some(&EVE_SCOPE.join(" "))
+                Some(&EVE_DEFAULT_SCOPE.join(" "))
             )?
             .to_string()
             .parse::<Uri>()
@@ -146,7 +125,7 @@ impl AuthService {
     ) -> Result<Uri, ServerError> {
         let (_, hash) = crate::utils::generate_secure_token()?;
         sqlx::query!("
-                INSERT INTO login (character_main, token)
+                INSERT INTO logins (character_main, token)
                 VALUES ($1, $2)
             ",
                 *cid,
@@ -157,7 +136,7 @@ impl AuthService {
 
         EveAuthClient::auth_uri(
                 &hash,
-                Some(&EVE_SCOPE.join(" "))
+                Some(&EVE_DEFAULT_SCOPE.join(" "))
             )?
             .to_string()
             .parse::<Uri>()
@@ -181,7 +160,7 @@ impl AuthService {
     ) -> Result<Vec<CharacterId>, ServerError> {
         let mut alts = sqlx::query!("
                 SELECT DISTINCT character_id
-                FROM login
+                FROM logins
                 WHERE character_main = $1 AND character_id IS NOT NULL
             ", *cid as i32)
             .fetch_all(&self.pool)
@@ -201,7 +180,7 @@ impl AuthService {
     ) -> Result<String, ServerError> {
         let refresh_token = sqlx::query!("
                 SELECT refresh_token
-                FROM login
+                FROM logins
                 WHERE character_id = $1
             ",
                 **cid
@@ -212,27 +191,6 @@ impl AuthService {
             .refresh_token
             .ok_or(ServerError::InvalidUser)?;
         Ok(refresh_token)
-    }
-
-    #[instrument(err)]
-    pub async fn is_admin(
-        &self,
-        cid: CharacterId
-    ) -> Result<bool, ServerError> {
-        if let Some(x) = sqlx::query!("
-                SELECT admin
-                FROM   character
-                WHERE  character_id = $1
-            ",
-                *cid
-            )
-            .fetch_optional(&self.pool)
-            .await? {
-
-            Ok(x.admin)
-        } else {
-            Ok(false)
-        }
     }
 
     /// Gets the character id from the database
@@ -252,7 +210,7 @@ impl AuthService {
     ) -> Result<CharacterId, ServerError> {
         let character = sqlx::query!("
                 SELECT character_id
-                FROM login
+                FROM logins
                 WHERE token = $1
             ",
             token
@@ -283,7 +241,7 @@ impl AuthService {
                 WHERE project = $1
                   AND character_id = (
                       SELECT character_id
-                      FROM login
+                      FROM logins
                       WHERE token = $2
                 )
             ",
@@ -301,7 +259,7 @@ impl AuthService {
     ) -> Result<bool, ServerError> {
         let result = sqlx::query!("
                 SELECT character_id
-                FROM login
+                FROM logins
                 WHERE token = $1
             ",
                 token
@@ -332,24 +290,24 @@ impl AuthService {
         let character_id = character.character_id()?;
 
         sqlx::query!("
-            DELETE FROM login WHERE character_id = $1
+            DELETE FROM logins WHERE character_id = $1
         ", *character_id)
         .execute(&self.pool)
         .await?;
 
         sqlx::query!("
-                UPDATE login
+                UPDATE logins
                 SET
                     character_id = $1,
-                    access_token = $2,
-                    refresh_token = $3,
+                    refresh_token = $2,
+                    access_token = $3,
                     expire_date = NOW() + interval '1199' second,
                     token = $4
                 WHERE token = $5
             ",
             *character_id,
-            character.access_token,
-            character.refresh_token,
+            &character.refresh_token,
+            &character.access_token,
             token,
             state
         )
@@ -378,7 +336,7 @@ impl AuthService {
     ) -> Result<bool, ServerError> {
         let is_alt = sqlx::query!("
                 SELECT character_main
-                FROM login
+                FROM logins
                 WHERE token = $1
             ",
                 token

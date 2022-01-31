@@ -50,6 +50,8 @@
 
 <script lang="ts">
 import {CharacterService, ICharacter} from '@/services/character';
+import { events } from '@/main';
+import { ROUTE } from '@/event_bus';
 import axios from 'axios';
 import { NButton, NCard, NImage, NGrid, NGridItem, NSkeleton, NSpace,
 NPageHeader } from 'naive-ui';
@@ -75,6 +77,13 @@ export default class Settings extends Vue {
   public refresh_map: { [key: number]: boolean } = {}
 
   public async created() {
+    console.log(this.$route.params);
+
+    events.$emit(
+      ROUTE,
+      `settings_characters`
+    );
+
     this.busy = true;
 
     await this.load();

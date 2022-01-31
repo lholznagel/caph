@@ -12,7 +12,6 @@ pub fn router() -> Router {
     Router::new()
         .route("/alts", get(alts))
         .route("/ids", get(ids))
-        .route("/asset/views", get(asset_views))
         .route("/:id", delete(remove))
         .route("/:id/name", get(name))
         .route("/:id/refresh", get(refresh))
@@ -42,7 +41,7 @@ async fn remove(
     Path(character_id): Path<i32>
 ) -> Result<impl IntoResponse, ServerError> {
     let character_id = character_id.into();
-    let name = character_service.remove(character_id).await?;
+    character_service.remove(character_id).await?;
     Ok((StatusCode::OK, Json("")))
 }
 
@@ -62,21 +61,4 @@ async fn refresh(
     let character_id = character_id.into();
     character_service.refresh(character_id).await?;
     Ok((StatusCode::OK, Json(())))
-}
-
-async fn asset_views(
-    _character_service: Extension<CharacterService>,
-) -> Result<impl IntoResponse, ServerError> {
-    let json = serde_json::json!([{
-        "name": "Blueprints",
-        "query": {
-            "category": 9
-        }
-    }, {
-        "name": "Ships",
-        "query": {
-            "category": 6
-        }
-    }]);
-    Ok((StatusCode::OK, Json(json)))
 }
