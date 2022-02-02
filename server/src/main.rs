@@ -1,12 +1,13 @@
-use caph_connector::EveClient;
-use caph_core::MarketService;
+use axum::{Extension, Router};
 use caph_server::*;
 use sqlx::postgres::PgPoolOptions;
 use tracing::Level;
 use tracing_subscriber::EnvFilter;
 
 /// ENV variable for the database URL
-const PG_ADDR: &'static str = "DATABASE_URL";
+const PG_ADDR: &str          = "DATABASE_URL";
+/// ENV variable for the address the server should bind to
+const SERVER_BIND_ADDR: &str = "SERVER_BIND_ADDR";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -33,38 +34,56 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .run(&pool)
         .await?;
 
-    let asset_service     = AssetService::new(pool.clone());
     let auth_service      = AuthService::new(pool.clone());
-    let character_service = CharacterService::new(pool.clone());
-    let item_service      = ItemService::new(pool.clone());
-    let project_service = ProjectService {  };
-
-    let eve_client = EveClient::new().map_err(ServerError::ConnectError)?;
-    let market_service = MarketService::new(pool.clone(), eve_client.clone());
-    let mut project_service2 = caph_core::ProjectService::new(
+    let character_service = CharacterService::new(
         pool.clone(),
-        market_service.clone()
+        auth_service.clone()
     );
-    project_service2.populate_cache().await?;
+    let item_service      = ItemService::new(pool.clone());
 
-    let (tx, rx) = tokio::sync::mpsc::channel(5);
-    let market_task = MarketTask::new(market_service, rx);
+    let dependency_cache = DependencyCache::new(pool.clone()).await?;
+    let project_blueprint_service = ProjectBlueprintService::new(
+        pool.clone(),
+        character_service.clone(),
+    );
+    let project_storage_service = ProjectStorageService::new(
+        pool.clone()
+    );
+    let project_service = ProjectService::new(
+        pool.clone(),
 
-    let task_service = TaskService::new(tx);
+        project_blueprint_service.clone(),
 
-    tokio::task::spawn(async move { market_task.task().await });
-    tokio::task::spawn(async move { task_service.task().await });
+        dependency_cache
+    );
 
-    start(
-        asset_service,
-        auth_service,
-        character_service,
-        item_service,
-        project_service,
+    let app = Router::new()
+        .nest(
+            "/api/v1",
+            Router::new()
+                .nest("/auth", crate::AuthApi::router())
+                .nest("/character", crate::CharacterApi::router())
+                .nest("/items", crate::ItemApi::router())
+                .nest("/projects", crate::ProjectApi::router())
+        )
+        .layer(Extension(auth_service))
+        .layer(Extension(character_service))
+        .layer(Extension(item_service))
+        .layer(Extension(project_service))
+        .layer(Extension(project_blueprint_service))
+        .layer(Extension(project_storage_service))
+        .layer(Extension(pool))
+        .into_make_service();
 
-        project_service2
-    )
-    .await?;
+    let bind = std::env::var(SERVER_BIND_ADDR)
+        .unwrap_or_else(|_| String::from("127.0.0.1:8080"))
+        .parse()
+        .map_err(|_| Error::CouldNotParseServerListenAddr)?;
+    tracing::info!("Starting server");
+    axum::Server::bind(&bind)
+        .serve(app)
+        .await
+        .map_err(|_| Error::CouldNotStartServer)?;
 
     Ok(())
 }

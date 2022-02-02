@@ -6,13 +6,13 @@
         <th width="34"></th>
         <th width="500">Name</th>
         <th width="100">Runs</th>
-        <th width="100">Produces</th>
+        <th width="100">Required</th>
         <th width="200">Time per run</th>
         <th width="200">Total time</th>
       </tr>
     </thead>
     <tbody>
-      <template v-for="entry in buildsteps" :key="entry.type_id">
+      <template v-for="entry in buildsteps" :key="entry.ptype_id">
         <tr>
           <td>
             <n-icon size="22">
@@ -31,15 +31,15 @@
           <td>
             <item-icon
               type="icon"
-              :id="entry.type_id"
+              :id="entry.ptype_id"
               :width="32"
             />
           </td>
           <td>{{ entry.name }}</td>
-          <td>{{ entry.runs }}</td>
-          <td>{{ entry.produces }}</td>
+          <td>{{ Math.ceil(entry.products / entry.products_per_run) }}</td>
+          <td>{{ entry.products }}</td>
           <td><format-number :value="entry.time_per_run" time /></td>
-          <td><format-number :value="entry.time_total" time /></td>
+          <td><format-number :value="entry.time" time /></td>
         </tr>
         <tr v-if="entry.open">
           <td></td>
@@ -51,17 +51,17 @@
                 <th>Qty.</th>
               </thead>
               <tbody>
-                <tr v-for="material in entry.materials">
+                <tr v-for="material in entry.components">
                   <td>
                     <item-icon
                       type="icon"
-                      :id="material.type_id"
+                      :id="material.ptype_id"
                       :width="32"
                     />
                   </td>
                   <td>{{ material.name }}</td>
                   <td>
-                    <format-number :value="material.quantity" />
+                    <format-number :value="material.products" />
                   </td>
                 </tr>
               </tbody>
@@ -77,7 +77,8 @@
 import { Options, Vue, prop } from 'vue-class-component';
 import { NIcon, NSkeleton, NTable } from 'naive-ui';
 import { AngleDown, AngleRight } from '@vicons/fa';
-import { ProjectId, ProjectService2, IBuildstepEntry } from '@/project/service';
+import { IBuildstepEntry, Service } from '@/project/service';
+import { ProjectId } from '@/project/project';
 
 import FormatNumber from '@/components/FormatNumber.vue';
 import ItemIcon from '@/components/ItemIcon.vue';
@@ -107,9 +108,11 @@ export default class ProjectBuildstep extends Vue.with(Props) {
   public buildsteps: IBuildstepEntry[] = [];
 
   public async created() {
-    let project = await ProjectService2.by_id(<ProjectId>this.$route.params.pid);
+    let project = await Service.by_id(<ProjectId>this.$route.params.pid);
     await project.init();
     this.buildsteps = project.buildsteps.manufacture || [];
+
+    console.log(this.buildsteps)
   }
 }
 </script>

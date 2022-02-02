@@ -1,4 +1,4 @@
-use crate::error::ServerError;
+use crate::error::Error;
 
 use hmac::{Hmac, Mac};
 use rand::prelude::*;
@@ -16,9 +16,9 @@ use sha2::Sha256;
 /// 
 /// Base64 encoded key and a base64 encoded hashed version of the key
 /// 
-pub fn generate_secure_token() -> Result<(String, String), ServerError> {
+pub fn generate_secure_token() -> Result<(String, String), Error> {
     let secret = std::env::var("SECRET_KEY")
-        .map_err(ServerError::MissingEnvSecretKey)?;
+        .map_err(Error::MissingEnvSecretKey)?;
 
     let mut rng = ChaCha20Rng::from_entropy();
     let mut key: Vec<u8> = (0..255).collect::<Vec<_>>();
@@ -26,7 +26,7 @@ pub fn generate_secure_token() -> Result<(String, String), ServerError> {
     let token = base64::encode(key.clone());
 
     let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes())
-        .map_err(ServerError::HmacInitError)?;
+        .map_err(Error::HmacInitError)?;
     mac.update(&key);
     let result = mac.finalize();
     let result = result.into_bytes();
@@ -34,17 +34,18 @@ pub fn generate_secure_token() -> Result<(String, String), ServerError> {
     Ok((token, hashed))
 }
 
+/// TODO: validate
 pub fn recreate_secure_token(
     token: String,
-) -> Result<String, ServerError> {
+) -> Result<String, Error> {
     let secret = std::env::var("SECRET_KEY")
-        .map_err(ServerError::MissingEnvSecretKey)?;
+        .map_err(Error::MissingEnvSecretKey)?;
 
     let token = base64::decode(token)
-        .map_err(ServerError::InvalidBase64)?;
+        .map_err(Error::InvalidBase64)?;
 
     let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes())
-        .map_err(ServerError::HmacInitError)?;
+        .map_err(Error::HmacInitError)?;
     mac.update(&token);
 
     let result = mac.finalize();

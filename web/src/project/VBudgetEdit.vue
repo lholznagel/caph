@@ -71,7 +71,7 @@
 <script lang="ts">
 import { Options, Vue } from 'vue-class-component';
 import { NButton, NCard, NDynamicInput, NInput, NInputNumber, NPageHeader, NSelect, NSpace, NText } from 'naive-ui';
-import { ProjectService2, IBudgetEntry, BUDGET_CATEGORIES } from '@/project/service';
+import { Service, IBudgetEntry, BUDGET_CATEGORIES } from '@/project/service';
 
 import CharacterSelector from '@/components/CharacterSelector.vue';
 
@@ -98,7 +98,7 @@ export default class AddBudgetView extends Vue {
   public entry: IBudgetEntry = <IBudgetEntry>{};
 
   public async created() {
-    this.entry = await ProjectService2.budget_entry(
+    this.entry = await Service.budget_entry(
       <string>this.$route.params.pid,
       <string>this.$route.params.bid
     );
@@ -115,7 +115,7 @@ export default class AddBudgetView extends Vue {
       .map(x => x.cost)
       .reduce((prev, curr) => (prev ? prev : 0) + (curr ? curr : 0), 0);
 
-    ProjectService2.budget_edit_entry(
+    Service.budget_edit_entry(
       <string>this.$route.params.pid,
       <string>this.$route.params.bid,
       this.entry

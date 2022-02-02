@@ -39,7 +39,7 @@
 
 <script lang="ts">
 import axios from 'axios';
-import { IProject, ProjectService2 } from './service';
+import { Service } from '@/project/service';
 import { CharacterService } from '@/services/character';
 import { Options, Vue } from 'vue-class-component';
 import { NButton, NCard, NPageHeader, NSkeleton, NSpace } from 'naive-ui';
@@ -61,12 +61,12 @@ export default class ProjectInvite extends Vue {
   public async created() {
     this.busy = true;
     this.project = (await axios.get(`/api/v1/projects/${this.$route.params.pid}/name`)).data;
-    this.owner = await CharacterService.character_name(this.project.owner);
+    this.owner = (await CharacterService.info(this.project.owner)).character;
     this.busy = false;
   }
 
   public async add_member() {
-    ProjectService2.add_member(<string>this.$route.params.pid);
+    Service.add_member(<string>this.$route.params.pid);
     this.$router.push({
       name: 'projects_overview',
       params: {

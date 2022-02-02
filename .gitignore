@@ -1,5 +1,5 @@
 .env
-/target
+target
 **/*.rs.bk
 Cargo.lock
 
@@ -10,3 +10,5 @@ node_modules
 sde_parser/output
 sde_parser/input
 sde_parser/sde
+
+terraform/.terraform

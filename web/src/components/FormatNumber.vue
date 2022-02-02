@@ -4,7 +4,7 @@
 
 <script lang="ts">
 import { Options, Vue, prop } from 'vue-class-component';
-import { formatNumber, formatTime } from '../services/formatNumber';
+import { format_date, format_number, format_time } from '@/utils';
 import { NText } from 'naive-ui';
 
 class Props {
@@ -14,6 +14,11 @@ class Props {
   });
 
   time = prop({
+    type:     Boolean,
+    required: false,
+  });
+
+  date = prop({
     type:     Boolean,
     required: false,
   });
@@ -39,9 +44,11 @@ class Props {
 export default class FormatNumber extends Vue.with(Props) {
   public format(): string {
     if (this.time) {
-      return formatTime(this.value);
+      return format_time(this.value);
+    } else if(this.date) {
+      return format_date(this.value);
     } else {
-      return formatNumber(this.value, this.withComma);
+      return format_number(this.value, this.withComma);
     }
   }
 }

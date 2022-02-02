@@ -1,5 +1,5 @@
 [profile.release]
-#codegen-units = 1
+codegen-units = 1
 debug = true
 lto = true
 opt-level = 3
@@ -7,8 +7,10 @@ panic = 'abort'
 
 [workspace]
 members = [
-  'core',
+  'appraisal',
   'connector',
   'server',
-  'sde_parser'
+  'sde_parser',
+
+  'moon_parser'
 ]

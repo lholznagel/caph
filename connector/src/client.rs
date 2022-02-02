@@ -168,7 +168,7 @@ impl EveClient {
         loop {
             if retry_counter == 3 {
                 tracing::error!("Too many retries requesting {}.", &path);
-                return Err(ConnectError::TooManyRetries(path.into()));
+                return Err(ConnectError::TooManyRetries(path));
             }
 
             let response = self.0
@@ -226,7 +226,7 @@ impl RequestClient for EveClient {
         path: &str,
     ) -> Result<T, ConnectError>
     where T: DeserializeOwned {
-        let json = self.send(&path)
+        let json = self.send(path)
             .await?
             .json::<T>()
             .await
@@ -505,9 +505,10 @@ impl EveAuthClient {
     /// use caph_connector::*;
     /// # std::env::set_var("EVE_CALLBACK", "");
     /// # std::env::set_var("EVE_CLIENT_ID", "");
+    /// # std::env::set_var("EVE_SECRET_KEY", "");
     ///
     /// let state = "my_unique_state";
-    /// let url = EveClient::auth_uri(state).unwrap();
+    /// let url = EveAuthClient::auth_uri(state, None).unwrap();
     ///
     /// // redirect user to the returned url
     /// ```
@@ -829,8 +830,30 @@ impl RequestClient for EveAuthClient {
 /// Decoded access token
 #[derive(Debug, Deserialize)]
 pub struct EveOAuthPayload {
+    /// List of all permissions that where granted
+    pub scp: Scp,
     /// User identification
     pub sub: String,
+}
+
+/// Parses the scp field in the payload
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum Scp {
+    /// The permission is a single String
+    Str(String),
+    /// The permission is a list of strings
+    StrArray(Vec<String>)
+}
+
+impl Scp {
+    /// Gets the inner string or vec of string and returns it as vec
+    pub fn into_vec(self) -> Vec<String> {
+        match self {
+            Self::Str(x)      => vec![x],
+            Self::StrArray(x) => x
+        }
+    }
 }
 
 /// Parsed version of the response from EVE after a successfull login.

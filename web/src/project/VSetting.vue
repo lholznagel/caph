@@ -64,6 +64,7 @@
               </n-button>
 
               <n-button
+                @click="show_invite = true"
                 type="info"
               >
                 Invite member
@@ -128,6 +129,11 @@
               The character will no longer have access to the project.
               Please type in 'delete' to confirm.
             </confirm-dialog>
+
+            <p-invite-modal
+              v-model:show="show_invite"
+              :pid="$route.params.pid"
+            />
           </n-card>
         </n-tab-pane>
       </n-tabs>
@@ -141,8 +147,10 @@ import { NButton, NCard, NCheckbox, NDynamicInput, NInput, NInputNumber, NSpace,
 NTabs, NSelect, NTable, NTabPane, SelectOption, NText, useMessage } from 'naive-ui';
 import { events } from '@/main';
 import { PROJECT_ROUTE } from '@/event_bus';
-import { IConfig, Project, ProjectId, ProjectService2 } from './service';
-import { AssetService } from '@/services/asset';
+import { Project } from './project';
+import { Service, IConfig } from '@/project/service';
+import { ProjectId } from '@/project/project';
+import { ItemService } from '@/services/item';
 
 import Alliance from '@/components/Alliance.vue';
 import Character from '@/components/Character.vue';
@@ -151,6 +159,7 @@ import Corporation from '@/components/Corporation.vue';
 import Resolve from '@/components/Resolve.vue';
 
 import PHeader from '@/project/CHeader.vue';
+import PInviteModal from '@/project/MInvite.vue';
 import WProject from '@/project/WProject.vue';
 
 @Options({
@@ -175,6 +184,7 @@ import WProject from '@/project/WProject.vue';
     Resolve,
 
     PHeader,
+    PInviteModal,
     WProject
   }
 })
@@ -183,6 +193,7 @@ export default class ProjectOverviewView extends Vue {
 
   public selected_member: string | undefined = '';
   public show_confirm_kick_member: boolean = false;
+  public show_invite: boolean = false;
 
   public config: IConfig  = <IConfig>{  };
   public project: Project = <Project>{  };
@@ -195,7 +206,7 @@ export default class ProjectOverviewView extends Vue {
       `projects_setting`
     );
 
-    this.buildable_items = (await AssetService.buildable_items()).map(x => {
+    this.buildable_items = (await ItemService.buildable_items()).map(x => {
       return {
         label: x.name,
         value: x.type_id
@@ -203,16 +214,16 @@ export default class ProjectOverviewView extends Vue {
     });
 
     this.config = (
-      await ProjectService2.by_id(<string>this.$route.params.pid)
+      await Service.by_id(<string>this.$route.params.pid)
     ).info;
 
-    this.project = await ProjectService2.by_id(<ProjectId>this.$route.params.pid);
+    this.project = await Service.by_id(<ProjectId>this.$route.params.pid);
     await this.project.init();
   }
 
   public async edit_project() {
     // The selector adds it as an object, we want it as an array
-    await ProjectService2.edit(
+    await Service.edit(
       <string>this.$route.params.pid,
       this.config
     );

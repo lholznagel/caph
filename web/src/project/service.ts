@@ -1,5 +1,6 @@
 import {CharacterId, GroupId, ItemGroup, ItemId, SystemId, BudgetId, TypeId, Uuid} from '@/utils';
 import axios from 'axios';
+import { Project, ProjectId } from './project';
 
 // Base path that is used for all requests
 const BASE_ADDR = '/api/v1/projects';
@@ -24,285 +25,7 @@ export const BUDGET_CATEGORIES: {
   value: 'OTHER'
 }]
 
-export class Project {
-  private load_promise: Promise<void> | null = null;
-
-  public info: IProject = <IProject>{  };
-  public raw: IMaterial[] = [];
-  public buildsteps: IBuildstep = <IBuildstep>{  };
-  public stored: IMaterial[] = [];
-  public members: IMember[] = [];
-
-  public market: Map<String, IProjectMarket[]> = new Map();
-
-  public blueprints: Blueprint[] = [];
-
-  constructor(
-    public pid: ProjectId
-  ) {
-    this.load_promise = this.by_id();
-  }
-
-  public async init(): Promise<void> {
-    return this.load_promise
-      ? this.load_promise
-      : new Promise<void>((r, _) => r());
-  }
-
-  public required_blueprints(
-    filter: 'ALL' | 'BLUEPRINTS' | 'REACTIONS'
-  ): Blueprint[] {
-    return this.blueprints
-      .filter(x => {
-        if (filter === 'BLUEPRINTS') {
-          return x.is_manufacture();
-        } else if (filter === 'REACTIONS') {
-          return x.is_reaction();
-        } else {
-          return true;
-        }
-      })
-      .sort((a, b) => a.name().localeCompare(b.name()));
-  }
-
-  public has_blueprint(
-    filter: 'BLUEPRINTS' | 'REACTIONS'
-  ): boolean {
-    return this.blueprints.find(x => {
-      if (filter === 'BLUEPRINTS') {
-        return x.is_manufacture()
-      } else if (filter === 'REACTIONS') {
-        return x.is_reaction()
-      } else {
-        return true;
-      }
-    }) !== undefined;
-  }
-
-  public stored_products(): IMaterial[] {
-    let result: IMaterial[] = [];
-
-    for (let product of this.info.products) {
-      let material = this.stored
-        .find(x => x.type_id === product.type_id);
-
-      if (!material) {
-        result.push({
-          type_id:  product.type_id,
-          name:     product.name,
-          quantity: product.count,
-          stored:   0,
-          bonus:    0,
-        });
-      } else {
-        result.push({
-          type_id:  product.type_id,
-          name:     product.name,
-          quantity: product.count,
-          stored:   material.quantity,
-          bonus:    material.material,
-        });
-      }
-    }
-
-    return result;
-  }
-
-  public required_materials(groups: ItemGroup[]): IRequiredMaterial[] {
-    if (groups.length === 0 || groups[0] === ItemGroup.All) {
-      groups = this.all_groups();
-    }
-
-    let stored = this.stored
-      .filter(x => groups.indexOf(x.group_id || 0) >= 0);
-
-    return this.raw
-      .filter(x => groups.indexOf(x.group_id || 0) >= 0)
-      .map(x => {
-        let s = stored.find(y => y.type_id === x.type_id);
-        let s_count = s ? s.quantity : 0;
-
-        return {
-          type_id:  x.type_id,
-          name:     x.name,
-          quantity: x.quantity,
-          group_id: x.group_id,
-          stored:   s_count,
-          bonus:    x.material
-        };
-      });
-  }
-
-  public all_groups(): ItemGroup[] {
-    return [
-      ItemGroup.Minerals,
-      ItemGroup.Ice,
-      ItemGroup.Moon,
-      ItemGroup.Gas,
-      ItemGroup.Salvage,
-      ItemGroup.PI0Solid,
-      ItemGroup.PI0Liquid,
-      ItemGroup.PI0Organic,
-      ItemGroup.PI1,
-      ItemGroup.PI2,
-      ItemGroup.PI3,
-      ItemGroup.PI4,
-    ];
-  }
-
-  public market_info(
-    filter: 'BUY' | 'SELL',
-    sid:    SystemId
-  ): IProjectMarket[] {
-    return this.market.get(filter + sid) || [];
-  }
-
-  public market_total_min(
-    filter: 'BUY' | 'SELL',
-    sid:    SystemId
-  ): number {
-    return (this.market.get(filter + sid) || [])
-      .map(x => x.a_min)
-      .reduce((acc, x) => acc += x, 0);
-  }
-
-  public market_total_avg(
-    filter: 'BUY' | 'SELL',
-    sid:    SystemId
-  ): number {
-    return (this.market.get(filter + sid) || [])
-      .map(x => x.a_avg)
-      .reduce((acc, x) => acc += x, 0);
-  }
-
-  public market_total_max(
-    filter: 'BUY' | 'SELL',
-    sid:    SystemId
-  ): number {
-    return (this.market.get(filter + sid) || [])
-      .map(x => x.a_max)
-      .reduce((acc, x) => acc += x, 0);
-  }
-
-  public async kick_member(cid: number) {
-    await axios.delete(`${BASE_ADDR}/${this.pid}/members/${cid}`)
-    this.members = (await axios.get(`${BASE_ADDR}/${this.pid}/members`)).data;
-  }
-
-  private async by_id(): Promise<void> {
-    let sid = 30000142; // Jita
-
-    // TODO: refactor
-    await axios.get(`${BASE_ADDR}/${this.pid}`)
-      .then(x => this.info = x.data)
-      .then(_ => axios.get(`${BASE_ADDR}/${this.pid}/materials/stored`))
-      .then(x => this.stored = x.data)
-      .then(_ => axios.get(`${BASE_ADDR}/${this.pid}/materials/raw`))
-      .then(x => this.raw = x.data)
-      .then(_ => axios.get(`${BASE_ADDR}/${this.pid}/buildsteps`))
-      .then(x => this.buildsteps = x.data)
-      .then(_ => axios.get(`${BASE_ADDR}/${this.pid}/members`))
-      .then(x => this.members = x.data)
-      .then(_ => ProjectService2.market_buy(this.pid, sid))
-      .then(x => this.market.set('BUY' + sid, x))
-      .then(_ => ProjectService2.market_sell(this.pid, sid))
-      .then(x => this.market.set('SELL' + sid, x))
-
-    let blueprint_info = (await axios.get(`${BASE_ADDR}/${this.pid}/blueprints/info`)).data;
-    this.blueprints = (await axios.get(`${BASE_ADDR}/${this.pid}/blueprints/required`))
-      .data
-      .map((x: IBlueprint) => {
-        let info = blueprint_info
-          .find((x: IBlueprintInfo) => x.type_id === x.type_id);
-        return new Blueprint(x, info);
-      });
-
-    /*await Promise.all([
-      info,
-      stored,
-      raw,
-      buildsteps,
-      members,
-      buy,
-      sell
-    ])
-    .then(_ => console.log('Loaded shit \'n stuff'));*/
-
-    this.load_promise = null;
-    return;
-  }
-}
-
-export class Blueprint {
-  constructor(
-    public blueprint: IBlueprint,
-    public info:      IBlueprintInfo | undefined
-  ){  }
-
-  public name(): string {
-    return this.blueprint.name;
-  }
-
-  public type_id(): number {
-    return this.blueprint.type_id;
-  }
-
-  public iters(): number {
-    return this.blueprint.iters;
-  }
-
-  public is_manufacture(): boolean {
-    return this.blueprint.is_manufacture;
-  }
-
-  public is_reaction(): boolean {
-    return this.blueprint.is_reaction;
-  }
-
-  public typ(): string {
-    if (this.info) {
-      if (this.info.original === null || this.info.original) {
-        return 'bp';
-      } else {
-        return 'bpc';
-      }
-    } else {
-      return 'bp';
-    }
-  }
-
-  public runs(): string | number {
-    if (this.info && this.info.original) {
-      return '∞';
-    } else if (this.info && !this.info.original) {
-      return this.info.runs;
-    } else {
-      return '';
-    }
-  }
-
-  public material_eff(): string | number {
-    if (this.info) {
-      return this.info.material_eff;
-    } else {
-      return '';
-    }
-  }
-
-  public time_eff(): string | number {
-    if (this.info) {
-      return this.info.time_eff;
-    } else {
-      return '';
-    }
-  }
-
-  public is_stored(): boolean {
-    return this.info ? true : false;
-  }
-}
-
-export class ProjectService2 {
+export class Service {
   public static cache: Map<string, Project> = new Map();
 
   // Gets a specific project by its id.
@@ -369,10 +92,6 @@ export class ProjectService2 {
     return (await axios.get(`${BASE_ADDR}/${pid}/market/${sid}/sell`)).data;
   }
 
-  public static async budget_entries(pid: string): Promise<IBudgetEntry[]> {
-    return (await axios.get(`${BASE_ADDR}/${pid}/budget`)).data;
-  }
-
   public static async budget_entry(
     pid: string,
     bid: string
@@ -380,14 +99,10 @@ export class ProjectService2 {
     return (await axios.get(`${BASE_ADDR}/${pid}/budget/${bid}`)).data;
   }
 
-  public static async budget_add_entry(pid: string, data: IAddBudgetEntry): Promise<void> {
-    return (await axios.post(`${BASE_ADDR}/${pid}/budget`, data));
-  }
-
   public static async budget_edit_entry(
     pid: string,
     bid: string,
-    data: IAddBudgetEntry
+    data: any
   ): Promise<void> {
 
     return (
@@ -395,20 +110,58 @@ export class ProjectService2 {
     );
   }
 
-  public static async budget_remove_entry(pid: string, tid: BudgetId): Promise<void> {
-    return await axios.delete(`${BASE_ADDR}/${pid}/budget/${tid}`);
+  public static async add_member(pid: string): Promise<void> {
+    return await axios.post(`${BASE_ADDR}/${pid}/members`);
   }
 
-   public static async add_member(pid: string): Promise<void> {
-     return await axios.post(`${BASE_ADDR}/${pid}/members`);
-   }
+  public static async stored(pid: ProjectId): Promise<IStorageEntry[]> {
+    return (await axios.get(`${BASE_ADDR}/${pid}/storage`)).data;
+  }
+
+  public static async storage_by_id(pid: ProjectId, tid: number): Promise<IStorageEntry> {
+    return (await axios.get(`${BASE_ADDR}/${pid}/storage/${tid}`)).data;
+  }
+
+  public static async modify(pid: ProjectId, entries: IModify[], mode: string): Promise<IStorageEntry[]> {
+    return await axios.put(`${BASE_ADDR}/${pid}/storage`, { mode, entries});
+  }
+
+  public static async set_storage(pid: ProjectId, modify: IModify[]): Promise<IStorageEntry[]> {
+    return await axios.post(`${BASE_ADDR}/${pid}/storage`, modify);
+  }
+
+  public static async blueprints_import(pid: ProjectId): Promise<any> {
+    return await axios.put(`${BASE_ADDR}/${pid}/blueprints/import`)
+  }
 }
 
-export type ProjectId   = Uuid;
 export type TemplateId  = Uuid;
 
+export interface IDependency {
+  // Name of the product
+  name:              string;
+  // [TypeId] of the product
+  ptype_id:          TypeId;
+  // [GroupId] of the project
+  group_id:          GroupId;
+  // Number of products to produce
+  products:          number;
+  // Base requirements for building a single run
+  products_base:     number;
+  // Quantity that is produced with each iteration
+  products_per_run:  number;
+  // Time it takes to run one production cycle
+  time_per_run:      number;
+
+  // Materials that are required to build this component
+  materials:         IDependency[];
+
+  // Added by us, number of stored materials
+  stored?:           number;
+}
+
 export interface IProject {
-  project:             ProjectId;
+  project:             any;
   name:                string;
   owner:               CharacterId;
   products:            IProduct[];
@@ -488,12 +241,6 @@ export interface IBudgetEntry {
   created_at:  number;
 }
 
-export interface IAddBudgetEntry {
-  character:   number;
-  amount:      number;
-  description: string;
-}
-
 export interface IRequiredMaterial {
   type_id:  TypeId;
   name:     string;
@@ -534,4 +281,24 @@ export interface IMember {
   corporation_name: string,
   alliance_id?:     number,
   alliance_name?:   string,
+}
+
+export interface IModify {
+  type_id:  TypeId;
+  quantity: number;
+
+  runs?:    number;
+  me?:      number;
+  te?:      number;
+}
+
+export interface IStorageEntry {
+  type_id:  TypeId;
+  group_id: GroupId;
+  quantity: number;
+  name:     string;
+
+  runs?:    number;
+  me?:      number;
+  te?:      number;
 }

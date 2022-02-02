@@ -1,16 +1,14 @@
-use crate::{ConnectError, EveAuthClient, RequestClient};
-use crate::{AllianceId, CharacterId, CorporationId, LocationId, ItemId, TypeId, StationId, JobId};
+use crate::{ConnectError, EveAuthClient, RequestClient, EveClient};
+use crate::{AllianceId, CharacterId, CorporationId, LocationId, ItemId, TypeId};
 use serde::{Deserialize, Serialize};
 
 /// Wrapper for character
-pub struct ConnectCharacterService<'a> {
-    /// Client for communicating with the EVE-API
-    client: &'a EveAuthClient,
+pub struct ConnectCharacterService {
     /// Character id this client belongs to
     cid:    CharacterId,
 }
 
-impl<'a> ConnectCharacterService<'a> {
+impl ConnectCharacterService {
 
     /// Creates a new instance of the service
     ///
@@ -24,11 +22,9 @@ impl<'a> ConnectCharacterService<'a> {
     /// New instance
     ///
     pub fn new(
-        client: &'a EveAuthClient,
-        cid:    CharacterId,
+        cid: CharacterId,
     ) -> Self {
         Self {
-            client,
             cid,
         }
     }
@@ -45,10 +41,10 @@ impl<'a> ConnectCharacterService<'a> {
     ///
     pub async fn info(
         &self,
+        client: &EveClient
     ) -> Result<CharacterInfo, ConnectError> {
         let path = format!("latest/characters/{}/", self.cid);
-        self
-            .client
+        client
             .fetch::<CharacterInfo>(&path)
             .await
             .map_err(Into::into)
@@ -66,7 +62,8 @@ impl<'a> ConnectCharacterService<'a> {
     ///
     pub async fn alliance_name(
         &self,
-        aid: AllianceId,
+        client: &EveClient,
+        aid:    AllianceId,
     ) -> Result<String, ConnectError> {
         /// Temporary struct for deserializing
         #[derive(Deserialize)]
@@ -76,8 +73,7 @@ impl<'a> ConnectCharacterService<'a> {
         }
 
         let path = format!("latest/alliances/{}", aid);
-        self
-            .client
+        client
             .fetch::<Alliance>(&path)
             .await
             .map(|x| x.name)
@@ -96,7 +92,8 @@ impl<'a> ConnectCharacterService<'a> {
     ///
     pub async fn corporation_name(
         &self,
-        cid: CorporationId,
+        client: &EveClient,
+        cid:    CorporationId,
     ) -> Result<String, ConnectError> {
         /// Temporary struct for deserializing
         #[derive(Deserialize)]
@@ -106,11 +103,53 @@ impl<'a> ConnectCharacterService<'a> {
         }
 
         let path = format!("latest/corporations/{}", cid);
-        self
-            .client
+        client
             .fetch::<Corp>(&path)
             .await
             .map(|x| x.name)
+            .map_err(Into::into)
+    }
+
+    /// Gets all blueprints the character owns
+    ///
+    /// # Errors
+    ///
+    /// Fails when the server returns an error or parsing the response fails
+    ///
+    /// # Returns
+    ///
+    /// List of Blueprints
+    ///
+    pub async fn blueprints(
+        &self,
+        client: &EveAuthClient,
+    ) -> Result<Vec<BlueprintEntry>, ConnectError> {
+        let path = format!("latest/characters/{}/blueprints", self.cid);
+        client
+            .fetch_page::<BlueprintEntry>(&path)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Gets all blueprints the character owns
+    ///
+    /// # Errors
+    ///
+    /// Fails when the server returns an error or parsing the response fails
+    ///
+    /// # Returns
+    ///
+    /// List of Blueprints
+    ///
+    pub async fn corporation_blueprints(
+        &self,
+        client: &EveAuthClient,
+        cid:    CorporationId
+    ) -> Result<Vec<BlueprintEntry>, ConnectError> {
+        let path = format!("latest/corporations/{}/blueprints", cid);
+        client
+            .fetch_page::<BlueprintEntry>(&path)
+            .await
             .map_err(Into::into)
     }
 }
@@ -126,33 +165,9 @@ pub struct CharacterInfo {
     pub name:           String,
 }
 
-/// Represents a single character asset
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-pub struct CharacterAssetEntry {
-    /// Unique ID of the asset
-    pub item_id:       ItemId,
-    /// Id of the location the asset is located in
-    pub location_id:   LocationId,
-    /// Location of the item
-    pub location_flag: String,
-    /// Number of assets
-    pub quantity:      i32,
-    /// Type id of the asset
-    pub type_id:       TypeId,
-}
-
-/// Name of an asset that belongs to an character
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct CharacterAssetName {
-    /// Id of the asset
-    pub item_id: ItemId,
-    /// Name of the asset
-    pub name:    String,
-}
-
 /// Represents a single character blueprint
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct CharacterBlueprintEntry {
+pub struct BlueprintEntry {
     /// Unique ID of the asset
     pub item_id:             ItemId,
     /// Id of the location the asset is located in
@@ -170,31 +185,4 @@ pub struct CharacterBlueprintEntry {
     pub runs:                i32,
     /// Type id of the asset
     pub type_id:             TypeId,
-}
-
-/// Represents a single industry job
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct IndustryJob {
-    /// Activity of the job
-    #[serde(rename = "activity_id")]
-    pub activity:    i32,
-    /// TypeId of the blueprint that is used
-    #[serde(rename = "blueprint_type_id")]
-    pub type_id:      TypeId,
-    /// Date the character started the job
-    #[serde(rename = "start_date")]
-    pub start_date:   String,
-    /// Date when the job is done
-    #[serde(rename = "end_date")]
-    pub end_date:     String,
-    /// Character id of the character that installed the job
-    #[serde(rename = "installer_id")]
-    pub character_id: CharacterId,
-    /// Id of the station the job was started
-    #[serde(alias = "location_id")]
-    #[serde(rename = "station_id")]
-    pub station_id:   StationId,
-    /// Unique id of the job
-    #[serde(rename = "job_id")]
-    pub job_id:       JobId,
 }

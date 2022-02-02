@@ -7,7 +7,6 @@
 <script lang="ts">
 import { Options, Vue } from 'vue-class-component';
 import { NCard } from 'naive-ui';
-import { drawMinimalSystemInfo, MapNode } from '@/services/map';
 
 const compose = <T>(init: (x: T) => T, ...f: Array<(x: T) => T>) => f.reduceRight((prev, next) => value => prev(next(value)), init);
 const pipe = <T>(init: (x: T) => T, ...f: Array<(x: T) => T>) => f.reduce((prev, next) => value => next(prev(value)), init);

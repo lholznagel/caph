@@ -60,84 +60,12 @@ pub fn run() -> Result<String, Box<dyn std::error::Error>> {
 /// String containing the SQL-Query.
 ///
 fn sql_header() -> String {
-    r#"
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
-DROP TABLE IF EXISTS blueprint_raw                    CASCADE;
-DROP TABLE IF EXISTS blueprint_manufacture            CASCADE;
-DROP TABLE IF EXISTS blueprint_manufacture_components CASCADE;
-DROP TABLE IF EXISTS blueprint_inventions             CASCADE;
-DROP TABLE IF EXISTS blueprint_research               CASCADE;
-DROP TABLE IF EXISTS blueprint_materials              CASCADE;
-
-CREATE TABLE blueprint_raw(
-    bp_id    UUID    NOT NULL, -- Unique id
-
-    btype_id INTEGER NOT NULL, -- Blueprint Type Id
-    ptype_id INTEGER NOT NULL, -- Product Type Id
-
-    quantity BIGINT  NOT NULL, -- Quantity that is produced with each run
-
-    PRIMARY KEY (bp_id)
-);
-
-CREATE TABLE blueprint_manufacture (
-    bp_id    UUID    NOT NULL, -- Unique id
-
-    btype_id INTEGER NOT NULL, -- Blueprint TypeId
-    ptype_id INTEGER NOT NULL, -- Product TypeId
-
-    time     INTEGER NOT NULL, -- Time it takes to produce a single unit
-
-    reaction BOOLEAN NOT NULL, -- Determines if this is a reaction
-
-    quantity BIGINT  NOT NULL, -- Quantity that is produced with each run
-
-    PRIMARY KEY (bp_id)
-);
-
-CREATE TABLE blueprint_manufacture_components (
-    bp_id    UUID    NOT NULL, -- Unique id
-
-    btype_id INTEGER NOT NULL, -- Blueprint TypeId
-    ptype_id INTEGER NOT NULL, -- Product TypeId
-
-    quantity BIGINT  NOT NULL, -- Quantity that is produced with each run
-
-    PRIMARY KEY (bp_id)
-);
-
-CREATE TABLE blueprint_inventions (
-    bp_id       UUID    NOT NULL, -- Unqiue id
-
-    btype_id    INTEGER NOT NULL, -- Blueprint TypeId
-    ptype_id    INTEGER NOT NULL, -- Product TypeId
-    itype_id    INTEGER NOT NULL, -- Blueprint TypeId of the invention
-    ttype_id    INTEGER NOT NULL, -- Tier 1 product TypeId
-
-    time        INTEGER NOT NULL, -- Time it takes to invent
-    probability FLOAT   NOT NULL, -- Probability that the invention works
-
-    PRIMARY KEY (bp_id)
-);
-
-CREATE TABLE blueprint_research (
-    btype_id INTEGER NOT NULL, -- Blueprint TypeId
-    ptype_id INTEGER NOT NULL, -- Product TypeId
-
-    material INTEGER NOT NULL, -- Material efficiency time
-    time     INTEGER NOT NULL, -- Time efficiency time
-    copy     INTEGER NOT NULL, -- Copy time
-
-    PRIMARY KEY (btype_id, ptype_id)
-);
-
-CREATE TABLE blueprint_materials (
-    bp_id    UUID    NOT NULL, -- Unqiue id that references to either blueprint_manufacture or blueprint_inventions
-    mtype_id INTEGER NOT NULL, -- Material TypeId
-    produces INTEGER NOT NULL, -- Quantity that is prodiuced by the process
-    quantity BIGINT  NOT NULL  -- Required quantity
-);"#.into()
+    r#"DELETE FROM blueprint_raw                    CASCADE;
+DELETE FROM blueprint_manufacture            CASCADE;
+DELETE FROM blueprint_manufacture_components CASCADE;
+DELETE FROM blueprint_inventions             CASCADE;
+DELETE FROM blueprint_research               CASCADE;
+DELETE FROM blueprint_materials              CASCADE;"#.into()
 }
 
 /// Generates the SQL-Code for inserting all blueprint research entries.
@@ -206,6 +134,12 @@ INSERT INTO blueprint_research VALUES {};",
     )
 }
 
+/// Generates a SQL-Query containing all blueprints
+/// 
+/// # Returns
+/// 
+/// String containing the value-tuple
+/// 
 fn sql_manufacture(
     blueprints: &HashMap<TypeId, Blueprint>,
 ) -> String {
@@ -222,11 +156,14 @@ fn sql_manufacture(
             let quantity = e.quantity;
             let mtype_id = e.type_id;
             let produces = entry.product_quantity().unwrap_or_default();
+            let time = entry.manufacture_time().unwrap_or_default();
+
             let bpm = BlueprintMaterial {
                 bp_id,
                 quantity,
                 mtype_id,
-                produces
+                produces,
+                time
             };
             compounds
                 .entry(e.type_id)
@@ -276,6 +213,12 @@ INSERT INTO blueprint_materials VALUES {};",
     )
 }
 
+/// Generates a SQL-Query containing all blueprints components
+/// 
+/// # Returns
+/// 
+/// String containing the value-tuple
+/// 
 fn sql_manufacture_components(
     blueprints: &HashMap<TypeId, Blueprint>,
     products:   &HashMap<TypeId, Blueprint>,
@@ -306,11 +249,14 @@ fn sql_manufacture_components(
             let quantity = e.quantity;
             let mtype_id = e.type_id;
             let produces = product.product_quantity().unwrap_or_default();
+            let time = product.manufacture_time().unwrap_or_default();
+
             let bpm = BlueprintMaterial {
                 bp_id,
                 quantity,
                 mtype_id,
-                produces
+                produces,
+                time
             };
             compounds
                 .entry(e.type_id)
@@ -422,12 +368,14 @@ fn sql_invention(bps: &HashMap<TypeId, Blueprint>) -> String {
                 let quantity = i.quantity;
                 let mtype_id = i.type_id;
                 let produces = entry.product_quantity().unwrap_or_default();
+                let time = entry.manufacture_time().unwrap_or_default();
 
                 let material = BlueprintMaterial {
                     bp_id,
                     quantity,
                     mtype_id,
-                    produces
+                    produces,
+                    time
                 };
                 materials.push(material.into_sql());
             }
@@ -493,12 +441,14 @@ fn sql_raw(
             let quantity = raw.quantity;
             let mtype_id = raw.type_id;
             let produces = bp.product_quantity().unwrap_or_default();
+            let time = bp.manufacture_time().unwrap_or_default();
 
             materials.push(BlueprintMaterial {
                 bp_id,
                 quantity,
                 mtype_id,
-                produces
+                produces,
+                time
             }.into_sql());
         }
     }
@@ -703,7 +653,9 @@ struct BlueprintMaterial {
     /// TypeId of the material
     mtype_id: TypeId,
     /// Quantity that is produced by the product
-    produces: i32
+    produces: i32,
+    /// Time to research time efficiency
+    time:     i32,
 }
 
 impl BlueprintMaterial {
@@ -715,10 +667,11 @@ impl BlueprintMaterial {
     ///
     pub fn into_sql(self) -> String {
         format!(
-            "('{}', {}, {}, {})",
+            "('{}', {}, {}, {}, {})",
             self.bp_id,
             self.mtype_id,
             self.produces,
+            self.time,
             self.quantity,
         )
     }

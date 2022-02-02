@@ -31,16 +31,20 @@ import { NDropdown, NIcon, NInput, NSelect } from 'naive-ui';
 import { Search } from '@vicons/fa';
 import { VNode } from 'vue';
 
-import Owner from './Owner.vue';
-
 class Props {
   filters = prop({
     type: Object,
     required: true
   });
+
   options = prop({
     type: Object,
     required: true
+  });
+
+  entries = prop({
+    type:     Array,
+    required: true,
   });
 }
 
@@ -52,7 +56,6 @@ class Props {
     NSelect,
 
     Search,
-    Owner
   }
 })
 export default class Filter extends Vue.with(Props) {
@@ -62,6 +65,8 @@ export default class Filter extends Vue.with(Props) {
   public filterOptions: any     = [];
   public filterOptionsOrig: any = [];
   public showOptions: boolean   = false;
+
+  public entries_orig = this.entries;
 
   public created() {
     for (let key of Object.keys(this.options)) {
@@ -73,6 +78,11 @@ export default class Filter extends Vue.with(Props) {
     }
 
     this.filterOptionsOrig = this.filterOptions;
+
+    this.$watch(() => this.filters, () => {
+      console.log('asdasdasd')
+      this.filter_entries();
+    }, { deep: true });
   }
 
   public filterSelected(key: string) {
@@ -99,13 +109,14 @@ export default class Filter extends Vue.with(Props) {
       }
     } else {
       this.filters[this.selectedKey] = key;
+      this.filter_entries();
       this.reset();
     }
   }
 
   public handleKeydown(event: any) {
     if (event.keyCode === 8) {
-      if (this.search.indexOf(':') === -1) {
+      if (this.selectedKey && this.search.indexOf(':') === -1) {
         this.reset();
       }
     } else if (!this.selectedKey && event.keyCode === 13) {
@@ -139,11 +150,43 @@ export default class Filter extends Vue.with(Props) {
       this.filterOptions = this.filterOptionsOrig;
       this.showOptions = false;
   }
+
+  private filter_entries() {
+    let entries = this.entries_orig;
+
+    for (const key in this.filters) {
+      console.log(this.filters)
+      const matcher_exact = (
+        key: string,
+        val: string,
+        entry: any
+      ) => entry[key].localeCompare(val, undefined, { sensitivity: 'accent' });
+      const matcher_fuzzy = (
+        key: string,
+        val: string,
+        entry: any
+      ) => entry[key].toLowerCase().includes(val.toLowerCase());
+      let matcher = matcher_exact;
+
+      if (this.options[key].matcher) {
+        matcher = this.options[key].matcher;
+      } else if (this.options[key].fuzzy) {
+        matcher = matcher_fuzzy;
+      }
+
+      entries = entries
+        .filter((x: any) => matcher(key, this.filters[key], x));
+    }
+
+    this.$emit('update:entries', entries);
+  }
 }
 
 export interface IFilterOption {
   label:     string;
+  fuzzy?:    boolean;
   options?:  string[] | number[];
+  matcher?: (key: string, val: string, entry: any) => boolean;
   template?: (val: string) => VNode;
 }
 </script>

@@ -19,6 +19,16 @@
                 >
                   Export
                 </n-button>
+
+                <n-button
+                  @click="$router.push({
+                    name: 'projects_storage_add_material',
+                    params: { pid: $route.params.pid }
+                  })"
+                  type="info"
+                >
+                  Add materials
+                </n-button>
               </n-space>
 
               <n-table>
@@ -35,23 +45,23 @@
                 <tbody>
                   <tr
                     v-for="entry in project.required_materials(filter.key)"
-                    :key="entry.type_id"
+                    :key="entry.ptype_id"
                   >
-                    <td><item-icon :id="entry.type_id" type="icon" /></td>
+                    <td><item-icon :id="entry.ptype_id" type="icon" /></td>
                     <td>{{ entry.name }}</td>
-                    <td><format-number :value="entry.quantity" /></td>
-                    <td><format-number :value="entry.stored || 0" /></td>
+                    <td><format-number :value="entry.products" /></td>
+                    <td><format-number :value="stored_products(entry.ptype_id)" /></td>
                     <td>
                       <format-number
-                        :value="missing_materials(entry.quantity, entry.stored)"
+                        :value="missing_materials(entry.ptype_id, entry.products)"
                       />
                     </td>
                     <td>
                       <n-progress
                         type="line"
-                        :percentage="calc_progress(entry)"
+                        :percentage="calc_progress(entry.ptype_id, entry.products)"
                         :indicator-placement="'inside'"
-                        :status="calc_progress(entry) >= 100 ? 'success' : 'default'"
+                        :status="calc_progress(entry.ptype_id, entry.products) >= 100 ? 'success' : 'default'"
                       />
                     </td>
                   </tr>
@@ -73,11 +83,12 @@
 
 <script lang="ts">
 import { Options, Vue } from 'vue-class-component';
-import { NButton, NCard, NProgress, NSpace, NTable, NTabs, NTabPane } from 'naive-ui';
+import { NButton, NCard, NProgress, NSpace, NTable, NTabs, NTabPane, NScrollbar } from 'naive-ui';
 import { events } from '@/main';
 import { PROJECT_ROUTE } from '@/event_bus';
 import { ItemGroup } from '@/utils';
-import { IRequiredMaterial } from './service';
+import { Service, IStorageEntry } from '@/project/service';
+import { ProjectId } from '@/project/project';
 
 import FormatNumber from '@/components/FormatNumber.vue';
 import ItemIcon from '@/components/ItemIcon.vue';
@@ -95,6 +106,7 @@ import WProject from '@/project/WProject.vue';
     NTable,
     NTabs,
     NTabPane,
+    NScrollbar,
 
     FormatNumber,
     ItemIcon,
@@ -106,6 +118,7 @@ import WProject from '@/project/WProject.vue';
 })
 export default class ProjectMaterialView extends Vue {
   public show_export: boolean = false;
+  public stored: IStorageEntry[] = [];
 
   public filters: { label: string, key: ItemGroup[] }[] = [{
     label: 'All',
@@ -145,15 +158,24 @@ export default class ProjectMaterialView extends Vue {
   public async created() {
     events.$emit(
       PROJECT_ROUTE,
-      `projects_raw_material`
+      this.$route.name
     );
+
+    this.stored = await Service.stored(<ProjectId>this.$route.params.pid);
   }
 
-  public calc_progress(x: IRequiredMaterial): number {
-    return Math.ceil(x.stored / (x.quantity / 100) * 100) / 100 || 0;
+  public stored_products(type_id: number): number {
+    let stored = this.stored.find(x => x.type_id === type_id);
+    return stored ? stored.quantity : 0;
   }
 
-  public missing_materials(quantity: number, stored: number): number {
+  public calc_progress(type_id: number, quantity: number): number {
+    let stored = this.stored_products(type_id);
+    return Math.ceil(stored / (quantity / 100) * 100) / 100 || 0;
+  }
+
+  public missing_materials(type_id: number, quantity: number): number {
+    let stored = this.stored_products(type_id);
     if (stored > quantity) {
       return 0;
     } else {

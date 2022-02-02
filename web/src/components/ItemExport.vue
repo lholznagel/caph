@@ -10,6 +10,13 @@
 
         <span>Copied to clipboard!</span>
       </n-tooltip>
+      <n-tooltip placement="top" trigger="click">
+        <template #trigger>
+          <n-button @click="copy_ingame">Copy ingame</n-button>
+        </template>
+
+        <span>Copied to clipboard!</span>
+      </n-tooltip>
     </n-space>
 
     <h3>CSV</h3>
@@ -24,7 +31,11 @@
         <span>Copied to clipboard!</span>
       </n-tooltip>
 
-      <n-button @click="download_csv">Download</n-button>
+      <n-button
+        @click="download_csv"
+      >
+        Download
+      </n-button>
     </n-space>
   </div>
 </template>
@@ -70,6 +81,7 @@ export default class ItemExport extends Vue.with(Props) {
   public csv:  string = '';
 
   public created() {
+    console.log(this.items)
     this.generate();
     this.$watch('items', () => this.generate(), { deep: true });
   }
@@ -80,6 +92,13 @@ export default class ItemExport extends Vue.with(Props) {
 
   public copy_list() {
     navigator.clipboard.writeText(this.list);
+  }
+
+  public copy_ingame() {
+    let a = this.items
+      .map((x: any) => `<url=showinfo:${x['type_id']}>${x['name']}</url>`)
+      .join('\n');
+    navigator.clipboard.writeText(a);
   }
 
   public download_csv() {
@@ -107,7 +126,7 @@ export default class ItemExport extends Vue.with(Props) {
     this.csv += data
       .map(x =>
         (<string[]>this.formatCsv)
-          .map((f: string) =>`${x[f]}`)
+          .map((f: string) => x[f] === undefined ? '' : x[f])
           .join(';')
       )
       .join('\n');

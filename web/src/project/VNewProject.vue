@@ -2,10 +2,16 @@
   <div>
     <n-page-header>
       <template #title>
-        <h1>
+        <h1 style="margin-bottom: 0">
           New project
         </h1>
       </template>
+
+      <p>
+        Create a new project to track your build progress, required blueprints, required materials and budget.
+        <br>
+        Start by inserting a project name and then either select one or more items to produce or copy just copy a fitting / list of items and their quantity in the field.
+      </p>
     </n-page-header>
 
     <n-card>
@@ -35,7 +41,7 @@
             </div>
           </div>
         </n-dynamic-input>
-        <resolve v-model="config.products" />
+        <resolve v-model="config.products" :buildable="true" />
       </n-space>
 
       <template #action>
@@ -65,10 +71,10 @@ import { Options, Vue } from 'vue-class-component';
 import { NButton, NCard, NDynamicInput, NInput, NInputNumber,
 NPageHeader, NSelect, NSpace, NText, SelectOption } from 'naive-ui';
 
-import {IConfig, ProjectService2} from '@/project/service';
-import {AssetService} from '@/services/asset';
+import { ItemService } from '@/services/item';
+import { Service, IConfig } from '@/project/service';
+import { TypeId } from '@/utils';
 
-import AssetSelector from '@/components/AssetSelector.vue';
 import Resolve from '@/components/Resolve.vue';
 
 @Options({
@@ -83,18 +89,19 @@ import Resolve from '@/components/Resolve.vue';
     NSpace,
     NText,
 
-    AssetSelector,
     Resolve
   }
 })
 export default class ProjectNew extends Vue {
-  public buildable_items: SelectOption[]   = [];
+  public buildable_items: SelectOption[] = [];
 
-  public config: IConfig = <IConfig>{  };
+  public config: IConfig = <IConfig>{
+    products: [this.add_item_to_produce()]
+  };
 
   public async created() {
     // TODO: replace with caching version
-    this.buildable_items = (await AssetService.buildable_items()).map(x => {
+    this.buildable_items = (await ItemService.buildable_items()).map(x => {
       return {
         label: x.name,
         value: x.type_id
@@ -104,7 +111,7 @@ export default class ProjectNew extends Vue {
 
   public async create_project() {
     // The selector adds it as an object, we want it as an array
-    let pid = await ProjectService2.create(this.config);
+    let pid = await Service.create(this.config);
     this.$router.push({
       name: 'projects_overview',
       params: {
@@ -115,7 +122,8 @@ export default class ProjectNew extends Vue {
 
   public add_item_to_produce() {
     return {
-      type_id: undefined,
+      name:    '',
+      type_id: <any>undefined,
       count:   1,
     }
   }

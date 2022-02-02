@@ -1,10 +1,10 @@
 <template>
   <w-project :pid="$route.params.pid">
-    <template v-slot="{ busy, project }">
-      <n-page-header v-if="!busy">
+    <template v-slot="{ project }">
+      <n-page-header>
         <template #title>
           <h1 style="margin-top: 10px">
-            Project "{{ project.info.name }}"
+            Project "{{ project.info.name || '' }}"
           </h1>
         </template>
       </n-page-header>

@@ -10,7 +10,7 @@
 
         <n-button
           text
-          @click="redirectLogin"
+          @click="redirect_login"
           v-if="!isLoggedIn()"
         >Login with Eve</n-button>
         <div v-if="isLoggedIn()" class="nav-header-character">
@@ -20,11 +20,10 @@
         </div>
       </n-layout-header>
 
-      <n-layout position="absolute" style="top: 64px;" :has-sider="isLoggedIn()">
+      <n-layout position="absolute" style="top: 64px;" has-sider>
         <n-layout-sider
-          :native-scrollbar="false"
           bordered
-          v-if="isLoggedIn()"
+          :native-scrollbar="false"
         >
           <n-menu
             :value="current_route"
@@ -35,26 +34,15 @@
         </n-layout-sider>
 
         <n-layout
-          content-style="padding-left: 24px; padding-right: 24px"
+          content-style="padding-left: 24px; padding-right: 24px;"
           :native-scrollbar="false"
         >
           <n-message-provider>
             <router-view
+              style="margin-bottom: 10px"
               :key="$route.fullPath"
-              v-if="isLoggedIn()"
             />
           </n-message-provider>
-
-          <n-result
-            status="403"
-            title="403 Forbidden"
-            description="Some of the doors are always close to you."
-            v-if="!isLoggedIn()"
-          >
-            <template #footer>
-              <n-button @click="redirectLogin">Login with eve</n-button>
-            </template>
-          </n-result>
         </n-layout>
       </n-layout>
     </n-layout>
@@ -62,7 +50,6 @@
 </template>
 
 <script lang="ts">
-import axios from 'axios';
 import {
   darkTheme, GlobalThemeOverrides, NAvatar, NButton, NConfigProvider, NGlobalStyle,
   NLayout, NLayoutHeader, NLayoutSider, NMenu, NMessageProvider, NResult
@@ -71,7 +58,9 @@ import { Options, Vue } from 'vue-class-component';
 import { h } from 'vue';
 import { RouterLink } from 'vue-router';
 import { events } from '@/main';
-import { ROUTE, PROJECT_ROUTE } from '@/event_bus';
+import { ROUTE_CHANGE, PROJECT_ROUTE } from '@/event_bus';
+
+import { CharacterService, ICharacter } from '@/services/character';
 
 @Options({
   components: {
@@ -107,44 +96,64 @@ export default class App extends Vue {
     },
     Tag: {
       borderRadius: '0'
+    },
+    Input: {
+      borderRadius: '0'
     }
   };
 
-  public whoami: ICharacter = DEFAULT_CHARACTER;
-
+  public whoami: ICharacter = <ICharacter>{  };
   public current_route: string = '';
-  public expand_keys: string[] = [];
 
-  public options = [{
-    label: () => h(
-      RouterLink,
-      {
-        to: {
-          name: 'projects_projects'
-        }
-      },
-      { default: () => 'Projects' }
-    ),
-    key:   'projects_projects',
-  }, {
-    label: 'Settings',
-    key:   'settings',
-    type:  'group',
-    children: [
-      this.app_link('settings_characters', 'Characters'),
-    ]
-  }];
+  public options: any = [];
 
   public async created() {
     events.$on(PROJECT_ROUTE, (e: string) => {
+      this.options = [{
+        label: () => h(
+          RouterLink,
+          {
+            to: {
+              name: 'projects_projects'
+            }
+          },
+          { default: () => 'Projects' }
+        ),
+        key:   'projects_projects',
+      }, {
+        label: 'Settings',
+        key:   'settings',
+        type:  'group',
+        children: [
+          this.app_link('settings_characters', 'Characters'),
+        ]
+      }];
+
       if (e) {
         let pid = <string>this.$route.params.pid;
         this.options[0].children = [
           this.project_link('projects_overview', 'Overview', pid),
-          this.project_link('projects_market', 'Market', pid),
           this.project_link('projects_budget', 'Budget', pid),
-          this.project_link('projects_blueprint', 'Blueprint', pid),
-          this.project_link('projects_raw_material', 'Raw Materials', pid),
+          this.project_link('projects_blueprint', 'Blueprints', pid),
+          this.project_link('projects_storage', 'Storage', pid),
+          <any>{
+            type:  'divider',
+            key:   'divider_raw_materials'
+          },
+          <any>{
+            type:  'group',
+            key:   'raw_materials',
+            label: 'Raw Materials',
+            children: [
+              this.project_link('projects_market', 'Market', pid),
+              this.project_link('projects_raw_material', 'Materials', pid),
+            ]
+          },
+          // Typescript does not like multiple types
+          <any>{
+            type: 'divider',
+            key:  'divider_buildsteps'
+          },
           this.project_link('projects_buildstep', 'Buildsteps', pid),
           this.project_link('projects_setting', 'Settings', pid),
         ];
@@ -155,17 +164,61 @@ export default class App extends Vue {
       }
     });
 
-    const res = await (axios.get<ICharacter>('/api/auth/whoami'));
-    if (res.status === 200) {
-      this.whoami = res.data;
-      let globalWindow: any = window;
-      globalWindow.whoami = res.data;
+    await CharacterService
+      .whoami()
+      .then(x => {
+        this.whoami = x;
+        (<any>window).whoami = x;
+      })
+      .catch(_ => {});
+
+    if (!this.isLoggedIn() && this.options.length === 0) {
+      this.options = [];
+    } else if(this.options.length === 0) {
+      this.options = [{
+        label: () => h(
+          RouterLink,
+          {
+            to: {
+              name: 'projects_projects'
+            }
+          },
+          { default: () => 'Projects' }
+        ),
+        key:   'projects_projects',
+      }, {
+        label: 'Settings',
+        key:   'settings',
+        type:  'group',
+        children: [
+          this.app_link('settings_characters', 'Characters'),
+        ]
+      }];
     }
 
-    events.$on(ROUTE, (e: string) => this.current_route = e);
+    events.$on(ROUTE_CHANGE, (e: string) => {this.current_route = e; console.log(e)});
   }
 
-  public app_link(to: string, name: string) {
+  public redirect_login() {
+    // TODO: Move to character seervice
+    window.location.href = `/api/v1/auth/login`;
+  }
+
+  // FIXME:
+  public isLoggedIn() {
+    // TODO: not very secure
+    return !!this.whoami.character;
+  }
+
+  public name() {
+    if (window.location.origin === 'https://dev.caph.xyz') {
+      return 'Caph DEV';
+    } else {
+      return 'Caph';
+    }
+  }
+
+  private app_link(to: string, name: string) {
     return {
       label: () =>
         h(
@@ -181,7 +234,7 @@ export default class App extends Vue {
     };
   }
 
-  public project_link(to: string, name: string, pid: string) {
+  private project_link(to: string, name: string, pid: string) {
     return {
       label: () =>
         h(
@@ -199,46 +252,6 @@ export default class App extends Vue {
       key: to,
     };
   }
-
-  public redirectLogin() {
-    window.location.href = `/api/auth/login`;
-  }
-
-  public isLoggedIn() {
-    // TODO: not very secure
-    return this.whoami.character !== '';
-  }
-
-  public name() {
-    if (window.location.origin === 'https://dev.caph.xyz') {
-      return 'Caph DEV';
-    } else {
-      return 'Caph';
-    }
-  }
-}
-
-interface ICharacter {
-  character:        string,
-  character_id:     number,
-  character_icon:   string,
-  corporation:      string,
-  corporation_icon: string,
-  corporation_id:   number,
-  alliance:         string,
-  alliance_icon:    string,
-  alliance_id:      number,
-}
-const DEFAULT_CHARACTER: ICharacter = {
-  character:        '',
-  character_id:     0,
-  character_icon:   '',
-  corporation:      '',
-  corporation_icon: '',
-  corporation_id:   0,
-  alliance:         '',
-  alliance_icon:    '',
-  alliance_id:      0,
 }
 </script>
 

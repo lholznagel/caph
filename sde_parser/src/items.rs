@@ -45,30 +45,22 @@ pub fn run() -> Result<String, Box<dyn std::error::Error>> {
     Ok(entries.join("\n"))
 }
 
-/// Generates the basic SQL-Query that is required for blueprints.
+/// Generates the basic SQL-Query that is required for items.
 ///
 /// # Returns
 ///
 /// String containing the SQL-Query.
 ///
 fn sql_header() -> String {
-    r#"
-DROP TABLE IF EXISTS items CASCADE;
-
-CREATE TABLE items(
-    type_id     INTEGER NOT NULL,
-    category_id INTEGER NOT NULL,
-    group_id    INTEGER NOT NULL,
-
-    volume      REAL    NOT NULL,
-
-    name        VARCHAR NOT NULL,
-
-    PRIMARY KEY(type_id)
-);
-"#.into()
+    r#"DELETE FROM items CASCADE;"#.into()
 }
 
+/// Generates a SQL-Query containing all game items
+/// 
+/// # Returns
+/// 
+/// String containing the value-tuple
+/// 
 fn sql_items(
     type_ids:  &HashMap<TypeId, TypeEntry>,
     group_ids: &HashMap<GroupId, GroupEntry>,
@@ -83,6 +75,7 @@ fn sql_items(
             .map(|x| x.category_id)
             .expect("Every entry should have a categroy id");
         let volume = entry.volume.unwrap_or(0f32);
+        let meta_group_id = entry.meta_group_id;
         let name = entry
             .name()
             .unwrap_or(
@@ -92,6 +85,7 @@ fn sql_items(
         let item= Item {
             type_id,
             group_id,
+            meta_group_id,
             category_id,
             volume,
             name,
@@ -108,15 +102,17 @@ fn sql_items(
 #[derive(Clone, Debug)]
 struct Item {
     /// TypeId of the item
-    type_id:     TypeId,
+    type_id:       TypeId,
     /// CategoryId of the item
-    category_id: TypeId,
+    category_id:   TypeId,
     /// GroupId of the item
-    group_id:    TypeId,
+    group_id:      TypeId,
+    /// MetaGroupId of the item
+    meta_group_id: Option<TypeId>,
     /// Volume
-    volume:      f32,
+    volume:        f32,
     /// English name of the item
-    name:        String
+    name:          String
 }
 
 impl Item {
@@ -124,8 +120,8 @@ impl Item {
     ///
     /// # Example
     ///
-    /// ```
-    /// (35834, 65, 1657, 800000.0, 'Keepstar')
+    /// ```text
+    /// (35834, 65, 1657, 1, 800000.0, 'Keepstar')
     /// ```
     ///
     /// # Returns
@@ -134,12 +130,13 @@ impl Item {
     ///
     pub fn into_sql(self) -> String {
         format!(
-            "({}, {}, {}, {}, '{}')",
+            "({}, {}, {}, {}, {}, '{}')",
             self.type_id,
             self.category_id,
             self.group_id,
+            self.meta_group_id.map_or("NULL".into(), |x| format!("{}", x)),
             self.volume,
-            self.name.replace("'", "''")
+            self.name.replace('\'', "''")
         )
     }
 }
@@ -153,6 +150,9 @@ pub struct TypeEntry {
     /// Name of the item in different languages
     #[serde(rename = "name")]
     pub name:                     HashMap<String, String>,
+    /// ID of the group this type belongs to
+    #[serde(rename = "metaGroupID")]
+    pub meta_group_id:            Option<GroupId>,
     /// Volume of the type
     #[serde(rename = "volume")]
     pub volume:                   Option<f32>,

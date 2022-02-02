@@ -28,6 +28,7 @@ class Props {
     type: Object,
     required: true
   });
+
   options = prop({
     type: Object,
     required: true

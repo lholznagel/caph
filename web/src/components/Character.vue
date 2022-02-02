@@ -5,9 +5,8 @@
       :src="getCharacterPortrait()"
       width="32"
       height="32"
-      v-if="!onlyText"
     />
-    <span v-if="withText || onlyText" style="">
+    <span v-if="withText" style="">
       {{ name || id }}
     </span>
   </n-space>
@@ -29,12 +28,17 @@ class Props {
     type: Boolean,
     required: false,
   });
-  onlyText = prop({
-    type: Boolean,
-    required: false,
-  });
 }
 
+/// Example usage:
+///
+/// ```
+/// <!-- This will show only the character portrait -->
+/// <character :id="character.cid">
+///
+/// <!-- This will add the character portrait and the name besides it -->
+/// <character :id="character.cid" with-text>
+/// ```
 @Options({
   components: {
     NAvatar,
@@ -50,8 +54,7 @@ export default class Character extends Vue.with(Props) {
   }
 
   public async loadName() {
-    const name = await CharacterService.character_name(this.id);
-    this.name = name;
+    this.name = (await CharacterService.info(this.id)).character;
   }
 
   public getCharacterPortrait(): string {

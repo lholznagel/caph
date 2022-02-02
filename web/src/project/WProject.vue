@@ -1,25 +1,24 @@
 <template>
   <div>
-    <n-empty
+    <loading
       description="Getting things ready"
-      size="large"
-      style="margin-top: 10%"
-      v-if="busy"
-    >
-      <template #icon>
-        <n-spin size="large" />
-      </template>
-    </n-empty>
+      :busy=busy
+    />
 
-    <slot v-if="!busy" :busy="busy" :project="project">
+    <slot v-if="!busy"
+      :busy="busy || project.busy"
+      :project="project"
+    >
     </slot>
   </div>
 </template>
 
 <script lang="ts">
 import { Options, Vue, prop } from 'vue-class-component';
-import { NEmpty, NSpin } from 'naive-ui';
-import { Project, ProjectId, ProjectService2 } from '@/project/service';
+import { Service } from '@/project/service';
+import { Project, ProjectId } from './project';
+
+import Loading from '@/components/Loading.vue';
 
 class Props {
   // Project id
@@ -31,8 +30,7 @@ class Props {
 
 @Options({
   components: {
-    NEmpty,
-    NSpin
+    Loading
   }
 })
 export default class ProjectWrapper extends Vue.with(Props) {
@@ -43,7 +41,7 @@ export default class ProjectWrapper extends Vue.with(Props) {
   public async created() {
     this.busy = true;
 
-    this.project = await ProjectService2.by_id(<ProjectId>this.$route.params.pid);
+    this.project = await Service.by_id(<ProjectId>this.pid);
     await this.project.init();
 
     this.busy = false;

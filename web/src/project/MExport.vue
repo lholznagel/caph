@@ -17,7 +17,12 @@
 
       <template #action>
         <n-space justify="end">
-          <n-button @click="close">Close</n-button>
+          <n-button
+            @click="close"
+            quaternary
+          >
+            Close
+          </n-button>
         </n-space>
       </template>
     </n-card>

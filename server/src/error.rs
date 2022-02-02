@@ -5,11 +5,14 @@ use axum::response::IntoResponse;
 use hmac::digest::InvalidLength;
 use serde_json::json;
 use std::env::VarError;
-use std::error::Error;
 use std::fmt;
 
+// TODO: Rename to Error
 #[derive(Debug)]
-pub enum ServerError {
+pub enum Error {
+    /// Contains all errors that can come from the appraisal library
+    AppraisalError(appraisal::Error),
+
     SerdeJsonError(serde_json::Error),
     Database(sqlx::Error),
     DatabaseError(sqlx::Error),
@@ -35,53 +38,44 @@ pub enum ServerError {
 
     FromReqestError(axum::extract::rejection::ExtensionRejection),
 
-    CaphCoreProject(caph_core::ProjectError),
-    CaphCoreMarket(caph_core::MarketError),
-
     MissingEnvSecretKey(VarError),
     HmacInitError(InvalidLength),
     InvalidBase64(base64::DecodeError)
 }
 
-impl Error for ServerError {}
+impl std::error::Error for Error {}
 
-impl From<caph_core::ProjectError> for ServerError {
-    fn from(x: caph_core::ProjectError) -> Self {
-        Self::CaphCoreProject(x)
-    }
-}
-
-impl From<serde_json::Error> for ServerError {
+impl From<serde_json::Error> for Error {
     fn from(e: serde_json::Error) -> Self {
         Self::SerdeJsonError(e)
     }
 }
 
-impl From<sqlx::Error> for ServerError {
+impl From<sqlx::Error> for Error {
     fn from(e: sqlx::Error) -> Self {
         Self::DatabaseError(e)
     }
 }
 
-impl From<caph_connector::ConnectError> for ServerError {
+impl From<caph_connector::ConnectError> for Error {
     fn from(e: caph_connector::ConnectError) -> Self {
         Self::ConnectError(e)
     }
 }
 
-impl fmt::Display for ServerError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl IntoResponse for ServerError {
+impl IntoResponse for Error {
     fn into_response(self) -> axum::http::Response<BoxBody> {
         let (status, msg) = match self {
-            ServerError::BadRequest   => (StatusCode::BAD_REQUEST, "Bad Request"),
-            ServerError::InvalidUser  => (StatusCode::FORBIDDEN, "Forbidden"),
-            ServerError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized"),
-            ServerError::NotFound     => (StatusCode::NOT_FOUND, "Requested entry not found"),
+            Error::BadRequest   => (StatusCode::BAD_REQUEST, "Bad Request"),
+            Error::InvalidUser  => (StatusCode::FORBIDDEN, "Forbidden"),
+            Error::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized"),
+            Error::NotFound     => (StatusCode::NOT_FOUND, "Requested entry not found"),
             _ => {
                 tracing::error!("Error {:?}", self);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
@@ -94,14 +88,4 @@ impl IntoResponse for ServerError {
 
         (status, body).into_response()
     }
-}
-
-/// Utility function for mapping any error into a `500 Internal Server Error`
-/// response.
-#[deprecated]
-pub fn internal_error<E>(err: E) -> (StatusCode, String)
-where
-    E: std::error::Error,
-{
-    (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
 }

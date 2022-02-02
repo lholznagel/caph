@@ -10,7 +10,7 @@
 <script lang="ts">
 import { NInput } from 'naive-ui';
 import { Options, prop, Vue } from 'vue-class-component';
-import { AssetService } from '@/services/asset';
+import { ItemService } from '@/services/item';
 
 class Props {
   modelValue = prop({
@@ -18,6 +18,11 @@ class Props {
     default:  [],
     required: true
   });
+
+  buildable = prop({
+    type:    Boolean,
+    default: false
+  })
 }
 
 @Options({
@@ -31,9 +36,6 @@ export default class Resolve extends Vue.with(Props) {
 
   public value: IResolve[] = [];
 
-  public created() {
-  }
-
   // Debounces the user input for 500 milliseconds
   // After the debounce the given function is executed
   public debounce(fnc: () => void): void {
@@ -42,9 +44,7 @@ export default class Resolve extends Vue.with(Props) {
   }
 
   public async resolve() {
-    if (!this.items) {
-      return;
-    }
+    if (!this.items) { return; }
 
     let val_idx: Map<string, number>= new Map();
     let splitted = this.items
@@ -52,7 +52,7 @@ export default class Resolve extends Vue.with(Props) {
       .filter(x => x !== '');
 
     for (let split of splitted) {
-      let count = 1;
+      let quantity = 1;
       let name = split;
 
       let header_rgx_match = split.match(/\[([a-bA-Z].*),/);
@@ -60,36 +60,37 @@ export default class Resolve extends Vue.with(Props) {
         name = header_rgx_match[1];
       }
 
-      let rgx_match = split.match(/ x([0-9]+)/);
+      let rgx_match = split.match(/ ?x?([0-9]+)/);
       if (rgx_match) {
-        count = Number(rgx_match[1]);
-        name  = name.replace(/ x([0-9]+)/, '');
+        quantity = Number(rgx_match[1]);
+        name  = name.replace(/ ?x?([0-9]+)/, '');
       }
+      name = (name.match(/([a-zA-Z]+ ?)/g) || ['Unknown']).join('');
 
       if (val_idx.get(name)) {
         let idx = val_idx.get(name) || 0;
-        this.value[idx].count += count;
+        this.value[idx].quantity += quantity;
       } else {
         let idx = this.value.length;
         val_idx.set(name, idx);
         this.value[idx] = {
           name,
-          count,
+          quantity,
           type_id: 0
         }
       }
     }
 
-    let ids: any[] = await AssetService.resolve_id_from_name_bulk(
+    let ids: any[] = await (<any>ItemService).resolve_id_from_name_bulk(
       this.value.map(x => x.name),
-      { has_blueprint: true }
+      { is_buildable: this.buildable }
     );
 
     for (let id of ids) {
       let idx = val_idx.get(id.name) || 0;
       let entry = this.value[idx];
       this.value[idx] = {
-        count:   entry.count,
+        quantity:   entry.quantity,
         name:    entry.name,
         type_id: id.type_id
       };
@@ -102,8 +103,8 @@ export default class Resolve extends Vue.with(Props) {
 }
 
 export interface IResolve {
-  name:    string;
-  count:   number;
-  type_id: number;
+  name:     string;
+  quantity: number;
+  type_id:  number;
 }
 </script>

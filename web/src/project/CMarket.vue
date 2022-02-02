@@ -54,7 +54,7 @@
 import { Options, Vue, prop } from 'vue-class-component';
 import { NButton, NCard, NInput, NInputNumber, NModal, NSkeleton, NSpace,
 NTable, NPageHeader, NStatistic, NGrid, NGridItem } from 'naive-ui';
-import { IProjectMarket, ProjectService } from '@/project/service';
+import { IProjectMarket, Service } from '@/project/service';
 
 import FormatNumber from '@/components/FormatNumber.vue';
 import ItemIcon from '@/components/ItemIcon.vue';
@@ -116,13 +116,13 @@ export default class ProjectMarket extends Vue.with(Props) {
 
     if (this.isSell) {
       // TODO: refactor when we have a reload button
-      this.market_entries = await ProjectService.market_sell(
+      this.market_entries = await Service.market_sell(
         this.pid,
         this.sid
       );
     } else {
       // TODO: refactor when we have a reload button
-      this.market_entries = await ProjectService.market_buy(
+      this.market_entries = await Service.market_buy(
         this.pid,
         this.sid
       );
