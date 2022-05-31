@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Wrapper for character
 pub struct ConnectCharacterService {
     /// Character id this client belongs to
-    cid:    CharacterId,
+    cid: CharacterId,
 }
 
 impl ConnectCharacterService {
@@ -141,6 +141,7 @@ impl ConnectCharacterService {
     ///
     /// List of Blueprints
     ///
+    #[deprecated(note = "Use CorporationService::bluerprints")]
     pub async fn corporation_blueprints(
         &self,
         client: &EveAuthClient,

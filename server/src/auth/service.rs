@@ -13,7 +13,9 @@ const EVE_DEFAULT_SCOPE: &[&str] = &[
 ];
 
 const EVE_CORPORATION_SCOPE: &[&str] = &[
-    "esi-corporations.read_blueprints.v1"
+    "esi-corporations.read_blueprints.v1",
+    "esi-wallet.read_corporation_wallets.v1",
+    "esi-assets.read_corporation_assets.v1"
 ];
 
 /// Handles authentication and authorisation.

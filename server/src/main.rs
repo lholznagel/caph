@@ -57,6 +57,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         dependency_cache
     );
 
+    let moon_service = MoonService::new(
+        pool.clone()
+    );
+
     let app = Router::new()
         .nest(
             "/api/v1",
@@ -65,6 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .nest("/character", crate::CharacterApi::router())
                 .nest("/items", crate::ItemApi::router())
                 .nest("/projects", crate::ProjectApi::router())
+                .nest("/moons", crate::moon::router())
         )
         .layer(Extension(auth_service))
         .layer(Extension(character_service))
@@ -72,6 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(Extension(project_service))
         .layer(Extension(project_blueprint_service))
         .layer(Extension(project_storage_service))
+        .layer(Extension(moon_service))
         .layer(Extension(pool))
         .into_make_service();
 

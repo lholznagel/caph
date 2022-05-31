@@ -27,6 +27,8 @@
 
 /// Module for handling characters
 mod character;
+/// Module for handling corporations
+mod corporation;
 /// Module containing clients to the EVE-API
 mod client;
 /// Module containing possible errors
@@ -37,9 +39,11 @@ mod macros;
 /// Collects all services under one import
 pub mod services {
     pub use crate::character::ConnectCharacterService;
+    pub use crate::corporation::CorporationService;
 }
 
 pub use self::character::*;
+pub use self::corporation::*;
 pub use self::client::*;
 pub use self::error::*;
 
