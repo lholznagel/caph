@@ -70,14 +70,6 @@ const routes: Array<RouteRecordRaw> = [
     )
   },
   {
-    path: '/projects/:pid/blueprint/:bid',
-    name: 'projects_blueprint_edit',
-    component: () => import(
-      /* webpackChunkName: "projects_blueprint_edit" */
-      '@/project/_BlueprintEdit.vue'
-    )
-  },
-  {
     path: '/projects/:pid/material/raw',
     name: 'projects_raw_material',
     component: () => import(

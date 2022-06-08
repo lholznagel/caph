@@ -1,7 +1,7 @@
 //! Creates the SQL-Code for blueprints
 use crate::FOLDER_INPUT;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use std::collections::{HashMap, VecDeque};
 use std::fs::File;
@@ -43,11 +43,12 @@ pub fn run() -> Result<String, Box<dyn std::error::Error>> {
 
     let entries = vec![
         sql_header(),
-        sql_manufacture(&blueprints),
-        sql_manufacture_components(&blueprints, &products),
-        sql_research(&blueprints),
-        sql_invention(&blueprints),
-        sql_raw(&blueprints, &products),
+        //sql_manufacture(&blueprints),
+        //sql_manufacture_components(&blueprints, &products),
+        //sql_research(&blueprints),
+        //sql_invention(&blueprints),
+        //sql_raw(&blueprints, &products),
+        sql_json(&blueprints, &products),
     ];
 
     Ok(entries.join("\n"))
@@ -65,7 +66,8 @@ DELETE FROM blueprint_manufacture            CASCADE;
 DELETE FROM blueprint_manufacture_components CASCADE;
 DELETE FROM blueprint_inventions             CASCADE;
 DELETE FROM blueprint_research               CASCADE;
-DELETE FROM blueprint_materials              CASCADE;"#.into()
+DELETE FROM blueprint_materials              CASCADE;
+DELETE FROM blueprint_json                   CASCADE;"#.into()
 }
 
 /// Generates the SQL-Code for inserting all blueprint research entries.
@@ -143,11 +145,23 @@ INSERT INTO blueprint_research VALUES {};",
 fn sql_manufacture(
     blueprints: &HashMap<TypeId, Blueprint>,
 ) -> String {
+    let excluded_type_ids = vec![
+        2738, 2742, 2743, 2744, 2745, 2746, 2747, 2748, 2749, 2751, 2753, 2754,
+        2756, 2758, 2760, 2762, 2764, 2765, 2766, 2767, 2768, 2769, 2770, 2771,
+        2772, 2773, 2786, 2788, 2789, 2790, 2791, 2793, 2795, 2797, 2800, 2820,
+        2821, 21943, 21944, 21945, 21946, 28605, 32800, 32802, 32804, 33515,
+        33582, 33584, 33868, 34222, 42134, 42135,
+    ];
+
     let mut bps       = Vec::new();
     let mut materials = Vec::new();
 
     for (btype_id, entry) in blueprints {
         let bp_id = Uuid::new_v4();
+
+        if excluded_type_ids.contains(btype_id) {
+            continue;
+        }
 
         let mut queue     = VecDeque::from(entry.materials());
         let mut compounds = HashMap::new();
@@ -229,8 +243,8 @@ fn sql_manufacture_components(
     for (btype_id, entry) in blueprints {
         let bp_id = Uuid::new_v4();
 
-        let mut queue     = VecDeque::from(entry.materials());
-        let mut compounds = HashMap::new();
+        let mut queue      = VecDeque::from(entry.materials());
+        let mut components = HashMap::new();
 
         while let Some(e) = queue.pop_front() {
             let product = if let Some(x) = products.get(&e.type_id) {
@@ -258,17 +272,17 @@ fn sql_manufacture_components(
                 produces,
                 time
             };
-            compounds
+            components
                 .entry(e.type_id)
                 .and_modify(|x: &mut BlueprintMaterial| x.quantity += bpm.quantity)
                 .or_insert(bpm);
         }
 
-        let compounds = compounds
+        let components = components
             .into_iter()
             .map(|(_, x)| x.into_sql())
             .collect::<Vec<_>>();
-        materials.extend(compounds);
+        materials.extend(components);
 
         let btype_id = *btype_id;
         let ptype_id = if let Some(x) = entry.product() {
@@ -458,6 +472,54 @@ INSERT INTO blueprint_raw VALUES {};
 INSERT INTO blueprint_materials VALUES {};",
         entries.join(", "),
         materials.join(", ")
+    )
+}
+
+/// Generates the SQL-Code for inserting all raw entries that are required for
+/// a blueprint or reaction.
+///
+/// # Params
+///
+/// * `bps` -> Map of the parsed `blueprint.yaml` file
+///
+/// # Returns
+///
+/// String containing the SQL-Query.
+///
+fn sql_json(
+    blueprints: &HashMap<TypeId, Blueprint>,
+    products:   &HashMap<TypeId, Blueprint>,
+) -> String {
+    #[derive(Clone, Debug, Serialize)]
+    enum DependencyType {
+        Blueprint,
+        Reaction,
+
+        Material,
+    }
+    #[derive(Clone, Debug, Serialize)]
+    struct Dependency {
+        btype_id:          TypeId,
+        ptype_id:          TypeId,
+        time:              u32,
+        quantity:          u32,
+        typ:               DependencyType,
+        components:        Vec<Dependency>,
+    }
+
+    let mut entries: Vec<String> = Vec::new();
+
+    for (btype_id, bentry) in blueprints {
+        if *btype_id != 461600 {
+            continue;
+        }
+    }
+
+    dbg!(products.get(&30305));
+
+    format!(
+        "INSERT INTO blueprint_json VALUES {};",
+        entries.join(", "),
     )
 }
 

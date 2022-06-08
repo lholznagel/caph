@@ -1,7 +1,7 @@
-use crate::AuthService;
+use crate::{AuthService, EVE_DEFAULT_SCOPE};
 use crate::error::Error;
 
-use caph_connector::{AllianceId, CharacterId, ConnectCharacterService, CorporationId, EveAuthClient, BlueprintEntry, EveClient, TypeId};
+use caph_connector::{AllianceId, CharacterId, ConnectCharacterService, CorporationId, EveAuthClient, BlueprintEntry, EveClient, TypeId, CorporationService};
 use serde::Serialize;
 use sqlx::PgPool;
 
@@ -161,9 +161,9 @@ impl CharacterService {
                 .await?;
 
             let client = EveAuthClient::new(refresh_token)?;
-            let character_service = ConnectCharacterService::new(char_id);
-            let corporation_bps = character_service
-                .corporation_blueprints(&client, corp_id)
+            let corporation_service = CorporationService::new(corp_id);
+            let corporation_bps = corporation_service
+                .blueprints(&client)
                 .await?;
             blueprints.extend(corporation_bps);
         }
@@ -207,19 +207,21 @@ impl CharacterService {
         &self,
         cid: CharacterId,
     ) -> Result<Option<Character>, Error> {
-        let character = sqlx::query!("
+        // FIXME: esi_tokens must be set as NOT NULL in SQL
+        let character = sqlx::query!(r#"
                 SELECT
                     c.alliance_id,
                     c.alliance_name,
                     c.character_id,
                     c.character_name,
                     c.corporation_id,
-                    c.corporation_name
+                    c.corporation_name,
+                    c.esi_tokens       AS "esi_tokens!"
                 FROM logins l
                 JOIN characters c
                 ON l.character_id = c.character_id
                 WHERE c.character_id = $1;
-            ", *cid as i32)
+            "#, *cid as i32)
             .fetch_optional(&self.pool)
             .await?;
 
@@ -231,6 +233,7 @@ impl CharacterService {
                 x.character_id.into(),
                 x.corporation_name,
                 x.corporation_id.into(),
+                x.esi_tokens
             );
             Ok(Some(character))
         } else {
@@ -295,9 +298,10 @@ impl CharacterService {
                     alliance_id, alliance_name,
                     character_id, character_name,
                     corporation_id, corporation_name,
-                    character_main
+                    character_main,
+                    esi_tokens
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 ON CONFLICT (character_id)
                 DO UPDATE SET
                     alliance_id      = $1,
@@ -311,7 +315,8 @@ impl CharacterService {
             character.character,
             *character.corporation_id as i32,
             character.corporation,
-            main.map(|x| *x as i32)
+            main.map(|x| *x as i32),
+            &character.esi_tokens,
         )
         .execute(&self.pool)
         .await
@@ -353,7 +358,11 @@ impl CharacterService {
             character.name,
             cid,
             corporation,
-            coid
+            coid,
+            EVE_DEFAULT_SCOPE
+                .into_iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
         ))
     }
 }
@@ -370,6 +379,7 @@ pub struct Character {
     pub corporation:      String,
     pub corporation_icon: String,
     pub corporation_id:   CorporationId,
+    pub esi_tokens:       Vec<String>
 }
 
 impl Character {
@@ -379,7 +389,8 @@ impl Character {
         character:      String,
         character_id:   CharacterId,
         corporation:    String,
-        corporation_id: CorporationId
+        corporation_id: CorporationId,
+        esi_tokens:     Vec<String>
     ) -> Self {
         let alliance_icon = if let Some(x) = alliance_id {
             Some(format!("https://images.evetech.net/alliances/{}/logo?size=1024", x))
@@ -403,6 +414,7 @@ impl Character {
                 "https://images.evetech.net/corporations/{}/logo?size=1024",
                 corporation_id
             ),
+            esi_tokens
         }
     }
 }

@@ -10,6 +10,7 @@
           <template #icon>
             <n-icon><refresh /></n-icon>
           </template>
+          Refresh
         </n-button>
 
         <slot name="additional" />

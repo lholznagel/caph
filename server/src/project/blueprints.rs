@@ -4,7 +4,7 @@ use crate::{ProjectId, Error, CharacterService};
 use caph_connector::{TypeId, GroupId, CharacterId};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use super::dependency::Dependency;
 
@@ -168,7 +168,6 @@ impl ProjectBlueprintService {
     /// 
     /// Nothing.
     /// 
-    /// 
     pub async fn set(
         &self,
         pid:   ProjectId,
@@ -252,7 +251,7 @@ impl ProjectBlueprintService {
         let corporation_bps = self.character.corporation_blueprints(cid).await?;
         character_bps.extend(corporation_bps);
 
-        let required_bps = self.required(pid, buildsteps).await?;
+        let required_bps = self.required(buildsteps).await?;
 
         let mut res = HashMap::new();
 
@@ -305,14 +304,37 @@ impl ProjectBlueprintService {
     /// # Returns
     ///
     /// List of all blueprints that are required for the project.
-    /// TODO: review, blueprint_flat and blueprint_material are deprecated
-    /// TODO: it should probably use the pid
+    /// 
     pub async fn required(
         &self,
-        _pid:       ProjectId,
-        buildsteps: Vec<Dependency>
+        dependencies: Vec<Dependency>
     ) -> Result<Vec<Blueprint>, Error> {
-        let steps = buildsteps
+        /*let mut required_blueprints = HashMap::new();
+        let mut queue = VecDeque::from(dependencies);
+
+        while let Some(x) = queue.pop_front() {
+            if x.dependency_type.is_material() {
+                continue;
+            }
+
+            let blueprint = Blueprint {
+                type_id:        x.btype_id.into(),
+                name:           x.blueprint_name.clone(),
+                is_stored:      false,
+                is_blueprint:   x.dependency_type.is_blueprint(),
+                is_reaction:    x.dependency_type.is_reaction(),
+                iters:          x.runs()
+            };
+
+            required_blueprints
+                .entry(x.btype_id)
+                .and_modify(|x: &mut Blueprint| x.iters += blueprint.iters)
+                .or_insert(blueprint);
+
+            queue.extend(x.components);
+        }*/
+
+        let steps = dependencies
             .iter()
             .map(|x| x
                     .collect_ptype_ids()
@@ -343,11 +365,12 @@ impl ProjectBlueprintService {
                 type_id:        x.btype_id.into(),
                 name:           x.name,
                 is_stored:      false,
-                is_manufacture: !x.reaction,
+                is_blueprint:   !x.reaction,
                 is_reaction:    x.reaction,
                 iters:          0
             })
             .collect::<Vec<_>>();
+
         Ok(bps)
     }
 }
@@ -390,15 +413,15 @@ pub struct BlueprintStorageEntry {
 #[derive(Clone, Debug, Serialize)]
 pub struct Blueprint {
     /// [TypeId] of the blueprint
-    pub type_id:       TypeId,
+    pub type_id:      TypeId,
     /// Name of the blueprint
-    pub name:           String,
-    /// True if the blueprint is a reaction blueprint
-    pub is_reaction:    bool,
+    pub name:         String,
     /// True if the blueprint is a manufacture blueprint
-    pub is_manufacture: bool,
+    pub is_blueprint: bool,
+    /// True if the blueprint is a reaction blueprint
+    pub is_reaction:  bool,
     /// True if the blueprint is stored
-    pub is_stored:      bool,
+    pub is_stored:    bool,
     /// Number of blueprint iterations needed
-    pub iters:          i32,
+    pub iters:        u32,
 }

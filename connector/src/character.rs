@@ -1,5 +1,5 @@
-use crate::{ConnectError, EveAuthClient, RequestClient, EveClient};
-use crate::{AllianceId, CharacterId, CorporationId, LocationId, ItemId, TypeId};
+use crate::{ConnectError, EveAuthClient, RequestClient, EveClient, AssetEntry, BlueprintEntry};
+use crate::{AllianceId, CharacterId, CorporationId};
 use serde::{Deserialize, Serialize};
 
 /// Wrapper for character
@@ -110,6 +110,27 @@ impl ConnectCharacterService {
             .map_err(Into::into)
     }
 
+    /// Gets all assets the character owns
+    ///
+    /// # Errors
+    ///
+    /// Fails when the server returns an error or parsing the response fails
+    ///
+    /// # Returns
+    ///
+    /// List of assets
+    ///
+    pub async fn assets(
+        &self,
+        client: &EveAuthClient,
+    ) -> Result<Vec<AssetEntry>, ConnectError> {
+        let path = format!("latest/characters/{}/assets", self.cid);
+        client
+            .fetch_page::<AssetEntry>(&path)
+            .await
+            .map_err(Into::into)
+    }
+
     /// Gets all blueprints the character owns
     ///
     /// # Errors
@@ -164,26 +185,4 @@ pub struct CharacterInfo {
     pub corporation_id: CorporationId,
     /// Name of the character
     pub name:           String,
-}
-
-/// Represents a single character blueprint
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct BlueprintEntry {
-    /// Unique ID of the asset
-    pub item_id:             ItemId,
-    /// Id of the location the asset is located in
-    pub location_id:         LocationId,
-    /// Material efficiency of the blueprint, max 10
-    pub material_efficiency: i32,
-    /// Time efficiency of the blueprint, max 20
-    pub time_efficiency:     i32,
-    /// A range of numbers with a minimum of -2 and no maximum value where -1
-    /// is an original and -2 is a copy. It can be a positive integer if it is
-    /// a stack of blueprint originals fresh from the market (e.g. no 
-    /// activities performed on them yet).
-    pub quantity:            i32,
-    /// Number of runs remaining if the blueprint is a copy, -1 if it is an original
-    pub runs:                i32,
-    /// Type id of the asset
-    pub type_id:             TypeId,
 }

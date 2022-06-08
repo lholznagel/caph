@@ -7,15 +7,15 @@ use sqlx::PgPool;
 use tracing::instrument;
 use serde::Deserialize;
 
-const EVE_DEFAULT_SCOPE: &[&str] = &[
+pub const EVE_DEFAULT_SCOPE: &[&str] = &[
     "publicData",
-    "esi-characters.read_blueprints.v1"
+    "esi-assets.read_assets.v1",
+    "esi-characters.read_blueprints.v1",
 ];
 
-const EVE_CORPORATION_SCOPE: &[&str] = &[
+pub const EVE_CORPORATION_SCOPE: &[&str] = &[
+    "esi-assets.read_corporation_assets.v1",
     "esi-corporations.read_blueprints.v1",
-    "esi-wallet.read_corporation_wallets.v1",
-    "esi-assets.read_corporation_assets.v1"
 ];
 
 /// Handles authentication and authorisation.
@@ -84,7 +84,7 @@ impl AuthService {
     /// This function is for login in a user without any activated features, it
     /// therefore only requires the most basic permissions.
     /// 
-    /// For extending a users permissions the function [AuthService::xyz] FIXME:
+    /// For extending a users permissions the function [AuthService::add_scope]
     /// must be used.
     /// 
     /// # Errors
@@ -196,16 +196,16 @@ impl AuthService {
         &self,
         cid: CharacterId
     ) -> Result<Vec<CharacterId>, Error> {
-        let mut alts = sqlx::query!("
-                SELECT DISTINCT character_id
+        let mut alts = sqlx::query!(r#"
+                SELECT DISTINCT character_id AS "character_id!"
                 FROM logins
                 WHERE character_main = $1 AND character_id IS NOT NULL
-            ", *cid as i32)
+            "#, *cid as i32)
             .fetch_all(&self.pool)
             .await?
             .into_iter()
             .map(|x| x.character_id)
-            .map(|x| x.unwrap().into())
+            .map(|x| x.into())
             .collect::<Vec<CharacterId>>();
         alts.push(cid);
         Ok(alts)

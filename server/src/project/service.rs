@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use tracing::instrument;
 use uuid::Uuid;
 
-use crate::{Error, ProjectBlueprintService, Blueprint};
+use crate::{Error, ProjectBlueprintService, Blueprint, project::dependency::DependencyGroup};
 use super::dependency::{DependencyCache, Dependency};
 
 /// An id of a tracking entry
@@ -130,9 +130,8 @@ impl ProjectService {
         let buildsteps = self.buildsteps(pid).await?;
         let members = self.members(pid).await?;
         let market = self.market_price(pid).await?;
-        //let market = AppraisalInformation { sell_price:0f32, split_price: 0f32, buy_price: 0f32, items: Vec::new(), code: None, uri: None };
         let steps = self.buildstep_manufacturing(pid).await?;
-        let bp_required = self.blueprint.required(pid, steps).await?;
+        let bp_required = self.blueprint.required(steps).await?;
 
         Ok(GodProject {
             info,
@@ -548,24 +547,52 @@ impl ProjectService {
                 );
 
                 dependency.set_product_quantity(x.count as i64);
-                dependency.apply_material_bonus(&bp_bonus);
-                dependency.apply_material_bonus(&structure_bonus);
+                //dependency.apply_material_bonus(&bp_bonus);
+                //dependency.apply_material_bonus(&structure_bonus);
                 dependency
             })
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>();
+
+        //let mut group = DependencyGroup::from_dependencies(dependencies);
+        //let dependencies = group.sort();
+
+        //let mut dependency_group = DependencyGroup::from_dependencies(dependencies);
+        //let dependencies = dependency_group.sort();
+        //let components = dependency_group.collect_components();
+
+        let dependencies = dependencies
             .into_iter()
             .map(|x| x.collect_components())
+            .collect::<Vec<_>>();
+        let mut dependencies = dependencies
+            .into_iter()
             .reduce(|mut acc, e| {
                 acc.merge(e);
                 acc
             })
-            .unwrap_or_default()
-            .build_order();
+            .unwrap_or_default();
 
-        /*let dependencies = dependencies
-            .values()
-            .cloned()
-            .collect::<Vec<_>>();*/
+        let old = dependencies.clone();
+        dependencies.recalculate();
+        dependencies.fix(old);
+
+        let dependencies = dependencies.sort();
+
+        #[derive(Debug, serde::Serialize)]
+        struct Temp {
+            name: String,
+            quantity: i64
+        }
+        //let xyz: std::collections::HashMap<TypeId, Temp> = dependencies.clone()
+        let xyz = dependencies.clone()
+            .into_iter()
+            .map(|x| (x.ptype_id, x))
+            .collect::<HashMap<_, _>>();
+
+        use std::fs::File;
+        let mut file = File::create("dependencies.json").unwrap();
+        serde_json::to_writer_pretty(&mut file, &xyz).unwrap();
+
         Ok(dependencies)
     }
 
@@ -1407,4 +1434,67 @@ pub struct Member {
     pub alliance_id:      Option<AllianceId>,
     /// Name of the alliance
     pub alliance_name:    Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use caph_connector::TypeId;
+    use sqlx::postgres::PgPoolOptions;
+    use std::str::FromStr;
+
+    use crate::{AuthService, CharacterService};
+    use super::*;
+
+    #[tokio::test]
+    async fn what_da_fuck() {
+        dotenv::dotenv().ok();
+        let pg_addr = std::env::var("DATABASE_URL")
+            .expect("Expected that a DATABASE_URL ENV is set");
+        let pool = PgPoolOptions::new()
+            .max_connections(10)
+            .connect(&pg_addr)
+            .await
+            .unwrap();
+
+        let cache = DependencyCache::new(pool.clone()).await.unwrap();
+        let auth_service = AuthService::new(pool.clone());
+        let character_service = CharacterService::new(pool.clone(), auth_service);
+        let bp_service = ProjectBlueprintService::new(pool.clone(), character_service);
+
+        let service = ProjectService::new(pool, bp_service, cache);
+        let xyz = service
+            .buildstep_manufacturing(Uuid::from_str("b555b8e9-5957-4441-b850-33d33f88f234").unwrap())
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|x| (x.ptype_id, x))
+            .collect::<HashMap<_, _>>();
+
+        assert_eq!(xyz.get(&TypeId(30303)).unwrap().products, 1875);
+        assert_eq!(xyz.get(&TypeId(30303)).unwrap().components[1].products, 10);
+        assert_eq!(xyz.get(&TypeId(30304)).unwrap().products, 525);
+        assert_eq!(xyz.get(&TypeId(30304)).unwrap().components[1].products, 15);
+        assert_eq!(xyz.get(&TypeId(30305)).unwrap().products, 1125);
+        assert_eq!(xyz.get(&TypeId(30305)).unwrap().components[1].products, 50);
+        assert_eq!(xyz.get(&TypeId(30306)).unwrap().products, 525);
+        assert_eq!(xyz.get(&TypeId(30306)).unwrap().components[1].products, 20);
+        assert_eq!(xyz.get(&TypeId(30307)).unwrap().products, 525);
+        assert_eq!(xyz.get(&TypeId(30307)).unwrap().components[1].products, 25);
+        assert_eq!(xyz.get(&TypeId(30308)).unwrap().products, 375);
+        assert_eq!(xyz.get(&TypeId(30308)).unwrap().components[1].products, 15);
+        assert_eq!(xyz.get(&TypeId(30308)).unwrap().products, 375);
+        assert_eq!(xyz.get(&TypeId(30308)).unwrap().components[1].products, 15);
+        assert_eq!(xyz.get(&TypeId(57457)).unwrap().products, 45170);
+        assert_eq!(xyz.get(&TypeId(57457)).unwrap().components[0].products, 45200);
+        assert_eq!(xyz.get(&TypeId(57457)).unwrap().components[1].products, 226);
+        assert_eq!(xyz.get(&TypeId(57457)).unwrap().components[2].products, 45200);
+        assert_eq!(xyz.get(&TypeId(57453)).unwrap().products, 45200);
+        assert_eq!(xyz.get(&TypeId(57453)).unwrap().components[0].products, 1130);
+        assert_eq!(xyz.get(&TypeId(57455)).unwrap().products, 45200);
+        assert_eq!(xyz.get(&TypeId(57455)).unwrap().components[0].products, 1130);
+        assert_eq!(xyz.get(&TypeId(57454)).unwrap().products, 402);
+        assert_eq!(xyz.get(&TypeId(57454)).unwrap().components[0].products, 205);
+        assert_eq!(xyz.get(&TypeId(16659)).unwrap().products, 35300);
+        assert_eq!(xyz.get(&TypeId(16659)).unwrap().components[0].products, 885);
+    }
 }

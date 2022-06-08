@@ -61,3 +61,44 @@ eve_id!(StationId,     i64);
 eve_id!(SystemId,      i64);
 eve_id!(TypeId,        i32);
 eve_id!(RegionId,      i32);
+
+/// Represents an asset
+#[derive(Debug, Deserialize)]
+pub struct AssetEntry {
+    /// Unique Id of the item
+    pub item_id:           ItemId,
+    /// Flag of the location, eg. MedSlot6, Deliveries, Wallet
+    pub location_flag:     String,
+    /// Either a id of a structurte, container or ship
+    pub location_id:       LocationId,
+    /// Stored quantity
+    pub quantity:          u32,
+    /// [TypeId] of the item
+    pub type_id:           TypeId,
+
+    /// True if the item is a copy
+    #[serde(default)]
+    pub is_blueprint_copy: bool,
+}
+
+/// Represents a single character blueprint
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct BlueprintEntry {
+    /// Unique ID of the asset
+    pub item_id:             ItemId,
+    /// Id of the location the asset is located in
+    pub location_id:         LocationId,
+    /// Material efficiency of the blueprint, max 10
+    pub material_efficiency: i32,
+    /// Time efficiency of the blueprint, max 20
+    pub time_efficiency:     i32,
+    /// A range of numbers with a minimum of -2 and no maximum value where -1
+    /// is an original and -2 is a copy. It can be a positive integer if it is
+    /// a stack of blueprint originals fresh from the market (e.g. no 
+    /// activities performed on them yet).
+    pub quantity:            i32,
+    /// Number of runs remaining if the blueprint is a copy, -1 if it is an original
+    pub runs:                i32,
+    /// Type id of the asset
+    pub type_id:             TypeId,
+}

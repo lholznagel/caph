@@ -220,7 +220,7 @@ impl ProjectApi {
             .await?;
 
         service
-            .required(pid, buildsteps)
+            .required(buildsteps)
             .await
             .map(Json)
             .map_err(Into::into)

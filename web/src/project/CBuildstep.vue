@@ -111,8 +111,6 @@ export default class ProjectBuildstep extends Vue.with(Props) {
     let project = await Service.by_id(<ProjectId>this.$route.params.pid);
     await project.init();
     this.buildsteps = project.buildsteps.manufacture || [];
-
-    console.log(this.buildsteps)
   }
 }
 </script>

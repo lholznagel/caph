@@ -1,6 +1,6 @@
 use caph_connector::TypeId;
 
-use super::Dependency;
+use super::{Dependency, DependencyType};
 
 pub fn dependency(
     name:       String,
@@ -10,6 +10,8 @@ pub fn dependency(
 ) -> Dependency {
     Dependency {
         name:             name,
+        blueprint_name:   "".into(),
+        btype_id:         0.into(),
         ptype_id:         ptype_id,
         category_id:      0.into(),
         group_id:         0.into(),
@@ -18,6 +20,7 @@ pub fn dependency(
         products_per_run: 1i64,
         time:             1i64,
         time_per_run:     1i64,
+        dependency_type:  DependencyType::Material,
         components:       components,
     }
 }
@@ -28,6 +31,8 @@ pub fn fuel_block(
 ) -> Dependency {
     let mut isotope = Dependency {
         name:             "".into(),
+        blueprint_name:   "".into(),
+        btype_id:         0.into(),
         ptype_id:         0.into(),
         category_id:      4.into(),
         group_id:         423.into(),
@@ -36,6 +41,7 @@ pub fn fuel_block(
         products_base:    450i64,
         time:             0i64,
         time_per_run:     0i64,
+        dependency_type:  DependencyType::Material,
         components:       Vec::new()
     };
 
@@ -60,7 +66,9 @@ pub fn fuel_block(
     }
 
     let mut dep = Dependency {
-        name:             name,
+        name:             name.clone(),
+        blueprint_name:   format!("{} Blueprint", name),
+        btype_id:         0.into(),
         ptype_id:         type_id,
         category_id:      4.into(),
         group_id:         1136.into(),
@@ -69,9 +77,12 @@ pub fn fuel_block(
         products_per_run: 40,
         time:             900i64,
         time_per_run:     900i64,
+        dependency_type:  DependencyType::Blueprint,
         components:       vec![
             Dependency {
                 name:             "Enriched Uranium".into(),
+                blueprint_name:   "".into(),
+                btype_id:         0.into(),
                 ptype_id:         44.into(),
                 category_id:      43.into(),
                 group_id:         1034.into(),
@@ -80,10 +91,13 @@ pub fn fuel_block(
                 products_base:    4i64,
                 time:             0i64,
                 time_per_run:     0i64,
+                dependency_type:  DependencyType::Material,
                 components:       Vec::new()
             },
             Dependency {
                 name:             "Oxygen".into(),
+                blueprint_name:   "".into(),
+                btype_id:         0.into(),
                 ptype_id:         3683.into(),
                 category_id:      43.into(),
                 group_id:         1042.into(),
@@ -92,10 +106,13 @@ pub fn fuel_block(
                 products_base:    22i64,
                 time:             0i64,
                 time_per_run:     0i64,
+                dependency_type:  DependencyType::Material,
                 components:       Vec::new()
             },
             Dependency {
                 name:             "Mechanical Parts".into(),
+                blueprint_name:   "".into(),
+                btype_id:         0.into(),
                 ptype_id:         3689.into(),
                 category_id:      43.into(),
                 group_id:         1034.into(),
@@ -104,10 +121,13 @@ pub fn fuel_block(
                 products_base:    4i64,
                 time:             0i64,
                 time_per_run:     0i64,
+                dependency_type:  DependencyType::Material,
                 components:       Vec::new()
             },
             Dependency {
                 name:             "Coolant".into(),
+                blueprint_name:   "".into(),
+                btype_id:         0.into(),
                 ptype_id:         9832.into(),
                 category_id:      43.into(),
                 group_id:         1034.into(),
@@ -116,10 +136,13 @@ pub fn fuel_block(
                 products_base:    9i64,
                 time:             0i64,
                 time_per_run:     0i64,
+                dependency_type:  DependencyType::Material,
                 components:       Vec::new()
             },
             Dependency {
                 name:             "Robotics".into(),
+                blueprint_name:   "".into(),
+                btype_id:         0.into(),
                 ptype_id:         9848.into(),
                 category_id:      43.into(),
                 group_id:         1040.into(),
@@ -128,10 +151,13 @@ pub fn fuel_block(
                 products_base:    1i64,
                 time:             0i64,
                 time_per_run:     0i64,
+                dependency_type:  DependencyType::Material,
                 components:       Vec::new()
             },
             Dependency {
                 name:             "Heavy Water".into(),
+                blueprint_name:   "".into(),
+                btype_id:         0.into(),
                 ptype_id:         16272.into(),
                 category_id:      4.into(),
                 group_id:         423.into(),
@@ -140,10 +166,13 @@ pub fn fuel_block(
                 products_base:    170i64,
                 time:             0i64,
                 time_per_run:     0i64,
+                dependency_type:  DependencyType::Material,
                 components:       Vec::new()
             },
             Dependency {
                 name:             "Liquid Ozone".into(),
+                blueprint_name:   "".into(),
+                btype_id:         0.into(),
                 ptype_id:         16273.into(),
                 category_id:      4.into(),
                 group_id:         423.into(),
@@ -152,10 +181,13 @@ pub fn fuel_block(
                 products_base:    350i64,
                 time:             0i64,
                 time_per_run:     0i64,
+                dependency_type:  DependencyType::Material,
                 components:       Vec::new()
             },
             Dependency {
                 name:             "Strontium Clathrates".into(),
+                blueprint_name:   "".into(),
+                btype_id:         0.into(),
                 ptype_id:         16275.into(),
                 category_id:      4.into(),
                 group_id:         423.into(),
@@ -164,6 +196,7 @@ pub fn fuel_block(
                 products_base:    20i64,
                 time:             0i64,
                 time_per_run:     0i64,
+                dependency_type:  DependencyType::Material,
                 components:       Vec::new()
             },
             isotope

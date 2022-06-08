@@ -187,7 +187,7 @@ export default class ProjectBlueprintView extends Vue {
         options:  ['Blueprints', 'Reactions'],
         matcher: (_: string, val: string, entry: any): boolean => {
           if (val === 'Blueprints') {
-            return entry.is_manufacture;
+            return entry.is_blueprint;
           } else if (val === 'Reactions') {
             return entry.is_reaction;
           } else {

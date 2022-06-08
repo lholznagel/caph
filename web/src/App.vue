@@ -108,6 +108,8 @@ export default class App extends Vue {
   public options: any = [];
 
   public async created() {
+    events.$on(ROUTE_CHANGE, (e: string) => this.current_route = e);
+
     events.$on(PROJECT_ROUTE, (e: string) => {
       this.options = [{
         label: () => h(
@@ -195,8 +197,6 @@ export default class App extends Vue {
         ]
       }];
     }
-
-    events.$on(ROUTE_CHANGE, (e: string) => {this.current_route = e; console.log(e)});
   }
 
   public redirect_login() {

@@ -11,15 +11,19 @@ use super::{MoonService, Pull};
 
 pub fn router() -> Router {
     Router::new()
-        .route(
+        .nest(
             "/pulls",
-            get(pulls)
-                .post(create)
-        )
-        .route("
-            /pulls/:id",
-            get(pull)
-                .put(update)
+            Router::new()
+                .route(
+                    "/",
+                    get(pulls)
+                    .post(create)
+                )
+                .route(
+                    "/:id",
+                    get(pull)
+                        .put(update)
+                )
         )
 }
 

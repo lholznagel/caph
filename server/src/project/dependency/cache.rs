@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use caph_connector::TypeId;
 use sqlx::PgPool;
 
 use crate::Error;
 
-use super::Dependency;
+use super::{Dependency, DependencyType};
 
 /// Maps product [TypeId] to a dependency containing all its required materials
 #[derive(Clone, Debug)]
@@ -64,19 +64,22 @@ impl DependencyCache {
     async fn populate(
         pg: PgPool
     ) -> Result<HashMap<TypeId, Dependency>, Error> {
-        let mut entries = HashMap::new();
         // TODO: different query needed
         // Compnents have the wrong time assigned to them 
         // Example: Fullerides -> has he right time, Nitrogen Fuel blocks have the wrong -> Nitrogen materials have the right time (0)
-        
+        let mut entries = HashMap::new();
+
         sqlx::query!(r#"
                 SELECT
+                    bman.btype_id  AS "btype_id!",
                     bman.ptype_id  AS "ptype_id!",
                     bman.quantity  AS "product_quantity!",
                     bman.time      AS "product_time!",
+                    bman.reaction  AS "reaction!",
                     i.name         AS "product_name!",
                     i.category_id  AS "product_category_id!",
                     i.group_id     AS "product_group_id!",
+                    bi.name        AS "blueprint_name!",
                     bm.mtype_id    AS "mtype_id!",
                     bm.quantity    AS "material_quantity!",
                     ii.name        AS "material_name!",
@@ -87,6 +90,8 @@ impl DependencyCache {
                   ON bm.bp_id = bman.bp_id
                 JOIN items i
                   ON bman.ptype_id = i.type_id
+                JOIN items bi
+                  ON bman.btype_id = bi.type_id
                 JOIN items ii
                   ON bm.mtype_id = ii.type_id
             "#)
@@ -96,6 +101,8 @@ impl DependencyCache {
             .for_each(|x| {
                 let material = Dependency {
                     name:             x.material_name,
+                    blueprint_name:   "".into(),
+                    btype_id:         0.into(),
                     ptype_id:         x.mtype_id.into(),
                     category_id:      x.material_category_id.into(),
                     group_id:         x.material_group_id.into(),
@@ -104,6 +111,7 @@ impl DependencyCache {
                     products_per_run: 0,
                     time:             0,
                     time_per_run:     0,
+                    dependency_type:  DependencyType::Material,
                     components:       Vec::new()
                 };
 
@@ -114,6 +122,8 @@ impl DependencyCache {
                     )
                     .or_insert(Dependency {
                         name:             x.product_name,
+                        blueprint_name:   x.blueprint_name,
+                        btype_id:         x.btype_id.into(),
                         ptype_id:         x.ptype_id.into(),
                         category_id:      x.product_category_id.into(),
                         group_id:         x.product_group_id.into(),
@@ -122,6 +132,7 @@ impl DependencyCache {
                         products_per_run: x.product_quantity,
                         time:             x.product_time as i64,
                         time_per_run:     x.product_time as i64,
+                        dependency_type:  DependencyType::from_is_reaction(x.reaction),
                         components:       vec![material]
                     });
             });

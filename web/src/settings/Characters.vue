@@ -8,7 +8,12 @@
       </template>
     </n-page-header>
 
-    <n-card content-style="padding: 0">
+    <loading
+      description="Loading characters"
+      :busy=busy
+    />
+
+    <n-card content-style="padding: 0" v-if="!busy">
       <n-space justify="end" style="margin: 10px">
         <n-button
           @click="refresh"
@@ -32,12 +37,11 @@
         </n-button>
       </n-space>
 
-      <n-skeleton text v-if="busy" :repeat="5" />
-
       <n-table v-if="!busy">
         <thead>
           <tr>
-            <th width="10px"></th>
+            <th width="24"></th>
+            <th width="34px"></th>
             <th width="40px"></th>
             <th width="500px">Name</th>
             <th width="40px"></th>
@@ -47,41 +51,73 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="character in characters" :key="character.character_id">
-            <td>
-              <n-checkbox
-                :checked="selected"
-                :checked-value="character.character_id"
-                @update:checked="handle_select"
-                unchecked-value="undefined"
-                name="selected"
-              >
-              </n-checkbox>
-            </td>
-            <td>
-              <character :id="character.character_id" />
-            </td>
-            <td>
-              {{ character.character }}
-            </td>
-            <td>
-              <corporation :id="character.corporation_id" />
-            </td>
-            <td>
-              {{ character.corporation }}
-            </td>
-            <td v-if="character.alliance_id">
-              <alliance :id="character.alliance_id" />
-            </td>
-            <td v-if="!character.alliance_id"></td>
-            <td v-if="character.alliance_id">
-              {{ character.alliance }}
-            </td>
-            <td v-if="!character.alliance_id"></td>
-            <td>
-              <n-button @click="add_corp_blueprints(character.character_id)">Add Corporation</n-button>
-            </td>
-          </tr>
+          <template v-for="c in characters" :key="c.character_id">
+            <tr>
+              <td>
+                <n-icon size="22">
+                  <angle-right
+                    style="cursor: pointer"
+                    @click="c.open = true"
+                    v-if="!c.open"
+                  />
+                  <angle-down
+                    style="cursor: pointer"
+                    @click="c.open = false"
+                    v-if="c.open"
+                  />
+                </n-icon>
+              </td>
+              <td>
+                <n-checkbox
+                  :checked="selected"
+                  :checked-value="c.character_id"
+                  @update:checked="handle_select"
+                  unchecked-value="undefined"
+                  name="selected"
+                >
+                </n-checkbox>
+              </td>
+              <td>
+                <character :id="c.character_id" />
+              </td>
+              <td>
+                {{ c.character }}
+              </td>
+              <td>
+                <corporation :id="c.corporation_id" />
+              </td>
+              <td>
+                {{ c.corporation }}
+              </td>
+              <td v-if="c.alliance_id">
+                <alliance :id="c.alliance_id" />
+              </td>
+              <td v-if="!c.alliance_id"></td>
+              <td v-if="c.alliance_id">
+                {{ c.alliance }}
+              </td>
+              <td v-if="!c.alliance_id"></td>
+            </tr>
+            <tr v-if="c.open">
+              <td></td>
+              <td colspan="8" style="padding-top: 0; padding-right: 0; padding-bottom: 0">
+                <n-list>
+                  <template #header>
+                    <h3>Given permissions:</h3>
+                  </template>
+                  <template #footer>
+                    <n-button @click="add_corp_blueprints(c.character_id)">Add corporation permissions</n-button>
+                  </template>
+
+                  <n-list-item>
+                    <div v-for="p in c.esi_tokens" :key="p">
+                      {{ p }}<br>
+                    </div>
+                  </n-list-item>
+                </n-list>
+              </td>
+            </tr>
+          </template>
         </tbody>
       </n-table>
 
@@ -100,32 +136,40 @@
 </template>
 
 <script lang="ts">
-import {CharacterService, ICharacter} from '@/services/character';
+import { AngleDown, AngleRight } from '@vicons/fa';
+import { CharacterId } from '@/utils';
+import { CharacterService, ICharacter } from '@/services/character';
 import { events } from '@/main';
-import { ROUTE_CHANGE } from '@/event_bus';
-import { NButton, NCard, NCheckbox, NPageHeader, NTable, NSkeleton, NSpace, useMessage } from 'naive-ui';
+import { NButton, NCard, NCheckbox, NIcon, NList, NListItem, NPageHeader, NTable, NSpace, useMessage } from 'naive-ui';
 import { Options, Vue } from 'vue-class-component';
+import { ROUTE_CHANGE } from '@/event_bus';
 
 import Alliance from '@/components/Alliance.vue';
 import Character from '@/components/Character.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Corporation from '@/components/Corporation.vue';
-import { CharacterId } from '@/utils';
+import Loading from '@/components/Loading.vue';
 
 @Options({
   components: {
     NButton,
     NCard,
     NCheckbox,
+    NIcon,
+    NList,
+    NListItem,
     NPageHeader,
-    NSkeleton,
     NSpace,
     NTable,
+
+    AngleDown,
+    AngleRight,
 
     Alliance,
     Character,
     ConfirmDialog,
     Corporation,
+    Loading
   }
 })
 export default class CharacterSettings extends Vue {

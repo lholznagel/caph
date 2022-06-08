@@ -5,8 +5,8 @@ CREATE TABLE moon_pulls (
   -- TypeId of the material
   material_1        INTEGER     NOT NULL,
   material_2        INTEGER     NOT NULL,
-  material_3        INTEGER
-  material_4        INTEGER
+  material_3        INTEGER,
+  material_4        INTEGER,
 
   -- Amount that is pulled
   material_1_amount INTEGER     NOT NULL,

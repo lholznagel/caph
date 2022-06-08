@@ -1,4 +1,4 @@
-use crate::{CorporationId, ConnectError, BlueprintEntry, EveAuthClient, RequestClient, TypeId, LocationId, ItemId};
+use crate::{CorporationId, ConnectError, BlueprintEntry, EveAuthClient, RequestClient, AssetEntry};
 use serde::Deserialize;
 
 /// Wrapper for corporations
@@ -113,38 +113,17 @@ impl CorporationService {
     }
 }
 
-/// Represents an asset
-#[derive(Debug, Deserialize)]
-pub struct AssetEntry {
-    /// Unique Id of the item
-    pub item_id:           ItemId,
-    /// Flag of the location, eg. MedSlot6, Deliveries, Wallet
-    pub location_flag:     String,
-    /// Either a id of a structurte, container or ship
-    pub location_id:       LocationId,
-    /// Stored quantity
-    pub quantity:          u32,
-    /// [TypeId] of the item
-    pub type_id:           TypeId,
-
-    /// True if the item is a copy
-    #[serde(default)]
-    pub is_blueprint_copy: bool,
-}
-
 /// Represents a transaction entry
 #[derive(Debug, Deserialize)]
 pub struct JournalEntry {
-    ///
+    /// ISK amount
     pub amount: f32,
-    ///
+    /// Date the transaction was performed
     pub date: String,
-    ///
+    /// Information about the transaction
     pub description: String,
-    ///
+    /// Unique ID
     pub id: u64,
-    ///
-    pub ref_type: String,
 }
 
 /// Represents a wallet entry

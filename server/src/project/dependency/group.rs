@@ -1,11 +1,12 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use caph_connector::TypeId;
 
 use super::Dependency;
+use headers::ContentLocation;
 
 /// List of components that are required in a project
-#[derive(Clone, Debug, Default)]
-pub struct DependencyGroup(BTreeMap<TypeId, Dependency>);
+#[derive(Clone, Debug, Default, serde::Serialize)]
+pub struct DependencyGroup(pub(crate) BTreeMap<TypeId, Dependency>);
 
 impl DependencyGroup {
     /// Consumes itself and returns the inner [BTreeMap].
@@ -16,6 +17,26 @@ impl DependencyGroup {
     /// 
     pub fn into_inner(self) -> BTreeMap<TypeId, Dependency> {
         self.0
+    }
+
+    /// Constructes a [DependencyGroup] from a list of dependencies
+    /// 
+    /// # Params
+    /// 
+    /// * `dependencies` -> List of dependencies
+    /// 
+    /// # Returens
+    /// 
+    /// New [DependencyGroup]
+    /// 
+    pub fn from_dependencies(
+        dependencies: Vec<Dependency>
+    ) -> Self {
+        let dependencies = dependencies
+            .into_iter()
+            .map(|x| (x.ptype_id, x))
+            .collect::<BTreeMap<_, _>>();
+        Self(dependencies)
     }
 
     /// Adds a new [Dependency] to the list.
@@ -49,24 +70,110 @@ impl DependencyGroup {
         for (type_id, entry) in dep.into_inner() {
             self.0
                 .entry(type_id)
-                .and_modify(|x: &mut Dependency| x.products += entry.products)
+                .and_modify(|x: &mut Dependency| {
+                    x.products += entry.products;
+                })
                 .or_insert(entry);
         }
     }
 
-    pub fn build_order(
-        &mut self
+    /// Sorts the dependencies into a build order
+    /// 
+    /// # Returns
+    /// 
+    /// List of sorted dependencies
+    /// 
+    pub fn sort(
+        &mut self,
     ) -> Vec<Dependency> {
         let dependencies = self.0
             .values()
             .cloned()
             .collect::<Vec<_>>();
 
+        let corrections = self.0
+            .clone()
+            .into_iter()
+            .collect::<HashMap<_, _>>();
+
         let mut virtual_dependency = Dependency::with_dependencies(
             dependencies
         );
-        virtual_dependency.sort();
+        virtual_dependency.sort(corrections);
         virtual_dependency.components
+    }
+
+    pub fn recalculate(
+        &mut self
+    ) {
+        for (_, entry) in self.0.iter_mut() {
+            entry.set_product_quantity(entry.products);
+        }
+    }
+
+    pub fn fix(
+        &mut self,
+        old: DependencyGroup
+    ) {
+        let mut result = BTreeSet::new();
+        for (ptype_id, new) in self.0.iter() {
+            if new.components.is_empty() {
+                continue;
+            }
+
+            if let Some(old) = old.0.get(&ptype_id) {
+                if new.has_diff(old.clone()) {
+                    result.insert(ptype_id);
+                }
+            }
+        }
+
+        let mut queue = VecDeque::new();
+        let mut corrections = result
+            .iter()
+            .map(|x| self.0.get(x))
+            .filter(|x| x.is_some())
+            .map(|x| x.unwrap())
+            .map(|x| {
+                for component in x.components.iter() {
+                    if component.components.is_empty() {
+                        continue;
+                    }
+                    queue.push_back(component.clone());
+                }
+
+                (x.ptype_id, x.clone())
+            })
+            .collect::<HashMap<_, _>>();
+        let mut init_changes = result.clone();
+
+        while let Some(popped) = queue.pop_front() {
+            if init_changes.contains(&popped.ptype_id) {
+                corrections
+                    .entry(popped.ptype_id)
+                    .and_modify(|x: &mut Dependency| x.products = popped.products)
+                    .or_insert(popped.clone());
+                init_changes.remove(&popped.ptype_id);
+            } else {
+                corrections
+                    .entry(popped.ptype_id)
+                    .and_modify(|x: &mut Dependency| x.products += popped.products)
+                    .or_insert(popped.clone());
+            }
+
+            for component in popped.components.iter() {
+                if component.components.is_empty() {
+                    continue;
+                }
+                queue.push_back(component.clone());
+            }
+        }
+
+        for (ptype_id, correction) in corrections.iter() {
+            if let Some(entry) = self.0.get_mut(&ptype_id) {
+                entry.set_product_quantity(correction.products);
+            }
+        }
     }
 }
 
@@ -178,5 +285,39 @@ mod dependency_group_test {
         assert_eq!(group.len(), 2);
         assert_eq!(group.get(&0.into()).unwrap().products, 1);
         assert_eq!(group.get(&1.into()).unwrap().products, 2);
+    }
+
+    #[test]
+    fn merge_deep() {
+        let a = dependency(
+            "A".into(),
+            0.into(),
+            1i64,
+            vec![
+                dependency(
+                    "B".into(),
+                    1.into(),
+                    1i64,
+                    Vec::new()
+                )
+            ]
+        );
+        let mut group1 = DependencyGroup::default();
+        group1.add(a);
+        let group2 = group1.clone();
+
+        group1.merge(group2);
+
+        let group = group1.into_inner();
+        assert_eq!(group.len(), 1);
+        assert_eq!(group.get(&0.into()).unwrap().products, 2);
+        assert_eq!(group
+            .get(&0.into())
+            .unwrap()
+            .components
+            .get(0)
+            .unwrap()
+            .products, 2
+        );
     }
 }
