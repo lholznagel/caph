@@ -150,6 +150,9 @@ pub struct TypeEntry {
     /// Name of the item in different languages
     #[serde(rename = "name")]
     pub name:                     HashMap<String, String>,
+    /// Volume of the type
+    #[serde(rename = "published")]
+    pub published:                bool,
     /// ID of the group this type belongs to
     #[serde(rename = "metaGroupID")]
     pub meta_group_id:            Option<GroupId>,

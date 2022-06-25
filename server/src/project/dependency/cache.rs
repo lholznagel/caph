@@ -8,6 +8,7 @@ use crate::Error;
 use super::{Dependency, DependencyType};
 
 /// Maps product [TypeId] to a dependency containing all its required materials
+#[deprecated(note = "Use blueprint_json table")]
 #[derive(Clone, Debug)]
 pub struct DependencyCache(HashMap<TypeId, Dependency>);
 
@@ -26,6 +27,7 @@ impl DependencyCache {
     /// 
     /// Populated cache
     /// 
+    #[deprecated]
     pub async fn new(pg: PgPool) -> Result<Self, Error> {
         let entries = Self::populate(pg).await?;
         Ok(Self(entries))
@@ -43,6 +45,7 @@ impl DependencyCache {
     ///                  required materials
     /// - [Option::None] if there is no such product
     ///
+    #[deprecated]
     pub fn get(&self, key: &TypeId) -> Option<&Dependency> {
         self.0.get(key)
     }
@@ -61,6 +64,7 @@ impl DependencyCache {
     /// 
     /// List of product [TypeId] to materials
     /// 
+    #[deprecated]
     async fn populate(
         pg: PgPool
     ) -> Result<HashMap<TypeId, Dependency>, Error> {
@@ -69,7 +73,7 @@ impl DependencyCache {
         // Example: Fullerides -> has he right time, Nitrogen Fuel blocks have the wrong -> Nitrogen materials have the right time (0)
         let mut entries = HashMap::new();
 
-        sqlx::query!(r#"
+        /*sqlx::query!(r#"
                 SELECT
                     bman.btype_id  AS "btype_id!",
                     bman.ptype_id  AS "ptype_id!",
@@ -135,7 +139,7 @@ impl DependencyCache {
                         dependency_type:  DependencyType::from_is_reaction(x.reaction),
                         components:       vec![material]
                     });
-            });
+            });*/
 
         Ok(entries)
     }

@@ -5,9 +5,12 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use std::collections::{HashMap, VecDeque};
 use std::fs::File;
+use crate::items::{TypeEntry, GroupEntry};
 
 /// Wrapper for TypeId
 type TypeId = i32;
+/// Wrapper for GroupId
+type GroupId     = i32;
 
 /// Parses the input file and exports it as SQL
 pub fn run() -> Result<String, Box<dyn std::error::Error>> {
@@ -24,8 +27,24 @@ pub fn run() -> Result<String, Box<dyn std::error::Error>> {
     );
     let file = File::open(&path)?;
 
+    let path_type_ids = format!(
+        "{}/{}/type_ids.yaml",
+        current,
+        FOLDER_INPUT
+    );
+    let file_type_ids = File::open(&path_type_ids)?;
+
+    let path_group_ids = format!(
+        "{}/{}/group_ids.yaml",
+        current,
+        FOLDER_INPUT
+    );
+    let file_group_ids = File::open(&path_group_ids)?;
+
     // Map with the blueprint as key
     let blueprints: HashMap<TypeId, Blueprint> = serde_yaml::from_reader(file)?;
+    let type_ids: HashMap<TypeId, TypeEntry> = serde_yaml::from_reader(file_type_ids)?;
+    let group_ids: HashMap<GroupId, GroupEntry> = serde_yaml::from_reader(file_group_ids)?;
 
     // Map with the product as key
     let products = blueprints
@@ -43,12 +62,12 @@ pub fn run() -> Result<String, Box<dyn std::error::Error>> {
 
     let entries = vec![
         sql_header(),
-        //sql_manufacture(&blueprints),
-        //sql_manufacture_components(&blueprints, &products),
-        //sql_research(&blueprints),
-        //sql_invention(&blueprints),
-        //sql_raw(&blueprints, &products),
-        sql_json(&blueprints, &products),
+        sql_manufacture(&blueprints),
+        sql_manufacture_components(&blueprints, &products),
+        sql_research(&blueprints),
+        sql_invention(&blueprints),
+        sql_raw(&blueprints, &products),
+        sql_json(&type_ids, &group_ids, &blueprints, &products),
     ];
 
     Ok(entries.join("\n"))
@@ -487,6 +506,8 @@ INSERT INTO blueprint_materials VALUES {};",
 /// String containing the SQL-Query.
 ///
 fn sql_json(
+    items:      &HashMap<TypeId, TypeEntry>,
+    groups:     &HashMap<GroupId, GroupEntry>,
     blueprints: &HashMap<TypeId, Blueprint>,
     products:   &HashMap<TypeId, Blueprint>,
 ) -> String {
@@ -497,26 +518,187 @@ fn sql_json(
 
         Material,
     }
+    impl DependencyType {
+        pub fn reaction(is: bool) -> Self {
+            if is {
+                Self::Reaction
+            } else {
+                Self::Blueprint
+            }
+        }
+    }
     #[derive(Clone, Debug, Serialize)]
     struct Dependency {
-        btype_id:          TypeId,
-        ptype_id:          TypeId,
-        time:              u32,
-        quantity:          u32,
-        typ:               DependencyType,
-        components:        Vec<Dependency>,
+        btype_id:       TypeId,
+        blueprint_name: String,
+        ptype_id:       TypeId,
+        category_id:    u32,
+        group_id:       u32,
+        product_name:   String,
+        time:           u32,
+        quantity:       u32,
+        produces:       u32,
+        typ:            DependencyType,
+        components:     Vec<Dependency>,
     }
-
-    let mut entries: Vec<String> = Vec::new();
-
-    for (btype_id, bentry) in blueprints {
-        if *btype_id != 461600 {
-            continue;
+    impl Dependency {
+        pub fn to_sql(self) -> String {
+            format!("({}, '{}')", &self.ptype_id, serde_json::to_string(&self).unwrap())
         }
     }
 
-    dbg!(products.get(&30305));
+    let find_btype_id = |ptype_id: TypeId| {
+        blueprints
+            .iter()
+            .filter(|(_, x)| x.product().is_some())
+            .find(|(_, x)| x.product().unwrap() == ptype_id)
+            .map(|(y, _)| y)
+            .unwrap()
+            .clone()
+    };
 
+    let mut entries: HashMap<TypeId, Dependency> = HashMap::new();
+    let mut queue: VecDeque<Dependency> = VecDeque::new();
+
+    for (ptype_id, pentry) in products {
+        let bentry = items.get(&find_btype_id(*ptype_id)).unwrap();
+        let bname = bentry
+            .name
+            .get("en")
+            .unwrap()
+            .replace('\'', "''");
+
+        if let None = items.get(&ptype_id) {
+            continue;
+        }
+
+        let ientry = items.get(&ptype_id).unwrap();
+        if !ientry.published {
+            continue;
+        }
+        dbg!(pentry);
+
+        let iname = ientry
+            .name
+            .get("en")
+            .unwrap()
+            .replace('\'', "''");
+        let igroup_id = ientry.group_id;
+        let icategory_id = groups.get(&igroup_id).unwrap().category_id;
+
+        let mut dependency = Dependency {
+            blueprint_name: bname.clone(),
+            product_name:   iname.clone(),
+            ptype_id:       *ptype_id,
+            btype_id:       find_btype_id(*ptype_id),
+            category_id:    icategory_id as u32,
+            group_id:       igroup_id as u32,
+            time:           pentry.manufacture_time().unwrap() as u32,
+            quantity:       pentry.product_quantity().unwrap() as u32,
+            produces:       pentry.product_quantity().unwrap() as u32,
+            typ:            DependencyType::reaction(pentry.is_reaction()),
+            components:     Vec::new()
+        };
+
+        let mut components = Vec::new();
+        for material in pentry.materials() {
+            if products.contains_key(&material.type_id) &&
+               entries.contains_key(&material.type_id) {
+                let mut entry = entries.get(&material.type_id).unwrap().clone();
+                entry.quantity = material.quantity as u32;
+                components.push(entry);
+            } else if !products.contains_key(&material.type_id) {
+                let ientry = items.get(&material.type_id).unwrap();
+                let iname = ientry
+                    .name
+                    .get("en")
+                    .unwrap()
+                    .replace('\'', "''");
+                let igroup_id = ientry.group_id;
+                let icategory_id = groups.get(&igroup_id).unwrap().category_id;
+
+                let dependency = Dependency {
+                    product_name:   iname.clone(),
+                    blueprint_name: String::new(),
+                    ptype_id:       material.type_id,
+                    btype_id:       0,
+                    category_id:    icategory_id as u32,
+                    group_id:       igroup_id as u32,
+                    time:           0,
+                    quantity:       material.quantity as u32,
+                    produces:       0,
+                    typ:            DependencyType::Material,
+                    components:     Vec::new()
+                };
+                components.push(dependency);
+            } else {
+                queue.push_back(dependency.clone());
+                break;
+            }
+        }
+
+        if components.len() == pentry.materials().len() {
+            dependency.components = components;
+            entries.insert(*ptype_id, dependency);
+        } else {
+            queue.push_back(dependency);
+        }
+    }
+
+    while let Some(pentry) = queue.pop_front() {
+        let mut entry = pentry;
+        let materials = products.get(&entry.ptype_id).unwrap().materials();
+
+        let mut components = Vec::new();
+        for material in materials.iter() {
+            if products.contains_key(&material.type_id) &&
+               entries.contains_key(&material.type_id) {
+                let mut entry = entries.get(&material.type_id).unwrap().clone();
+                entry.quantity = material.quantity as u32;
+                components.push(entry);
+            } else if !products.contains_key(&material.type_id) {
+                let ientry = items.get(&material.type_id).unwrap();
+                let iname = ientry
+                    .name
+                    .get("en")
+                    .unwrap()
+                    .replace('\'', "''");
+                let igroup_id = ientry.group_id;
+                let icategory_id = groups.get(&igroup_id).unwrap().category_id;
+
+                let dependency = Dependency {
+                    product_name:   iname.clone(),
+                    blueprint_name: String::new(),
+                    ptype_id:       material.type_id,
+                    btype_id:       0,
+                    category_id:    icategory_id as u32,
+                    group_id:       igroup_id as u32,
+                    time:           0,
+                    quantity:       material.quantity as u32,
+                    produces:       0,
+                    typ:            DependencyType::Material,
+                    components:     Vec::new()
+                };
+                components.push(dependency);
+            } else {
+                queue.push_back(entry.clone());
+                break;
+            }
+        }
+
+        if components.len() == materials.len() {
+            entry.components = components;
+            entries.insert(entry.ptype_id, entry);
+        } else {
+            queue.push_back(entry);
+        }
+    }
+
+    let entries = entries
+        .values()
+        .cloned()
+        .map(|x| x.to_sql())
+        .collect::<Vec<_>>();
     format!(
         "INSERT INTO blueprint_json VALUES {};",
         entries.join(", "),

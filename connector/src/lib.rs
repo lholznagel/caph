@@ -49,18 +49,18 @@ pub use self::error::*;
 
 use serde::{Deserialize, Serialize};
 
-eve_id!(AllianceId,    i32);
-eve_id!(CategoryId,    i32);
-eve_id!(CharacterId,   i32);
-eve_id!(CorporationId, i32);
-eve_id!(GroupId,       i32);
-eve_id!(ItemId,        i64);
-eve_id!(JobId,         i32);
-eve_id!(LocationId,    i64);
-eve_id!(StationId,     i64);
-eve_id!(SystemId,      i64);
-eve_id!(TypeId,        i32);
-eve_id!(RegionId,      i32);
+eve_id!(AllianceId,    i32, u32);
+eve_id!(CategoryId,    i32, u32);
+eve_id!(CharacterId,   i32, u32);
+eve_id!(CorporationId, i32, u32);
+eve_id!(GroupId,       i32, u32);
+eve_id!(ItemId,        i64, u64);
+eve_id!(JobId,         i32, u32);
+eve_id!(LocationId,    i64, u64);
+eve_id!(StationId,     i64, u64);
+eve_id!(SystemId,      i64, u64);
+eve_id!(TypeId,        i32, u32);
+eve_id!(RegionId,      i32, u32);
 
 /// Represents an asset
 #[derive(Debug, Deserialize)]

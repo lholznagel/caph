@@ -14,7 +14,7 @@
 ///
 #[macro_export]
 macro_rules! eve_id {
-    ($name:ident, $typ:ty) => {
+    ($name:ident, $typ:ty, $typ2:ty) => {
         /// Represents an ID-Type from EVE
         #[derive(
             Clone, Copy, Debug, Hash,
@@ -30,6 +30,12 @@ macro_rules! eve_id {
         impl From<$typ> for $name {
             fn from(x: $typ) -> Self {
                 Self(x)
+            }
+        }
+
+        impl From<$typ2> for $name {
+            fn from(x: $typ2) -> Self {
+                Self(x as $typ)
             }
         }
 

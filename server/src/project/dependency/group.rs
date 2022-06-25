@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
-use caph_connector::TypeId;
+use caph_connector::{GroupId, TypeId};
+
+use crate::project::dependency::DependencyType;
 
 use super::Dependency;
 use headers::ContentLocation;
@@ -53,7 +55,9 @@ impl DependencyGroup {
     ) {
         self.0
             .entry(dep.ptype_id)
-            .and_modify(|x: &mut Dependency| x.products += dep.products)
+            .and_modify(|x: &mut Dependency|
+                x.set_product_quantity(x.products + dep.products)
+            )
             .or_insert(dep.clone());
     }
 
@@ -71,10 +75,51 @@ impl DependencyGroup {
             self.0
                 .entry(type_id)
                 .and_modify(|x: &mut Dependency| {
-                    x.products += entry.products;
+                    //x.products += entry.products;
+                    x.set_product_quantity(x.products + entry.products);
                 })
                 .or_insert(entry);
         }
+    }
+
+    pub fn collect_components(
+        &self
+    ) -> DependencyGroup {
+        let mut group = DependencyGroup::default();
+
+        for (_, entry) in self.0.iter() {
+            group.merge(entry.collect_components());
+        }
+
+        // Recalculate Fuel Blocks
+        let mut fuel_blocks = HashMap::new();
+        for (_, entry) in group.0.iter() {
+            if entry.dependency_type != DependencyType::Reaction {
+                continue;
+            }
+
+            for component in entry.components.iter() {
+                if component.group_id != GroupId(1136) {
+                    continue;
+                }
+
+                fuel_blocks
+                    .entry(component.ptype_id)
+                    .and_modify(|x: &mut u32| *x += component.products)
+                    .or_insert(component.products);
+            }
+        }
+
+        for (ptype_id, entry) in fuel_blocks {
+            group.0
+                .entry(ptype_id)
+                .and_modify(
+                    |x: &mut Dependency|
+                    x.set_product_quantity(entry)
+                );
+        }
+
+        group
     }
 
     /// Sorts the dependencies into a build order
@@ -83,7 +128,7 @@ impl DependencyGroup {
     /// 
     /// List of sorted dependencies
     /// 
-    pub fn sort(
+    pub fn build_order(
         &mut self,
     ) -> Vec<Dependency> {
         let dependencies = self.0
@@ -103,6 +148,7 @@ impl DependencyGroup {
         virtual_dependency.components
     }
 
+    #[deprecated]
     pub fn recalculate(
         &mut self
     ) {
@@ -111,6 +157,7 @@ impl DependencyGroup {
         }
     }
 
+    #[deprecated]
     pub fn fix(
         &mut self,
         old: DependencyGroup

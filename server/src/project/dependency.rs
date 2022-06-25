@@ -90,15 +90,15 @@ pub struct Dependency {
     pub group_id:          GroupId,
 
     /// Number of products to produce
-    pub products:          i64,
+    pub products:          u32,
     /// Base requirements for building a single run
-    pub products_base:     i64,
+    pub products_base:     u32,
     /// Quantity that is produced with each iteration
-    pub products_per_run:  i64,
+    pub products_per_run:  u32,
     /// Total time it takes for all runs
-    pub time:              i64,
+    pub time:              u32,
     /// Time it takes to run one production cycle
-    pub time_per_run:      i64,
+    pub time_per_run:      u32,
 
     /// Type of the dependency
     pub dependency_type:   DependencyType,
@@ -119,6 +119,7 @@ impl Dependency {
     /// 
     /// New dependency instance
     /// 
+    #[deprecated]
     pub fn from_cache(
         cache:    &DependencyCache,
         ptype_id: TypeId,
@@ -136,6 +137,33 @@ impl Dependency {
         root
     }
 
+    pub(crate) fn from_database_dependency(
+        dependency: DatabaseDependency,
+    ) -> Self {
+        Dependency {
+            name:              dependency.product_name,
+            blueprint_name:    dependency.blueprint_name,
+            btype_id:          dependency.btype_id,
+            ptype_id:          dependency.ptype_id,
+            category_id:       dependency.category_id.into(),
+            group_id:          dependency.group_id.into(),
+
+            products:          dependency.produces,
+            products_base:     dependency.quantity,
+            products_per_run:  dependency.produces,
+            time:              dependency.time,
+            time_per_run:      dependency.time,
+
+            dependency_type:   dependency.typ,
+
+            components:        dependency
+                                    .components
+                                    .into_iter()
+                                    .map(Dependency::from_database_dependency)
+                                    .collect::<Vec<_>>(),
+        }
+    }
+
     pub(crate) fn with_dependencies(
         deps: Vec<Dependency>
     ) -> Self {
@@ -146,7 +174,7 @@ impl Dependency {
             ptype_id:         0.into(),
             category_id:      0.into(),
             group_id:         0.into(),
-            products:         0.into(),
+            products:         0,
             products_base:    0,
             products_per_run: 0,
             time:             0,
@@ -194,7 +222,7 @@ impl Dependency {
     /// 
     pub fn add_product_quantity(
         &mut self,
-        amount: i64
+        amount: u32
     ) {
         self.products += amount;
 
@@ -202,7 +230,7 @@ impl Dependency {
             self.products as f64 / self.products_per_run as f64
         ).ceil() as u32;
 
-        self.time = runs as i64 * self.time_per_run;
+        self.time = runs * self.time_per_run;
 
         // Recalculate dependencies
         for material in self.components.iter_mut() {
@@ -220,7 +248,7 @@ impl Dependency {
     /// 
     pub fn set_product_quantity(
         &mut self,
-        amount: i64,
+        amount: u32,
     ) {
         self.products = amount;
 
@@ -228,7 +256,7 @@ impl Dependency {
             self.products as f64 / self.products_per_run as f64
         ).ceil() as u32;
 
-        self.time = runs as i64 * self.time_per_run;
+        self.time = runs * self.time_per_run;
 
         // Recalculate dependencies
         for material in self.components.iter_mut() {
@@ -247,8 +275,8 @@ impl Dependency {
         &mut self,
         runs: u32
     ) {
-        self.time     = runs as i64 * self.time_per_run;
-        self.products = runs as i64 * self.products_base;
+        self.time     = runs * self.time_per_run;
+        self.products = runs * self.products_base;
 
         let runs = (
             self.products as f64 / self.products_per_run as f64
@@ -353,7 +381,7 @@ impl Dependency {
                 if material.products >= 10 {
                     material.products = material.products - (
                         (material.products as f64 * (*b as f64 / 100f64)).floor()
-                    ).round() as i64;
+                    ).round() as u32;
                 }
 
                 material.apply_material_bonus(&bonus);
@@ -382,12 +410,12 @@ impl Dependency {
             for material in self.components.iter_mut() {
                 let runs = (
                     self.products as f64 / self.products_per_run as f64
-                ).ceil() as i64;
+                ).ceil() as u32;
                 let runs = if runs == 0 { 1 } else { runs };
 
                 material.time_per_run = runs * material.time_per_run - (
                     runs as f64 * material.time_per_run as f64 * (*b as f64 / 100f64)
-                ).round() as i64;
+                ).round() as u32;
 
                 material.apply_time_bonus(&bonus);
             }
@@ -460,6 +488,21 @@ impl Dependency {
 
         inverted
     }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct DatabaseDependency {
+    pub btype_id:       TypeId,
+    pub blueprint_name: String,
+    pub ptype_id:       TypeId,
+    pub category_id:    u32,
+    pub group_id:       u32,
+    pub product_name:   String,
+    pub time:           u32,
+    pub quantity:       u32,
+    pub produces:       u32,
+    pub typ:            DependencyType,
+    pub components:     Vec<DatabaseDependency>,
 }
 
 #[cfg(test)]

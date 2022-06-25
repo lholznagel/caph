@@ -55,14 +55,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    let blueprints = blueprints::run()?;
-    let mut fs = File::create(format!(
-            "{}/{}/blueprints.sql",
-            current_dir.to_str().unwrap_or_default(),
-            FOLDER_OUTPUT
-    ))?;
-    fs.write_all(blueprints.as_bytes())?;
-
     let items = items::run()?;
     let mut fs = File::create(format!(
         "{}/{}/items.sql",
@@ -70,6 +62,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         FOLDER_OUTPUT
     ))?;
     fs.write_all(items.as_bytes())?;
+
+    let blueprints = blueprints::run()?;
+    let mut fs = File::create(format!(
+            "{}/{}/blueprints.sql",
+            current_dir.to_str().unwrap_or_default(),
+            FOLDER_OUTPUT
+    ))?;
+    fs.write_all(blueprints.as_bytes())?;
 
     Ok(())
 }

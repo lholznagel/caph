@@ -7,7 +7,7 @@ use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{Error, ProjectBlueprintService, Blueprint, project::dependency::DependencyGroup};
-use super::dependency::{DependencyCache, Dependency};
+use super::dependency::{DependencyCache, Dependency, DatabaseDependency};
 
 /// An id of a tracking entry
 pub type BudgetId    = Uuid;
@@ -24,7 +24,7 @@ pub struct GodProject {
     buildsteps:       Buildstep,
     members:          Vec<Member>,
     bp_required:      Vec<Blueprint>,
-    market:           AppraisalInformation
+    //market:           AppraisalInformation
 }
 
 /// Wrapper for managing projects
@@ -129,7 +129,7 @@ impl ProjectService {
         let materials_raw = self.raw_materials(pid).await?;
         let buildsteps = self.buildsteps(pid).await?;
         let members = self.members(pid).await?;
-        let market = self.market_price(pid).await?;
+        //let market = self.market_price(pid).await?;
         let steps = self.buildstep_manufacturing(pid).await?;
         let bp_required = self.blueprint.required(steps).await?;
 
@@ -140,7 +140,7 @@ impl ProjectService {
             buildsteps,
             members,
             bp_required,
-            market
+            //market
         })
     }
 
@@ -396,8 +396,10 @@ impl ProjectService {
             .collect::<HashMap<_, _>>();
 
         let products = sqlx::query!("
-                    SELECT type_id, count
-                    FROM project_products
+                    SELECT type_id, count, data
+                    FROM project_products pp
+                    JOIN blueprint_json bj
+                      ON bj.ptype_id = pp.type_id
                     WHERE project = $1
                 ",
                 pid
@@ -406,11 +408,9 @@ impl ProjectService {
             .await?
             .into_iter()
             .map(|x| {
-                let mut dependency = Dependency::from_cache(
-                    &self.dependency_cache,
-                    x.type_id.into(),
-                );
-                dependency.set_product_quantity(x.count as i64);
+                let dependency: DatabaseDependency = serde_json::from_value(x.data).unwrap();
+                let mut dependency = Dependency::from_database_dependency(dependency);
+                dependency.set_product_quantity(x.count as u32);
                 dependency.apply_material_bonus(&bp_bonus);
 
                 // TODO: extract, and add rigs
@@ -531,8 +531,10 @@ impl ProjectService {
             .collect::<HashMap<_, _>>();
 
         let dependencies = sqlx::query!("
-                    SELECT type_id, count
-                    FROM project_products
+                    SELECT type_id, count, data
+                    FROM project_products pp
+                    JOIN blueprint_json bj
+                    ON bj.ptype_id = pp.type_id
                     WHERE project = $1
                 ",
                 pid
@@ -541,58 +543,21 @@ impl ProjectService {
             .await?
             .into_iter()
             .map(|x| {
-                let mut dependency = Dependency::from_cache(
-                    &self.dependency_cache,
-                    x.type_id.into(),
-                );
+                let dependency: DatabaseDependency = serde_json::from_value(x.data).unwrap();
+                let mut dependency = Dependency::from_database_dependency(dependency);
 
-                dependency.set_product_quantity(x.count as i64);
+                dependency.set_product_quantity(x.count as u32);
                 //dependency.apply_material_bonus(&bp_bonus);
                 //dependency.apply_material_bonus(&structure_bonus);
                 dependency
             })
             .collect::<Vec<_>>();
 
-        //let mut group = DependencyGroup::from_dependencies(dependencies);
-        //let dependencies = group.sort();
+        let dependencies = DependencyGroup::from_dependencies(dependencies)
+            .collect_components()
+            .build_order();
 
-        //let mut dependency_group = DependencyGroup::from_dependencies(dependencies);
-        //let dependencies = dependency_group.sort();
-        //let components = dependency_group.collect_components();
-
-        let dependencies = dependencies
-            .into_iter()
-            .map(|x| x.collect_components())
-            .collect::<Vec<_>>();
-        let mut dependencies = dependencies
-            .into_iter()
-            .reduce(|mut acc, e| {
-                acc.merge(e);
-                acc
-            })
-            .unwrap_or_default();
-
-        let old = dependencies.clone();
-        dependencies.recalculate();
-        dependencies.fix(old);
-
-        let dependencies = dependencies.sort();
-
-        #[derive(Debug, serde::Serialize)]
-        struct Temp {
-            name: String,
-            quantity: i64
-        }
-        //let xyz: std::collections::HashMap<TypeId, Temp> = dependencies.clone()
-        let xyz = dependencies.clone()
-            .into_iter()
-            .map(|x| (x.ptype_id, x))
-            .collect::<HashMap<_, _>>();
-
-        use std::fs::File;
-        let mut file = File::create("dependencies.json").unwrap();
-        serde_json::to_writer_pretty(&mut file, &xyz).unwrap();
-
+        //let dependencies = Vec::new();
         Ok(dependencies)
     }
 
