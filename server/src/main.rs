@@ -1,8 +1,8 @@
 use axum::{Extension, Router};
 use caph_server::*;
 use sqlx::postgres::PgPoolOptions;
-use tracing::Level;
 use tracing_subscriber::EnvFilter;
+use tracing::Level;
 
 /// ENV variable for the database URL
 const PG_ADDR: &str          = "DATABASE_URL";
@@ -11,7 +11,7 @@ const SERVER_BIND_ADDR: &str = "SERVER_BIND_ADDR";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     if std::env::var("GIT_HEAD_SHORT").is_ok() {
         tracing_subscriber::fmt()
@@ -41,7 +41,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     let item_service      = ItemService::new(pool.clone());
 
-    let dependency_cache = DependencyCache::new(pool.clone()).await?;
     let project_blueprint_service = ProjectBlueprintService::new(
         pool.clone(),
         character_service.clone(),
@@ -53,12 +52,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         pool.clone(),
 
         project_blueprint_service.clone(),
-
-        dependency_cache
-    );
-
-    let moon_service = MoonService::new(
-        pool.clone()
     );
 
     let app = Router::new()
@@ -69,7 +62,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .nest("/character", crate::CharacterApi::router())
                 .nest("/items", crate::ItemApi::router())
                 .nest("/projects", crate::ProjectApi::router())
-                .nest("/moons", crate::moon::router())
         )
         .layer(Extension(auth_service))
         .layer(Extension(character_service))
@@ -77,7 +69,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(Extension(project_service))
         .layer(Extension(project_blueprint_service))
         .layer(Extension(project_storage_service))
-        .layer(Extension(moon_service))
         .layer(Extension(pool))
         .into_make_service();
 

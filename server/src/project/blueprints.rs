@@ -4,7 +4,7 @@ use crate::{ProjectId, Error, CharacterService};
 use caph_connector::{TypeId, GroupId, CharacterId};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 use super::dependency::Dependency;
 

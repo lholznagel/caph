@@ -27,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .connect(&pg_addr)
         .await?;
 
-    let journal = journal(&pool).await;
+    let _journal = journal(&pool).await;
 
     let asset_worth = assets(&pool).await;
     let wallet = wallets(&pool).await;
@@ -35,7 +35,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut headers = HeaderMap::new();
     headers.insert(
         "Authorization",
-        HeaderValue::from_static("Bot OTgwMjQ1MTcyNzM2NjIyNjIy.Go7wtl.vSkXQMxjtHMZGqTM-s0MCrG5lChsGg0wIXlSAg")
+        // TODO: insert BOT token
+        HeaderValue::from_static("")
     );
 
     let client = Client::builder()

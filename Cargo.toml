@@ -9,7 +9,6 @@ panic = 'abort'
 members = [
   'appraisal',
   'connector',
-  'corp_bot',
   'sde_parser',
   'server'
 ]

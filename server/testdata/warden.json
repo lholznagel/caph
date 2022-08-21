@@ -1,0 +1,2264 @@
+{
+  "btype_id": 28210,
+  "blueprint_name": "Warden II Blueprint",
+  "ptype_id": 28209,
+  "time": 4500,
+  "quantity": 1,
+  "produces": 1,
+  "info": {
+    "ptype_id": 28209,
+    "category_id": 18,
+    "group_id": 100,
+    "name": "Warden II"
+  },
+  "typ": "Blueprint",
+  "components": [
+    {
+      "btype_id": 23560,
+      "blueprint_name": "Warden I Blueprint",
+      "ptype_id": 23559,
+      "time": 900,
+      "quantity": 1,
+      "produces": 1,
+      "info": {
+        "ptype_id": 23559,
+        "category_id": 18,
+        "group_id": 100,
+        "name": "Warden I"
+      },
+      "typ": "Blueprint",
+      "components": [
+        {
+          "btype_id": 0,
+          "blueprint_name": "",
+          "ptype_id": 40,
+          "time": 0,
+          "quantity": 18,
+          "produces": 0,
+          "info": {
+            "ptype_id": 23559,
+            "category_id": 4,
+            "group_id": 18,
+            "name": "Megacyte"
+          },
+          "typ": "Material",
+          "components": []
+        },
+        {
+          "btype_id": 0,
+          "blueprint_name": "",
+          "ptype_id": 34,
+          "time": 0,
+          "quantity": 516,
+          "produces": 0,
+          "info": {
+            "ptype_id": 23559,
+            "category_id": 4,
+            "group_id": 18,
+            "name": "Tritanium"
+          },
+          "typ": "Material",
+          "components": []
+        },
+        {
+          "btype_id": 0,
+          "blueprint_name": "",
+          "ptype_id": 35,
+          "time": 0,
+          "quantity": 9929,
+          "produces": 0,
+          "info": {
+            "ptype_id": 23559,
+            "category_id": 4,
+            "group_id": 18,
+            "name": "Pyerite"
+          },
+          "typ": "Material",
+          "components": []
+        },
+        {
+          "btype_id": 0,
+          "blueprint_name": "",
+          "ptype_id": 38,
+          "time": 0,
+          "quantity": 4,
+          "produces": 0,
+          "info": {
+            "ptype_id": 23559,
+            "category_id": 4,
+            "group_id": 18,
+            "name": "Nocxium"
+          },
+          "typ": "Material",
+          "components": []
+        }
+      ]
+    },
+    {
+      "btype_id": 0,
+      "blueprint_name": "",
+      "ptype_id": 9834,
+      "time": 0,
+      "quantity": 5,
+      "produces": 0,
+      "info": {
+        "ptype_id": 9834,
+        "category_id": 43,
+        "group_id": 1040,
+        "name": "Guidance Systems"
+      },
+      "typ": "Material",
+      "components": []
+    },
+    {
+      "btype_id": 0,
+      "blueprint_name": "",
+      "ptype_id": 11399,
+      "time": 0,
+      "quantity": 5,
+      "produces": 0,
+      "info": {
+        "ptype_id": 11399,
+        "category_id": 4,
+        "group_id": 18,
+        "name": "Morphite"
+      },
+      "typ": "Material",
+      "components": []
+    },
+    {
+      "btype_id": 0,
+      "blueprint_name": "",
+      "ptype_id": 9848,
+      "time": 0,
+      "quantity": 5,
+      "produces": 0,
+      "info": {
+        "ptype_id": 9848,
+        "category_id": 43,
+        "group_id": 1040,
+        "name": "Robotics"
+      },
+      "typ": "Material",
+      "components": []
+    },
+    {
+      "btype_id": 11887,
+      "blueprint_name": "R.A.M.- Robotics Blueprint",
+      "ptype_id": 11481,
+      "time": 2500,
+      "quantity": 1,
+      "produces": 100,
+      "info": {
+        "ptype_id": 11481,
+        "category_id": 17,
+        "group_id": 332,
+        "name": "R.A.M.- Robotics"
+      },
+      "typ": "Blueprint",
+      "components": [
+        {
+          "btype_id": 0,
+          "blueprint_name": "",
+          "ptype_id": 34,
+          "time": 0,
+          "quantity": 556,
+          "produces": 0,
+          "info": {
+            "ptype_id": 11481,
+            "category_id": 4,
+            "group_id": 18,
+            "name": "Tritanium"
+          },
+          "typ": "Material",
+          "components": []
+        },
+        {
+          "btype_id": 0,
+          "blueprint_name": "",
+          "ptype_id": 35,
+          "time": 0,
+          "quantity": 444,
+          "produces": 0,
+          "info": {
+            "ptype_id": 11481,
+            "category_id": 4,
+            "group_id": 18,
+            "name": "Pyerite"
+          },
+          "typ": "Material",
+          "components": []
+        },
+        {
+          "btype_id": 0,
+          "blueprint_name": "",
+          "ptype_id": 36,
+          "time": 0,
+          "quantity": 222,
+          "produces": 0,
+          "info": {
+            "ptype_id": 11481,
+            "category_id": 4,
+            "group_id": 18,
+            "name": "Mexallon"
+          },
+          "typ": "Material",
+          "components": []
+        },
+        {
+          "btype_id": 0,
+          "blueprint_name": "",
+          "ptype_id": 37,
+          "time": 0,
+          "quantity": 82,
+          "produces": 0,
+          "info": {
+            "ptype_id": 11481,
+            "category_id": 4,
+            "group_id": 18,
+            "name": "Isogen"
+          },
+          "typ": "Material",
+          "components": []
+        },
+        {
+          "btype_id": 0,
+          "blueprint_name": "",
+          "ptype_id": 38,
+          "time": 0,
+          "quantity": 36,
+          "produces": 0,
+          "info": {
+            "ptype_id": 11481,
+            "category_id": 4,
+            "group_id": 18,
+            "name": "Nocxium"
+          },
+          "typ": "Material",
+          "components": []
+        }
+      ]
+    },
+    {
+      "btype_id": 17354,
+      "blueprint_name": "Superconductor Rails Blueprint",
+      "ptype_id": 11690,
+      "time": 150,
+      "quantity": 3,
+      "produces": 1,
+      "info": {
+        "ptype_id": 11690,
+        "category_id": 17,
+        "group_id": 334,
+        "name": "Superconductor Rails"
+      },
+      "typ": "Blueprint",
+      "components": [
+        {
+          "btype_id": 46212,
+          "blueprint_name": "Hypersynaptic Fibers Reaction Formula",
+          "ptype_id": 16682,
+          "time": 10800,
+          "quantity": 1,
+          "produces": 750,
+          "info": {
+            "ptype_id": 16682,
+            "category_id": 4,
+            "group_id": 429,
+            "name": "Hypersynaptic Fibers"
+          },
+          "typ": "Reaction",
+          "components": [
+            {
+              "btype_id": 4313,
+              "blueprint_name": "Oxygen Fuel Block Blueprint",
+              "ptype_id": 4312,
+              "time": 900,
+              "quantity": 5,
+              "produces": 40,
+              "info": {
+                "ptype_id": 4312,
+                "category_id": 4,
+                "group_id": 1136,
+                "name": "Oxygen Fuel Block"
+              },
+              "typ": "Blueprint",
+              "components": [
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 9848,
+                  "time": 0,
+                  "quantity": 1,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 43,
+                    "group_id": 1040,
+                    "name": "Robotics"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 44,
+                  "time": 0,
+                  "quantity": 4,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 43,
+                    "group_id": 1034,
+                    "name": "Enriched Uranium"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 3689,
+                  "time": 0,
+                  "quantity": 4,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 43,
+                    "group_id": 1034,
+                    "name": "Mechanical Parts"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 9832,
+                  "time": 0,
+                  "quantity": 9,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 43,
+                    "group_id": 1034,
+                    "name": "Coolant"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16275,
+                  "time": 0,
+                  "quantity": 20,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 4,
+                    "group_id": 423,
+                    "name": "Strontium Clathrates"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 3683,
+                  "time": 0,
+                  "quantity": 22,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 43,
+                    "group_id": 1042,
+                    "name": "Oxygen"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16272,
+                  "time": 0,
+                  "quantity": 170,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 4,
+                    "group_id": 423,
+                    "name": "Heavy Water"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16273,
+                  "time": 0,
+                  "quantity": 350,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 4,
+                    "group_id": 423,
+                    "name": "Liquid Ozone"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 17887,
+                  "time": 0,
+                  "quantity": 450,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 4,
+                    "group_id": 423,
+                    "name": "Oxygen Isotopes"
+                  },
+                  "typ": "Material",
+                  "components": []
+                }
+              ]
+            },
+            {
+              "btype_id": 46180,
+              "blueprint_name": "Solerium Reaction Formula",
+              "ptype_id": 16664,
+              "time": 10800,
+              "quantity": 100,
+              "produces": 200,
+              "info": {
+                "ptype_id": 16664,
+                "category_id": 4,
+                "group_id": 428,
+                "name": "Solerium"
+              },
+              "typ": "Reaction",
+              "components": [
+                {
+                  "btype_id": 4313,
+                  "blueprint_name": "Oxygen Fuel Block Blueprint",
+                  "ptype_id": 4312,
+                  "time": 900,
+                  "quantity": 5,
+                  "produces": 40,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 4,
+                    "group_id": 1136,
+                    "name": "Oxygen Fuel Block"
+                  },
+                  "typ": "Blueprint",
+                  "components": [
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 9848,
+                      "time": 0,
+                      "quantity": 1,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 43,
+                        "group_id": 1040,
+                        "name": "Robotics"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 44,
+                      "time": 0,
+                      "quantity": 4,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Enriched Uranium"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 3689,
+                      "time": 0,
+                      "quantity": 4,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Mechanical Parts"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 9832,
+                      "time": 0,
+                      "quantity": 9,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Coolant"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16275,
+                      "time": 0,
+                      "quantity": 20,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Strontium Clathrates"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 3683,
+                      "time": 0,
+                      "quantity": 22,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 43,
+                        "group_id": 1042,
+                        "name": "Oxygen"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16272,
+                      "time": 0,
+                      "quantity": 170,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Heavy Water"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16273,
+                      "time": 0,
+                      "quantity": 350,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Liquid Ozone"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 17887,
+                      "time": 0,
+                      "quantity": 450,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Oxygen Isotopes"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    }
+                  ]
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16641,
+                  "time": 0,
+                  "quantity": 100,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 16641,
+                    "category_id": 4,
+                    "group_id": 427,
+                    "name": "Chromium"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16647,
+                  "time": 0,
+                  "quantity": 100,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 16647,
+                    "category_id": 4,
+                    "group_id": 427,
+                    "name": "Caesium"
+                  },
+                  "typ": "Material",
+                  "components": []
+                }
+              ]
+            },
+            {
+              "btype_id": 46170,
+              "blueprint_name": "Dysporite Reaction Formula",
+              "ptype_id": 16668,
+              "time": 10800,
+              "quantity": 100,
+              "produces": 200,
+              "info": {
+                "ptype_id": 16668,
+                "category_id": 4,
+                "group_id": 428,
+                "name": "Dysporite"
+              },
+              "typ": "Reaction",
+              "components": [
+                {
+                  "btype_id": 4315,
+                  "blueprint_name": "Helium Fuel Block Blueprint",
+                  "ptype_id": 4247,
+                  "time": 900,
+                  "quantity": 5,
+                  "produces": 40,
+                  "info": {
+                    "ptype_id": 4247,
+                    "category_id": 4,
+                    "group_id": 1136,
+                    "name": "Helium Fuel Block"
+                  },
+                  "typ": "Blueprint",
+                  "components": [
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 9848,
+                      "time": 0,
+                      "quantity": 1,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 43,
+                        "group_id": 1040,
+                        "name": "Robotics"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 44,
+                      "time": 0,
+                      "quantity": 4,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Enriched Uranium"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 3689,
+                      "time": 0,
+                      "quantity": 4,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Mechanical Parts"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 9832,
+                      "time": 0,
+                      "quantity": 9,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Coolant"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16275,
+                      "time": 0,
+                      "quantity": 20,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Strontium Clathrates"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 3683,
+                      "time": 0,
+                      "quantity": 22,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 43,
+                        "group_id": 1042,
+                        "name": "Oxygen"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16272,
+                      "time": 0,
+                      "quantity": 170,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Heavy Water"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16273,
+                      "time": 0,
+                      "quantity": 350,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Liquid Ozone"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16274,
+                      "time": 0,
+                      "quantity": 450,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Helium Isotopes"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    }
+                  ]
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16646,
+                  "time": 0,
+                  "quantity": 100,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 16646,
+                    "category_id": 4,
+                    "group_id": 427,
+                    "name": "Mercury"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16650,
+                  "time": 0,
+                  "quantity": 100,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 16650,
+                    "category_id": 4,
+                    "group_id": 427,
+                    "name": "Dysprosium"
+                  },
+                  "typ": "Material",
+                  "components": []
+                }
+              ]
+            },
+            {
+              "btype_id": 46183,
+              "blueprint_name": "Vanadium Hafnite Reaction Formula",
+              "ptype_id": 17959,
+              "time": 10800,
+              "quantity": 100,
+              "produces": 200,
+              "info": {
+                "ptype_id": 17959,
+                "category_id": 4,
+                "group_id": 428,
+                "name": "Vanadium Hafnite"
+              },
+              "typ": "Reaction",
+              "components": [
+                {
+                  "btype_id": 4316,
+                  "blueprint_name": "Hydrogen Fuel Block Blueprint",
+                  "ptype_id": 4246,
+                  "time": 900,
+                  "quantity": 5,
+                  "produces": 40,
+                  "info": {
+                    "ptype_id": 4246,
+                    "category_id": 4,
+                    "group_id": 1136,
+                    "name": "Hydrogen Fuel Block"
+                  },
+                  "typ": "Blueprint",
+                  "components": [
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 9848,
+                      "time": 0,
+                      "quantity": 1,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4246,
+                        "category_id": 43,
+                        "group_id": 1040,
+                        "name": "Robotics"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 44,
+                      "time": 0,
+                      "quantity": 4,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4246,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Enriched Uranium"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 3689,
+                      "time": 0,
+                      "quantity": 4,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4246,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Mechanical Parts"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 9832,
+                      "time": 0,
+                      "quantity": 9,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4246,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Coolant"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16275,
+                      "time": 0,
+                      "quantity": 20,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4246,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Strontium Clathrates"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 3683,
+                      "time": 0,
+                      "quantity": 22,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4246,
+                        "category_id": 43,
+                        "group_id": 1042,
+                        "name": "Oxygen"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16272,
+                      "time": 0,
+                      "quantity": 170,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4246,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Heavy Water"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16273,
+                      "time": 0,
+                      "quantity": 350,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4246,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Liquid Ozone"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 17889,
+                      "time": 0,
+                      "quantity": 450,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4246,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Hydrogen Isotopes"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    }
+                  ]
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16642,
+                  "time": 0,
+                  "quantity": 100,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 17959,
+                    "category_id": 4,
+                    "group_id": 427,
+                    "name": "Vanadium"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16648,
+                  "time": 0,
+                  "quantity": 100,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 17959,
+                    "category_id": 4,
+                    "group_id": 427,
+                    "name": "Hafnium"
+                  },
+                  "typ": "Material",
+                  "components": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "btype_id": 46209,
+          "blueprint_name": "Fulleride Reaction Formula",
+          "ptype_id": 16679,
+          "time": 10800,
+          "quantity": 11,
+          "produces": 3000,
+          "info": {
+            "ptype_id": 16679,
+            "category_id": 4,
+            "group_id": 429,
+            "name": "Fullerides"
+          },
+          "typ": "Reaction",
+          "components": [
+            {
+              "btype_id": 4314,
+              "blueprint_name": "Nitrogen Fuel Block Blueprint",
+              "ptype_id": 4051,
+              "time": 900,
+              "quantity": 5,
+              "produces": 40,
+              "info": {
+                "ptype_id": 4051,
+                "category_id": 4,
+                "group_id": 1136,
+                "name": "Nitrogen Fuel Block"
+              },
+              "typ": "Blueprint",
+              "components": [
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 9848,
+                  "time": 0,
+                  "quantity": 1,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4051,
+                    "category_id": 43,
+                    "group_id": 1040,
+                    "name": "Robotics"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 44,
+                  "time": 0,
+                  "quantity": 4,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4051,
+                    "category_id": 43,
+                    "group_id": 1034,
+                    "name": "Enriched Uranium"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 3689,
+                  "time": 0,
+                  "quantity": 4,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4051,
+                    "category_id": 43,
+                    "group_id": 1034,
+                    "name": "Mechanical Parts"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 9832,
+                  "time": 0,
+                  "quantity": 9,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4051,
+                    "category_id": 43,
+                    "group_id": 1034,
+                    "name": "Coolant"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16275,
+                  "time": 0,
+                  "quantity": 20,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4051,
+                    "category_id": 4,
+                    "group_id": 423,
+                    "name": "Strontium Clathrates"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 3683,
+                  "time": 0,
+                  "quantity": 22,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4051,
+                    "category_id": 43,
+                    "group_id": 1042,
+                    "name": "Oxygen"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16272,
+                  "time": 0,
+                  "quantity": 170,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4051,
+                    "category_id": 4,
+                    "group_id": 423,
+                    "name": "Heavy Water"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16273,
+                  "time": 0,
+                  "quantity": 350,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4051,
+                    "category_id": 4,
+                    "group_id": 423,
+                    "name": "Liquid Ozone"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 17888,
+                  "time": 0,
+                  "quantity": 450,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4051,
+                    "category_id": 4,
+                    "group_id": 423,
+                    "name": "Nitrogen Isotopes"
+                  },
+                  "typ": "Material",
+                  "components": []
+                }
+              ]
+            },
+            {
+              "btype_id": 46167,
+              "blueprint_name": "Carbon Polymers Reaction Formula",
+              "ptype_id": 16659,
+              "time": 10800,
+              "quantity": 100,
+              "produces": 200,
+              "info": {
+                "ptype_id": 16659,
+                "category_id": 4,
+                "group_id": 428,
+                "name": "Carbon Polymers"
+              },
+              "typ": "Reaction",
+              "components": [
+                {
+                  "btype_id": 4315,
+                  "blueprint_name": "Helium Fuel Block Blueprint",
+                  "ptype_id": 4247,
+                  "time": 900,
+                  "quantity": 5,
+                  "produces": 40,
+                  "info": {
+                    "ptype_id": 4247,
+                    "category_id": 4,
+                    "group_id": 1136,
+                    "name": "Helium Fuel Block"
+                  },
+                  "typ": "Blueprint",
+                  "components": [
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 9848,
+                      "time": 0,
+                      "quantity": 1,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 43,
+                        "group_id": 1040,
+                        "name": "Robotics"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 44,
+                      "time": 0,
+                      "quantity": 4,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Enriched Uranium"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 3689,
+                      "time": 0,
+                      "quantity": 4,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Mechanical Parts"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 9832,
+                      "time": 0,
+                      "quantity": 9,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Coolant"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16275,
+                      "time": 0,
+                      "quantity": 20,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Strontium Clathrates"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 3683,
+                      "time": 0,
+                      "quantity": 22,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 43,
+                        "group_id": 1042,
+                        "name": "Oxygen"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16272,
+                      "time": 0,
+                      "quantity": 170,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Heavy Water"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16273,
+                      "time": 0,
+                      "quantity": 350,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Liquid Ozone"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16274,
+                      "time": 0,
+                      "quantity": 450,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4247,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Helium Isotopes"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    }
+                  ]
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16633,
+                  "time": 0,
+                  "quantity": 100,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 16633,
+                    "category_id": 4,
+                    "group_id": 427,
+                    "name": "Hydrocarbons"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16636,
+                  "time": 0,
+                  "quantity": 100,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 16636,
+                    "category_id": 4,
+                    "group_id": 427,
+                    "name": "Silicates"
+                  },
+                  "typ": "Material",
+                  "components": []
+                }
+              ]
+            },
+            {
+              "btype_id": 46177,
+              "blueprint_name": "Platinum Technite Reaction Formula",
+              "ptype_id": 16662,
+              "time": 10800,
+              "quantity": 100,
+              "produces": 200,
+              "info": {
+                "ptype_id": 16662,
+                "category_id": 4,
+                "group_id": 428,
+                "name": "Platinum Technite"
+              },
+              "typ": "Reaction",
+              "components": [
+                {
+                  "btype_id": 4314,
+                  "blueprint_name": "Nitrogen Fuel Block Blueprint",
+                  "ptype_id": 4051,
+                  "time": 900,
+                  "quantity": 5,
+                  "produces": 40,
+                  "info": {
+                    "ptype_id": 4051,
+                    "category_id": 4,
+                    "group_id": 1136,
+                    "name": "Nitrogen Fuel Block"
+                  },
+                  "typ": "Blueprint",
+                  "components": [
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 9848,
+                      "time": 0,
+                      "quantity": 1,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4051,
+                        "category_id": 43,
+                        "group_id": 1040,
+                        "name": "Robotics"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 44,
+                      "time": 0,
+                      "quantity": 4,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4051,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Enriched Uranium"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 3689,
+                      "time": 0,
+                      "quantity": 4,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4051,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Mechanical Parts"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 9832,
+                      "time": 0,
+                      "quantity": 9,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4051,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Coolant"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16275,
+                      "time": 0,
+                      "quantity": 20,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4051,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Strontium Clathrates"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 3683,
+                      "time": 0,
+                      "quantity": 22,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4051,
+                        "category_id": 43,
+                        "group_id": 1042,
+                        "name": "Oxygen"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16272,
+                      "time": 0,
+                      "quantity": 170,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4051,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Heavy Water"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16273,
+                      "time": 0,
+                      "quantity": 350,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4051,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Liquid Ozone"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 17888,
+                      "time": 0,
+                      "quantity": 450,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4051,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Nitrogen Isotopes"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    }
+                  ]
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16644,
+                  "time": 0,
+                  "quantity": 100,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 16662,
+                    "category_id": 4,
+                    "group_id": 427,
+                    "name": "Platinum"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16649,
+                  "time": 0,
+                  "quantity": 100,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 16662,
+                    "category_id": 4,
+                    "group_id": 427,
+                    "name": "Technetium"
+                  },
+                  "typ": "Material",
+                  "components": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "btype_id": 46204,
+          "blueprint_name": "Titanium Carbide Reaction Formula",
+          "ptype_id": 16671,
+          "time": 10800,
+          "quantity": 31,
+          "produces": 10000,
+          "info": {
+            "ptype_id": 16671,
+            "category_id": 4,
+            "group_id": 429,
+            "name": "Titanium Carbide"
+          },
+          "typ": "Reaction",
+          "components": [
+            {
+              "btype_id": 4313,
+              "blueprint_name": "Oxygen Fuel Block Blueprint",
+              "ptype_id": 4312,
+              "time": 900,
+              "quantity": 5,
+              "produces": 40,
+              "info": {
+                "ptype_id": 4312,
+                "category_id": 4,
+                "group_id": 1136,
+                "name": "Oxygen Fuel Block"
+              },
+              "typ": "Blueprint",
+              "components": [
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 9848,
+                  "time": 0,
+                  "quantity": 1,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 43,
+                    "group_id": 1040,
+                    "name": "Robotics"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 44,
+                  "time": 0,
+                  "quantity": 4,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 43,
+                    "group_id": 1034,
+                    "name": "Enriched Uranium"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 3689,
+                  "time": 0,
+                  "quantity": 4,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 43,
+                    "group_id": 1034,
+                    "name": "Mechanical Parts"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 9832,
+                  "time": 0,
+                  "quantity": 9,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 43,
+                    "group_id": 1034,
+                    "name": "Coolant"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16275,
+                  "time": 0,
+                  "quantity": 20,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 4,
+                    "group_id": 423,
+                    "name": "Strontium Clathrates"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 3683,
+                  "time": 0,
+                  "quantity": 22,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 43,
+                    "group_id": 1042,
+                    "name": "Oxygen"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16272,
+                  "time": 0,
+                  "quantity": 170,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 4,
+                    "group_id": 423,
+                    "name": "Heavy Water"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16273,
+                  "time": 0,
+                  "quantity": 350,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 4,
+                    "group_id": 423,
+                    "name": "Liquid Ozone"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 17887,
+                  "time": 0,
+                  "quantity": 450,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 4,
+                    "group_id": 423,
+                    "name": "Oxygen Isotopes"
+                  },
+                  "typ": "Material",
+                  "components": []
+                }
+              ]
+            },
+            {
+              "btype_id": 46182,
+              "blueprint_name": "Titanium Chromide Reaction Formula",
+              "ptype_id": 16654,
+              "time": 10800,
+              "quantity": 100,
+              "produces": 200,
+              "info": {
+                "ptype_id": 16654,
+                "category_id": 4,
+                "group_id": 428,
+                "name": "Titanium Chromide"
+              },
+              "typ": "Reaction",
+              "components": [
+                {
+                  "btype_id": 4313,
+                  "blueprint_name": "Oxygen Fuel Block Blueprint",
+                  "ptype_id": 4312,
+                  "time": 900,
+                  "quantity": 5,
+                  "produces": 40,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 4,
+                    "group_id": 1136,
+                    "name": "Oxygen Fuel Block"
+                  },
+                  "typ": "Blueprint",
+                  "components": [
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 9848,
+                      "time": 0,
+                      "quantity": 1,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 43,
+                        "group_id": 1040,
+                        "name": "Robotics"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 44,
+                      "time": 0,
+                      "quantity": 4,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Enriched Uranium"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 3689,
+                      "time": 0,
+                      "quantity": 4,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Mechanical Parts"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 9832,
+                      "time": 0,
+                      "quantity": 9,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Coolant"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16275,
+                      "time": 0,
+                      "quantity": 20,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Strontium Clathrates"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 3683,
+                      "time": 0,
+                      "quantity": 22,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 43,
+                        "group_id": 1042,
+                        "name": "Oxygen"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16272,
+                      "time": 0,
+                      "quantity": 170,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Heavy Water"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16273,
+                      "time": 0,
+                      "quantity": 350,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Liquid Ozone"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 17887,
+                      "time": 0,
+                      "quantity": 450,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Oxygen Isotopes"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    }
+                  ]
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16638,
+                  "time": 0,
+                  "quantity": 100,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 16638,
+                    "category_id": 4,
+                    "group_id": 427,
+                    "name": "Titanium"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16641,
+                  "time": 0,
+                  "quantity": 100,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 16641,
+                    "category_id": 4,
+                    "group_id": 427,
+                    "name": "Chromium"
+                  },
+                  "typ": "Material",
+                  "components": []
+                }
+              ]
+            },
+            {
+              "btype_id": 46179,
+              "blueprint_name": "Silicon Diborite Reaction Formula",
+              "ptype_id": 16658,
+              "time": 10800,
+              "quantity": 100,
+              "produces": 200,
+              "info": {
+                "ptype_id": 16658,
+                "category_id": 4,
+                "group_id": 428,
+                "name": "Silicon Diborite"
+              },
+              "typ": "Reaction",
+              "components": [
+                {
+                  "btype_id": 4313,
+                  "blueprint_name": "Oxygen Fuel Block Blueprint",
+                  "ptype_id": 4312,
+                  "time": 900,
+                  "quantity": 5,
+                  "produces": 40,
+                  "info": {
+                    "ptype_id": 4312,
+                    "category_id": 4,
+                    "group_id": 1136,
+                    "name": "Oxygen Fuel Block"
+                  },
+                  "typ": "Blueprint",
+                  "components": [
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 9848,
+                      "time": 0,
+                      "quantity": 1,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 43,
+                        "group_id": 1040,
+                        "name": "Robotics"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 44,
+                      "time": 0,
+                      "quantity": 4,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Enriched Uranium"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 3689,
+                      "time": 0,
+                      "quantity": 4,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Mechanical Parts"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 9832,
+                      "time": 0,
+                      "quantity": 9,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 43,
+                        "group_id": 1034,
+                        "name": "Coolant"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16275,
+                      "time": 0,
+                      "quantity": 20,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Strontium Clathrates"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 3683,
+                      "time": 0,
+                      "quantity": 22,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 43,
+                        "group_id": 1042,
+                        "name": "Oxygen"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16272,
+                      "time": 0,
+                      "quantity": 170,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Heavy Water"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 16273,
+                      "time": 0,
+                      "quantity": 350,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Liquid Ozone"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    },
+                    {
+                      "btype_id": 0,
+                      "blueprint_name": "",
+                      "ptype_id": 17887,
+                      "time": 0,
+                      "quantity": 450,
+                      "produces": 0,
+                      "info": {
+                        "ptype_id": 4312,
+                        "category_id": 4,
+                        "group_id": 423,
+                        "name": "Oxygen Isotopes"
+                      },
+                      "typ": "Material",
+                      "components": []
+                    }
+                  ]
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16635,
+                  "time": 0,
+                  "quantity": 100,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 16635,
+                    "category_id": 4,
+                    "group_id": 427,
+                    "name": "Evaporite Deposits"
+                  },
+                  "typ": "Material",
+                  "components": []
+                },
+                {
+                  "btype_id": 0,
+                  "blueprint_name": "",
+                  "ptype_id": 16636,
+                  "time": 0,
+                  "quantity": 100,
+                  "produces": 0,
+                  "info": {
+                    "ptype_id": 16636,
+                    "category_id": 4,
+                    "group_id": 427,
+                    "name": "Silicates"
+                  },
+                  "typ": "Material",
+                  "components": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

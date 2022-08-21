@@ -7,25 +7,25 @@ default-run = "caph_server"
 
 [dependencies]
 appraisal = { path = "../appraisal" }
-async-trait = "0.1.56"
-axum = { version = "0.5.8", features = ["headers"] }
+async-trait = "0.1.57"
+axum = { version = "0.5.15", features = ["headers"] }
 base64 = "0.13.0"
 caph_connector = { path = "../connector" }
-chrono = "0.4.19"
-dotenv = "0.15.0"
-futures = "0.3.21"
+chrono = "0.4.22"
+dotenvy = "0.15.1"
+futures = "0.3.23"
 headers = "0.3.7"
 hmac = "0.12.1"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
 reqwest = "0.11.11"
-serde = { version = "1.0.137", features = ["derive"] }
-serde_json = "1.0.81"
+serde = { version = "1.0.143", features = ["derive"] }
+serde_json = "1.0.83"
 sha2 = "0.10.2"
-sqlx = { version = "0.6.0", features = ["chrono", "runtime-tokio-rustls", "postgres", "uuid", "json"] }
-tokio = { version = "1.19.2", features = ["full"] }
-tracing = "0.1.35"
-tracing-subscriber =  { version = "0.3.11", features = ["env-filter"] }
+sqlx = { version = "0.6.1", features = ["chrono", "runtime-tokio-rustls", "postgres", "uuid", "json"] }
+tokio = { version = "1.20.1", features = ["full"] }
+tracing = "0.1.36"
+tracing-subscriber =  { version = "0.3.15", features = ["env-filter"] }
 uuid = { version = "1.1.2", features = ["v4", "serde"] }
 
 [dev-dependencies]

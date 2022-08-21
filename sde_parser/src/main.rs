@@ -22,6 +22,8 @@
 
 /// Module for creating the blueprints SQL-Code
 mod blueprints;
+/// Module for parsing dogma data
+mod dogma;
 /// Module for creating the items SQL-Code
 mod items;
 
@@ -70,6 +72,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             FOLDER_OUTPUT
     ))?;
     fs.write_all(blueprints.as_bytes())?;
+
+    let dogma = dogma::run()?;
+    let mut fs = File::create(format!(
+            "{}/{}/dogma.sql",
+            current_dir.to_str().unwrap_or_default(),
+            FOLDER_OUTPUT
+    ))?;
+    fs.write_all(dogma.as_bytes())?;
 
     Ok(())
 }

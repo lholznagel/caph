@@ -1,0 +1,129 @@
+{
+  "btype_id": 687,
+  "blueprint_name": "Caracal Blueprint",
+  "ptype_id": 621,
+  "time": 12000,
+  "quantity": 1,
+  "produces": 1,
+  "info": {
+    "ptype_id": 621,
+    "category_id": 6,
+    "group_id": 26,
+    "name": "Caracal"
+  },
+  "typ": "Blueprint",
+  "components": [
+    {
+      "btype_id": 0,
+      "blueprint_name": "",
+      "ptype_id": 34,
+      "time": 0,
+      "quantity": 540000,
+      "produces": 0,
+      "info": {
+        "ptype_id": 621,
+        "category_id": 4,
+        "group_id": 18,
+        "name": "Tritanium"
+      },
+      "typ": "Material",
+      "components": []
+    },
+    {
+      "btype_id": 0,
+      "blueprint_name": "",
+      "ptype_id": 35,
+      "time": 0,
+      "quantity": 180000,
+      "produces": 0,
+      "info": {
+        "ptype_id": 621,
+        "category_id": 4,
+        "group_id": 18,
+        "name": "Pyerite"
+      },
+      "typ": "Material",
+      "components": []
+    },
+    {
+      "btype_id": 0,
+      "blueprint_name": "",
+      "ptype_id": 36,
+      "time": 0,
+      "quantity": 36000,
+      "produces": 0,
+      "info": {
+        "ptype_id": 621,
+        "category_id": 4,
+        "group_id": 18,
+        "name": "Mexallon"
+      },
+      "typ": "Material",
+      "components": []
+    },
+    {
+      "btype_id": 0,
+      "blueprint_name": "",
+      "ptype_id": 37,
+      "time": 0,
+      "quantity": 10000,
+      "produces": 0,
+      "info": {
+        "ptype_id": 621,
+        "category_id": 4,
+        "group_id": 18,
+        "name": "Isogen"
+      },
+      "typ": "Material",
+      "components": []
+    },
+    {
+      "btype_id": 0,
+      "blueprint_name": "",
+      "ptype_id": 38,
+      "time": 0,
+      "quantity": 1500,
+      "produces": 0,
+      "info": {
+        "ptype_id": 621,
+        "category_id": 4,
+        "group_id": 18,
+        "name": "Nocxium"
+      },
+      "typ": "Material",
+      "components": []
+    },
+    {
+      "btype_id": 0,
+      "blueprint_name": "",
+      "ptype_id": 39,
+      "time": 0,
+      "quantity": 350,
+      "produces": 0,
+      "info": {
+        "ptype_id": 621,
+        "category_id": 4,
+        "group_id": 18,
+        "name": "Zydrine"
+      },
+      "typ": "Material",
+      "components": []
+    },
+    {
+      "btype_id": 0,
+      "blueprint_name": "",
+      "ptype_id": 40,
+      "time": 0,
+      "quantity": 140,
+      "produces": 0,
+      "info": {
+        "ptype_id": 621,
+        "category_id": 4,
+        "group_id": 18,
+        "name": "Megacyte"
+      },
+      "typ": "Material",
+      "components": []
+    }
+  ]
+}

@@ -1,13 +1,13 @@
 use appraisal::{Appraisal, AppraisalInformation, Janice};
-use caph_connector::{CharacterId, GroupId, TypeId, AllianceId, CorporationId};
+use caph_connector::{AllianceId, CorporationId, CharacterId, GroupId, TypeId};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::collections::HashMap;
 use tracing::instrument;
 use uuid::Uuid;
 
-use crate::{Error, ProjectBlueprintService, Blueprint, project::dependency::DependencyGroup};
-use super::dependency::{DependencyCache, Dependency, DatabaseDependency};
+use crate::{Error, ProjectBlueprintService, Blueprint, DependencyType, Structure, StructureRig};
+use crate::project::dependency::{Dependency, DatabaseDependency, DependencyGroup};
 
 /// An id of a tracking entry
 pub type BudgetId    = Uuid;
@@ -36,9 +36,6 @@ pub struct ProjectService {
 
     /// Service for handling blueprints
     blueprint:        ProjectBlueprintService,
-
-    /// Cache for specific entries
-    dependency_cache: DependencyCache
 }
 
 impl ProjectService {
@@ -56,15 +53,11 @@ impl ProjectService {
         pool:             PgPool,
 
         blueprint:        ProjectBlueprintService,
-
-        dependency_cache: DependencyCache
     ) -> Self {
         Self {
             pool,
 
             blueprint,
-
-            dependency_cache
         }
     }
 
@@ -386,13 +379,25 @@ impl ProjectService {
             .stored(pid)
             .await?
             .into_iter()
-            .map(|x| (x.ptype_id, x.me.unwrap_or_default() as u8))
+            .map(|x| (x.ptype_id, x.me.unwrap_or_default() as f32))
             .collect::<HashMap<_, _>>();
         let structure_bonus = self.blueprint
             .stored(pid)
             .await?
             .into_iter()
-            .map(|x| (x.ptype_id, 1u8))
+            .map(|x| (x.ptype_id, 1f32))
+            .collect::<HashMap<_, _>>();
+        let rig_bonus = self.blueprint
+            .stored(pid)
+            .await?
+            .into_iter()
+            .map(|x| (x.ptype_id, 4.2f32))
+            .collect::<HashMap<_, _>>();
+        let reaction_bonus = self.blueprint
+            .stored(pid)
+            .await?
+            .into_iter()
+            .map(|x| (x.ptype_id, 2.6f32))
             .collect::<HashMap<_, _>>();
 
         let products = sqlx::query!("
@@ -409,12 +414,19 @@ impl ProjectService {
             .into_iter()
             .map(|x| {
                 let dependency: DatabaseDependency = serde_json::from_value(x.data).unwrap();
-                let mut dependency = Dependency::from_database_dependency(dependency);
-                dependency.set_product_quantity(x.count as u32);
-                dependency.apply_material_bonus(&bp_bonus);
+                let mut dependency = Dependency::from(dependency);
 
-                // TODO: extract, and add rigs
-                dependency.apply_material_bonus(&structure_bonus);
+                if dependency.dependency_type == DependencyType::Material ||
+                    dependency.dependency_type == DependencyType::Blueprint {
+
+                    dependency.apply_material_bonus(&bp_bonus);
+                    dependency.apply_material_bonus(&rig_bonus);
+                    dependency.apply_material_bonus(&structure_bonus);
+                } else if dependency.dependency_type == DependencyType::Reaction {
+                    dependency.apply_material_bonus(&reaction_bonus);
+                }
+                dependency.round_material_bonus();
+
                 dependency
             })
             .collect::<Vec<_>>()
@@ -462,7 +474,7 @@ impl ProjectService {
             .raw_materials(pid)
             .await?
             .into_iter()
-            .map(|x| format!("{} {}", x.name, x.products))
+            .map(|x| format!("{} {}", x.name, x.product()))
             .collect::<Vec<_>>();
 
         janice.create(
@@ -521,14 +533,27 @@ impl ProjectService {
             .stored(pid)
             .await?
             .into_iter()
-            .map(|x| (x.ptype_id, x.me.unwrap_or_default() as u8))
+            .map(|x| (x.ptype_id, x.me.unwrap_or_default() as f32))
             .collect::<HashMap<_, _>>();
         let structure_bonus = self.blueprint
             .stored(pid)
             .await?
             .into_iter()
-            .map(|x| (x.ptype_id, 1u8))
+            .map(|x| (x.ptype_id, 1f32))
             .collect::<HashMap<_, _>>();
+        let rig_bonus = self.blueprint
+            .stored(pid)
+            .await?
+            .into_iter()
+            .map(|x| (x.ptype_id, 4.2f32))
+            .collect::<HashMap<_, _>>();
+        let reaction_bonus = self.blueprint
+            .stored(pid)
+            .await?
+            .into_iter()
+            .map(|x| (x.ptype_id, 2.6f32))
+            .collect::<HashMap<_, _>>();
+        let structures = Self::structures();
 
         let dependencies = sqlx::query!("
                     SELECT type_id, count, data
@@ -544,18 +569,29 @@ impl ProjectService {
             .into_iter()
             .map(|x| {
                 let dependency: DatabaseDependency = serde_json::from_value(x.data).unwrap();
-                let mut dependency = Dependency::from_database_dependency(dependency);
+                let mut dependency = Dependency::from(dependency);
 
                 dependency.set_product_quantity(x.count as u32);
-                //dependency.apply_material_bonus(&bp_bonus);
-                //dependency.apply_material_bonus(&structure_bonus);
+
+                /*if dependency.dependency_type == DependencyType::Material ||
+                    dependency.dependency_type == DependencyType::Blueprint {
+
+                    dependency.apply_material_bonus(&bp_bonus);
+                    dependency.apply_material_bonus(&rig_bonus);
+                    dependency.apply_material_bonus(&structure_bonus);
+                } else if dependency.dependency_type == DependencyType::Reaction {
+                    dependency.apply_material_bonus(&reaction_bonus);
+                }
+                dependency.round_material_bonus();*/
+
                 dependency
             })
             .collect::<Vec<_>>();
 
-        let dependencies = DependencyGroup::from_dependencies(dependencies)
-            .collect_components()
-            .build_order();
+        let mut dependencies = DependencyGroup::from_dependencies(dependencies)
+            .collect_components();
+        dependencies.recalculate();
+        let dependencies = dependencies.build_order();
 
         //let dependencies = Vec::new();
         Ok(dependencies)
@@ -1099,6 +1135,39 @@ impl ProjectService {
             .map(drop)
             .map_err(Error::DatabaseError)
     }
+
+    fn structures() -> Vec<Structure> {
+        vec![
+            Structure::new(
+                "Enablement Station - RAMI".into(),
+                "F-NMX6".into(),
+                crate::Security::Nullsec,
+                crate::StructureType::Tatara,
+                vec![
+                    crate::StructureRig::ReactorEfficiencyII,
+                ]
+            ),
+            Structure::new(
+                "Shipyard".into(),
+                "Q-5211".into(),
+                crate::Security::Nullsec,
+                crate::StructureType::Azbel,
+                vec![
+                    crate::StructureRig::AdvancedComponentManufacturingEfficiencyI,
+                ]
+            ),
+            Structure::new(
+                "CAPSBEL".into(),
+                "Q-5211".into(),
+                crate::Security::Nullsec,
+                crate::StructureType::Azbel,
+                vec![
+                    crate::StructureRig::CapitalShipManufacturingEfficiencyI,
+                    crate::StructureRig::CapitalComponentManufacturingEfficiencyI,
+                ]
+            ),
+        ]
+    }
 }
 
 impl std::fmt::Debug for ProjectService {
@@ -1399,67 +1468,4 @@ pub struct Member {
     pub alliance_id:      Option<AllianceId>,
     /// Name of the alliance
     pub alliance_name:    Option<String>,
-}
-
-#[cfg(test)]
-mod tests {
-    use caph_connector::TypeId;
-    use sqlx::postgres::PgPoolOptions;
-    use std::str::FromStr;
-
-    use crate::{AuthService, CharacterService};
-    use super::*;
-
-    #[tokio::test]
-    async fn what_da_fuck() {
-        dotenv::dotenv().ok();
-        let pg_addr = std::env::var("DATABASE_URL")
-            .expect("Expected that a DATABASE_URL ENV is set");
-        let pool = PgPoolOptions::new()
-            .max_connections(10)
-            .connect(&pg_addr)
-            .await
-            .unwrap();
-
-        let cache = DependencyCache::new(pool.clone()).await.unwrap();
-        let auth_service = AuthService::new(pool.clone());
-        let character_service = CharacterService::new(pool.clone(), auth_service);
-        let bp_service = ProjectBlueprintService::new(pool.clone(), character_service);
-
-        let service = ProjectService::new(pool, bp_service, cache);
-        let xyz = service
-            .buildstep_manufacturing(Uuid::from_str("b555b8e9-5957-4441-b850-33d33f88f234").unwrap())
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|x| (x.ptype_id, x))
-            .collect::<HashMap<_, _>>();
-
-        assert_eq!(xyz.get(&TypeId(30303)).unwrap().products, 1875);
-        assert_eq!(xyz.get(&TypeId(30303)).unwrap().components[1].products, 10);
-        assert_eq!(xyz.get(&TypeId(30304)).unwrap().products, 525);
-        assert_eq!(xyz.get(&TypeId(30304)).unwrap().components[1].products, 15);
-        assert_eq!(xyz.get(&TypeId(30305)).unwrap().products, 1125);
-        assert_eq!(xyz.get(&TypeId(30305)).unwrap().components[1].products, 50);
-        assert_eq!(xyz.get(&TypeId(30306)).unwrap().products, 525);
-        assert_eq!(xyz.get(&TypeId(30306)).unwrap().components[1].products, 20);
-        assert_eq!(xyz.get(&TypeId(30307)).unwrap().products, 525);
-        assert_eq!(xyz.get(&TypeId(30307)).unwrap().components[1].products, 25);
-        assert_eq!(xyz.get(&TypeId(30308)).unwrap().products, 375);
-        assert_eq!(xyz.get(&TypeId(30308)).unwrap().components[1].products, 15);
-        assert_eq!(xyz.get(&TypeId(30308)).unwrap().products, 375);
-        assert_eq!(xyz.get(&TypeId(30308)).unwrap().components[1].products, 15);
-        assert_eq!(xyz.get(&TypeId(57457)).unwrap().products, 45170);
-        assert_eq!(xyz.get(&TypeId(57457)).unwrap().components[0].products, 45200);
-        assert_eq!(xyz.get(&TypeId(57457)).unwrap().components[1].products, 226);
-        assert_eq!(xyz.get(&TypeId(57457)).unwrap().components[2].products, 45200);
-        assert_eq!(xyz.get(&TypeId(57453)).unwrap().products, 45200);
-        assert_eq!(xyz.get(&TypeId(57453)).unwrap().components[0].products, 1130);
-        assert_eq!(xyz.get(&TypeId(57455)).unwrap().products, 45200);
-        assert_eq!(xyz.get(&TypeId(57455)).unwrap().components[0].products, 1130);
-        assert_eq!(xyz.get(&TypeId(57454)).unwrap().products, 402);
-        assert_eq!(xyz.get(&TypeId(57454)).unwrap().components[0].products, 205);
-        assert_eq!(xyz.get(&TypeId(16659)).unwrap().products, 35300);
-        assert_eq!(xyz.get(&TypeId(16659)).unwrap().components[0].products, 885);
-    }
 }

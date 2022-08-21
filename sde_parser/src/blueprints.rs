@@ -532,12 +532,10 @@ fn sql_json(
         btype_id:       TypeId,
         blueprint_name: String,
         ptype_id:       TypeId,
-        category_id:    u32,
-        group_id:       u32,
-        product_name:   String,
         time:           u32,
         quantity:       u32,
         produces:       u32,
+        info:           DependencyInfo,
         typ:            DependencyType,
         components:     Vec<Dependency>,
     }
@@ -545,6 +543,14 @@ fn sql_json(
         pub fn to_sql(self) -> String {
             format!("({}, '{}')", &self.ptype_id, serde_json::to_string(&self).unwrap())
         }
+    }
+
+    #[derive(Clone, Debug, Serialize)]
+    struct DependencyInfo {
+        ptype_id:     TypeId,
+        category_id:  u32,
+        group_id:     u32,
+        name:         String,
     }
 
     let find_btype_id = |ptype_id: TypeId| {
@@ -576,7 +582,6 @@ fn sql_json(
         if !ientry.published {
             continue;
         }
-        dbg!(pentry);
 
         let iname = ientry
             .name
@@ -588,11 +593,14 @@ fn sql_json(
 
         let mut dependency = Dependency {
             blueprint_name: bname.clone(),
-            product_name:   iname.clone(),
             ptype_id:       *ptype_id,
             btype_id:       find_btype_id(*ptype_id),
-            category_id:    icategory_id as u32,
-            group_id:       igroup_id as u32,
+            info:           DependencyInfo {
+                                ptype_id: *ptype_id,
+                                category_id: icategory_id as u32,
+                                group_id: igroup_id as u32,
+                                name: iname.clone()
+                            },
             time:           pentry.manufacture_time().unwrap() as u32,
             quantity:       pentry.product_quantity().unwrap() as u32,
             produces:       pentry.product_quantity().unwrap() as u32,
@@ -618,15 +626,18 @@ fn sql_json(
                 let icategory_id = groups.get(&igroup_id).unwrap().category_id;
 
                 let dependency = Dependency {
-                    product_name:   iname.clone(),
                     blueprint_name: String::new(),
                     ptype_id:       material.type_id,
                     btype_id:       0,
-                    category_id:    icategory_id as u32,
-                    group_id:       igroup_id as u32,
                     time:           0,
                     quantity:       material.quantity as u32,
                     produces:       0,
+                    info:           DependencyInfo {
+                                        ptype_id: *ptype_id,
+                                        category_id: icategory_id as u32,
+                                        group_id: igroup_id as u32,
+                                        name: iname.clone()
+                                    },
                     typ:            DependencyType::Material,
                     components:     Vec::new()
                 };
@@ -667,15 +678,18 @@ fn sql_json(
                 let icategory_id = groups.get(&igroup_id).unwrap().category_id;
 
                 let dependency = Dependency {
-                    product_name:   iname.clone(),
                     blueprint_name: String::new(),
                     ptype_id:       material.type_id,
                     btype_id:       0,
-                    category_id:    icategory_id as u32,
-                    group_id:       igroup_id as u32,
                     time:           0,
                     quantity:       material.quantity as u32,
                     produces:       0,
+                    info:           DependencyInfo {
+                                        ptype_id: material.type_id,
+                                        category_id: icategory_id as u32,
+                                        group_id: igroup_id as u32,
+                                        name: iname.clone()
+                                    },
                     typ:            DependencyType::Material,
                     components:     Vec::new()
                 };
