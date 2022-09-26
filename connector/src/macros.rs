@@ -17,11 +17,8 @@ macro_rules! eve_id {
     ($name:ident, $typ:ty, $typ2:ty) => {
         /// Represents an ID-Type from EVE
         #[derive(
-            Clone, Copy, Debug, Hash,
-            PartialEq, Eq,
-            PartialOrd, Ord,
-            Deserialize, Serialize,
-         )]
+            Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize,
+        )]
         #[serde(transparent)]
         #[cfg_attr(feature = "sqlx_types", derive(sqlx::Type))]
         #[cfg_attr(feature = "sqlx_types", sqlx(transparent))]
@@ -48,11 +45,18 @@ macro_rules! eve_id {
         }
 
         impl std::fmt::Display for $name {
-            fn fmt(
-                &self,
-                f: &mut std::fmt::Formatter<'_>
-            ) -> std::fmt::Result {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{}", self.0)
+            }
+        }
+
+        impl std::str::FromStr for $name {
+            type Err = String;
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                s.parse::<$typ>()
+                    .map_err(|e| format!("Error parsing {e} into number {s}"))
+                    .map(|p| Self(p))
             }
         }
     };

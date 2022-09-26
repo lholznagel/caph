@@ -62,7 +62,7 @@
               :key="entry.type_id"
             >
               <td>
-                <item-icon
+                <eve-icon
                   :id="entry.type_id"
                   :type="
                     entry.runs === -1
@@ -118,12 +118,12 @@ import { PROJECT_ROUTE } from '@/event_bus';
 
 import FilterElement from '@/components/FilterElement.vue';
 import FilterText, { IFilterOption } from '@/components/Filter.vue';
-import ItemIcon from '@/components/ItemIcon.vue';
+import EveIcon from '@/components/EveIcon.vue';
 
 import PExport from '@/project/MExport.vue';
 import PHeader from '@/project/CHeader.vue';
 import PTableHeader from '@/project/CTableHeader.vue';
-import WProject from '@/project/WProject.vue';
+import WProject from '@/project/wrapper/Project.vue';
 
 @Options({
   components: {
@@ -140,7 +140,7 @@ import WProject from '@/project/WProject.vue';
 
     FilterElement,
     FilterText,
-    ItemIcon,
+    EveIcon,
 
     PExport,
     PHeader,

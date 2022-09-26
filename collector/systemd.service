@@ -1,0 +1,17 @@
+[Unit]
+Description=Caph Data Collector
+
+[Service]
+Type=simple
+
+Environment=RUST_BACKTRACE=1
+# Address the server should bind to
+Environment=SERVER_BIND_ADDR=
+# URI of the database
+Environment=DATABASE_URL=
+
+ExecStart=/opt/caph/caph_collector
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

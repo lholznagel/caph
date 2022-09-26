@@ -1,6 +1,6 @@
 use crate::Error;
 
-use caph_connector::TypeId;
+use caph_connector::{TypeId, CategoryId, GroupId};
 use serde::{Serialize, Deserialize};
 use sqlx::PgPool;
 
@@ -32,8 +32,11 @@ impl ItemService {
     ) -> Result<Vec<Item>, Error> {
         let blueprints = sqlx::query!(r#"
                 SELECT
-                    i.type_id AS "type_id!",
-                    i.name    AS "name!"
+                    i.type_id     AS "type_id!",
+                    i.category_id AS "category_id!",
+                    i.group_id    AS "group_id!",
+                    i.volume      AS "volume!",
+                    i.name        AS "name!"
                 FROM items i
                 WHERE i.type_id = ANY(
                     SELECT DISTINCT(btype_id) FROM blueprint_manufacture
@@ -51,8 +54,11 @@ impl ItemService {
             .into_iter()
             .map(|x| {
                 Item {
-                    type_id: x.type_id.into(),
-                    name:    x.name
+                    type_id:     x.type_id.into(),
+                    category_id: x.category_id.into(),
+                    group_id:    x.group_id.into(),
+                    volume:      x.volume.into(),
+                    name:        x.name,
                 }
             })
             .collect::<Vec<_>>();
@@ -73,27 +79,61 @@ impl ItemService {
     pub async fn buildable(
         &self,
     ) -> Result<Vec<Item>, Error> {
-        let blueprints = sqlx::query!("
+        let blueprints = sqlx::query!(r#"
                 SELECT
-                    bman.ptype_id,
-                    i.name
+                    bman.ptype_id AS "ptype_id!",
+                    i.category_id AS "category_id!",
+                    i.group_id    AS "group_id!",
+                    i.volume      AS "volume!",
+                    i.name        AS "name!"
                 FROM blueprint_manufacture bman
                 JOIN items i
                   ON i.type_id = bman.ptype_id
                 ORDER BY i.name
-            ")
+            "#)
             .fetch_all(&self.pool)
             .await?
             .into_iter()
             .map(|x| {
                 Item {
-                    type_id: x.ptype_id.into(),
-                    name:    x.name
+                    type_id:     x.ptype_id.into(),
+                    category_id: x.category_id.into(),
+                    group_id:    x.group_id.into(),
+                    volume:      x.volume.into(),
+                    name:        x.name,
                 }
             })
             .collect::<Vec<_>>();
 
         Ok(blueprints)
+    }
+
+    pub async fn resolve_id(
+        &self,
+        type_id: TypeId,
+    ) -> Result<Option<Item>, Error> {
+        let entry = sqlx::query!(r#"
+                SELECT
+                    i.type_id     AS "type_id!",
+                    i.category_id AS "category_id!",
+                    i.group_id    AS "group_id!",
+                    i.volume      AS "volume!",
+                    i.name        AS "name!"
+                FROM items i
+                WHERE i.type_id = $1
+            "#,
+                *type_id
+            )
+            .fetch_optional(&self.pool)
+            .await?
+            .map(|x| Item {
+                type_id:     x.type_id.into(),
+                category_id: x.category_id.into(),
+                group_id:    x.group_id.into(),
+                volume:      x.volume.into(),
+                name:        x.name,
+            });
+        Ok(entry)
     }
 
     /// Takes a name and resolves the name to a [TypeId].
@@ -123,6 +163,9 @@ impl ItemService {
             sqlx::query!(r#"
                     SELECT
                         bman.ptype_id AS "type_id!",
+                        i.category_id AS "category_id!",
+                        i.group_id    AS "group_id!",
+                        i.volume      AS "volume!",
                         i.name        AS "name!"
                     FROM blueprint_manufacture bman
                     JOIN items i
@@ -135,15 +178,21 @@ impl ItemService {
                 .await?
                 .into_iter()
                 .map(|x| Item {
-                    name:    x.name,
-                    type_id: x.type_id.into()
+                    type_id:     x.type_id.into(),
+                    category_id: x.category_id.into(),
+                    group_id:    x.group_id.into(),
+                    volume:      x.volume.into(),
+                    name:        x.name,
                 })
                 .collect::<Vec<_>>()
         } else {
             sqlx::query!(r#"
                 SELECT
-                    i.type_id AS "type_id!",
-                    i.name    AS "name!"
+                    i.type_id     AS "type_id!",
+                    i.category_id AS "category_id!",
+                    i.group_id    AS "group_id!",
+                    i.volume      AS "volume!",
+                    i.name        AS "name!"
                 FROM items i
                 WHERE i.name = ANY($1)
             "#,
@@ -153,8 +202,11 @@ impl ItemService {
             .await?
             .into_iter()
             .map(|x| Item {
-                name:    x.name,
-                type_id: x.type_id.into()
+                type_id:     x.type_id.into(),
+                category_id: x.category_id.into(),
+                group_id:    x.group_id.into(),
+                volume:      x.volume.into(),
+                name:        x.name,
             })
             .collect::<Vec<_>>()
         };
@@ -164,8 +216,11 @@ impl ItemService {
 
 #[derive(Debug, Serialize)]
 pub struct Item {
-    pub type_id: TypeId,
-    pub name:    String
+    pub type_id:     TypeId,
+    pub category_id: CategoryId,
+    pub group_id:    GroupId,
+    pub volume:      f32,
+    pub name:        String,
 }
 
 #[derive(Debug, Deserialize)]

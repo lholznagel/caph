@@ -79,7 +79,7 @@
               <td>{{ category(entry.category) }}</td>
               <td>{{ entry.description }}</td>
               <td><format-number :value="entry.created_at" date /></td>
-              <td><character :id="entry.character" /></td>
+              <td><eve-icon :id="entry.character" character /></td>
             </tr>
           </tbody>
         </n-table>
@@ -116,7 +116,7 @@ import { Project, ProjectId } from './project';
 
 import { Refresh } from '@vicons/tabler';
 
-import Character from '@/components/Character.vue';
+import EveIcon from '@/components/EveIcon.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import FormatNumber from '@/components/FormatNumber.vue';
 
@@ -125,8 +125,7 @@ import FilterText, { IFilterOption } from '@/components/Filter.vue';
 
 import PHeader from '@/project/CHeader.vue';
 import PTableHeader from '@/project/CTableHeader.vue';
-import WProject from '@/project/WProject.vue';
-
+import WProject from '@/project/wrapper/Project.vue';
 @Options({
   components: {
     NButton,
@@ -139,7 +138,7 @@ import WProject from '@/project/WProject.vue';
 
     Refresh,
 
-    Character,
+    EveIcon,
     ConfirmDialog,
     FilterElement,
     FilterText,
@@ -234,8 +233,8 @@ export default class ProjectBudgetView extends Vue {
         options:  characters,
         template: (val: string): VNode => {
           return h(
-            Character,
-            { id: Number(val), withText: true }
+            EveIcon,
+            { id: Number(val), character: true }
            )
         }
       }

@@ -1,0 +1,1 @@
+ALTER TABLE project_products ADD COLUMN meff INTEGER NOT NULL DEFAULT 0;

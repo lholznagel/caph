@@ -3,7 +3,8 @@ import axios from "axios";
 import { IBlueprint, IBuildstep, IDependency, IMaterial, IMember, IProject, IProjectMarket, IRequiredMaterial, IStorageEntry, Service } from "@/project/service";
 
 // Base path that is used for all requests
-const BASE_PATH = '/api/v1/projects';
+const BASE_PATH: string    = '/api/v1/projects';
+const PROJECT_PATH: string = '/api/v2/projects';
 
 export class Project {
   private load_promise: Promise<void> | null = null;
@@ -23,9 +24,10 @@ export class Project {
   constructor(
     public pid: ProjectId
   ) {
-    this.load_promise = this.god();
+    this.load_promise = this.load();
   }
 
+  // Loads all information about the project from the server
   public async init(): Promise<void> {
     return this.load_promise
       ? this.load_promise
@@ -109,7 +111,7 @@ export class Project {
     this.busy = true;
 
     await axios.put(`${BASE_PATH}/${this.pid}/blueprints/import`);
-    await this.god();
+    //await this.god();
 
     this.busy = false;
   }
@@ -124,7 +126,7 @@ export class Project {
   public async budget_remove_entry(tid: BudgetId): Promise<void> {
     this.busy = true;
     await axios.delete(`${BASE_PATH}/${this.pid}/budget/${tid}`);
-    await this.god();
+    //await this.god();
     this.busy = false;
   }
 
@@ -175,24 +177,25 @@ export class Project {
     return res;
   }
 
-  private async god(): Promise<void> {
+  private async load(): Promise<void> {
     this.busy = true;
 
-    await axios.get(`${BASE_PATH}/${this.pid}/god`)
-      .then((x: any) => {
+    await axios.get(`${PROJECT_PATH}/${this.pid}`)
+      .then(x => this.info = x.data)
+      /*.then((x: any) => {
         let a = x.data;
-        this.info = a.info;
-        this.stored = a.materials_stored;
-        this.raw = a.materials_raw;
-        this.buildsteps = a.buildsteps;
-        this.members = a.members;
-        this.market = a.market;
-        this.blueprints = a.bp_required;
-      });
-    this.stored = await Service.stored(this.pid);
+        this.info = a;
+        //this.stored = a.materials_stored;
+        //this.raw = a.materials_raw;
+        //this.buildsteps = a.buildsteps;
+        //this.members = a.members;
+        //this.market = a.market;
+        //this.blueprints = a.bp_required;
+      })*/;
+    //this.stored = await Service.stored(this.pid);
 
-    await this.load_stored_blueprints();
-    await this.load_budget_entries();
+    //await this.load_stored_blueprints();
+    //await this.load_budget_entries();
 
     this.load_promise = null;
     this.busy = false;

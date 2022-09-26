@@ -18,7 +18,7 @@ const routes: Array<RouteRecordRaw> = [
     name: 'projects_new',
     component: () => import(
       /* webpackChunkName: "projects_new" */
-      '@/project/VNewProject.vue'
+      '@/project/NewProject.vue'
     )
   },
   {
@@ -102,19 +102,11 @@ const routes: Array<RouteRecordRaw> = [
     )
   },
   {
-    path: '/projects/:pid/settings',
-    name: 'projects_setting',
+    path: '/projects/:pid/settings/general',
+    name: 'projects_settings_general',
     component: () => import(
-      /* webpackChunkName: "projects_setting" */
-      '@/project/VSetting.vue'
-    )
-  },
-  {
-    path: '/projects/:pid/invite',
-    name: 'projects_invite',
-    component: () => import(
-      /* webpackChunkName: "projects_invite" */
-      '@/project/VInvite.vue'
+      /* webpackChunkName: "projects_settings_general" */
+      '@/project/SettingsGeneral.vue'
     )
   },
   {
@@ -126,11 +118,35 @@ const routes: Array<RouteRecordRaw> = [
     )
   },
   {
+    path: '/settings/structures',
+    name: 'settings_structures',
+    component: () => import(
+      /* webpackChunkName: "settings_structures" */
+      '@/structure/Structures.vue'
+    )
+  },
+  {
+    path: '/settings/structures/new',
+    name: 'settings_structures_new',
+    component: () => import(
+      /* webpackChunkName: "settings_structures_new" */
+      '@/structure/NewStructure.vue'
+    )
+  },
+  {
     path: '/character/blueprints',
     name: 'character_blueprints',
     component: () => import(
       /* webpackChunkName: "character_blueprints" */
       '@/views/CharacterBlueprints.vue'
+    )
+  },
+  {
+    path: '/industry_jobs',
+    name: 'industry_jobs',
+    component: () => import(
+      /* webpackChunkName: "industry_jobs" */
+      '@/settings/IndustryJobs.vue'
     )
   }
 ]

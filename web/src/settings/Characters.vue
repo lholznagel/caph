@@ -78,13 +78,13 @@
                 </n-checkbox>
               </td>
               <td>
-                <character :id="c.character_id" />
+                <eve-icon :id="c.character_id" character />
               </td>
               <td>
                 {{ c.character }}
               </td>
               <td>
-                <corporation :id="c.corporation_id" />
+                <eve-icon :id="c.corporation_id" corporation />
               </td>
               <td>
                 {{ c.corporation }}
@@ -106,7 +106,30 @@
                     <h3>Given permissions:</h3>
                   </template>
                   <template #footer>
-                    <n-button @click="add_corp_blueprints(c.character_id)">Add corporation permissions</n-button>
+                    <n-button
+                      @click="add_scope(
+                        c.character_id,
+                        'character_assets'
+                      )"
+                    >Add character assets permissions</n-button>
+                    <n-button
+                      @click="add_scope(
+                        c.character_id,
+                        'corporation_assets'
+                      )"
+                    >Add corporation assets permissions</n-button>
+                    <n-button
+                      @click="add_scope(
+                        c.character_id,
+                        'character_industry_jobs'
+                      )"
+                    >Add character industry jobs permissions</n-button>
+                    <n-button
+                      @click="add_scope(
+                        c.character_id,
+                        'corporation_industry_jobs'
+                      )"
+                    >Add corporation industry jobs permissions</n-button>
                   </template>
 
                   <n-list-item>
@@ -145,9 +168,8 @@ import { Options, Vue } from 'vue-class-component';
 import { ROUTE_CHANGE } from '@/event_bus';
 
 import Alliance from '@/components/Alliance.vue';
-import Character from '@/components/Character.vue';
+import EveIcon from '@/components/EveIcon.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
-import Corporation from '@/components/Corporation.vue';
 import Loading from '@/components/Loading.vue';
 
 @Options({
@@ -166,9 +188,8 @@ import Loading from '@/components/Loading.vue';
     AngleRight,
 
     Alliance,
-    Character,
+    EveIcon,
     ConfirmDialog,
-    Corporation,
     Loading
   }
 })
@@ -239,8 +260,11 @@ export default class CharacterSettings extends Vue {
     this.selected = <number>cid;
   }
 
-  public add_corp_blueprints(cid: CharacterId) {
-    window.location.href = `/api/v1/auth/scope/${cid}/corporation_blueprints`;
+  public add_scope(
+    cid:   CharacterId,
+    scope: string
+  ) {
+    window.location.href = `/api/v1/auth/scope/${cid}/${scope}`;
   }
 
   private async load() {

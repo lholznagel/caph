@@ -33,7 +33,7 @@ import { PROJECT_ROUTE } from '@/event_bus';
 import PBuildstep from '@/project/CBuildstep.vue';
 import PInvention from '@/project/CBuildstepInvention.vue';
 import PHeader from '@/project/CHeader.vue';
-import WProject from '@/project/WProject.vue';
+import WProject from '@/project/wrapper/Project.vue';
 
 @Options({
   components: {

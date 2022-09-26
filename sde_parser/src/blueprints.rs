@@ -1,44 +1,30 @@
 //! Creates the SQL-Code for blueprints
 use crate::FOLDER_INPUT;
 
+use crate::items::{GroupEntry, TypeEntry};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use std::collections::{HashMap, VecDeque};
 use std::fs::File;
-use crate::items::{TypeEntry, GroupEntry};
+use uuid::Uuid;
 
 /// Wrapper for TypeId
 type TypeId = i32;
 /// Wrapper for GroupId
-type GroupId     = i32;
+type GroupId = i32;
 
 /// Parses the input file and exports it as SQL
 pub fn run() -> Result<String, Box<dyn std::error::Error>> {
     tracing::info!("Starting blueprint parsing");
 
     let current = std::env::current_dir()?;
-    let current = current
-        .to_str()
-        .unwrap_or_default();
-    let path = format!(
-        "{}/{}/blueprints.yaml",
-        current,
-        FOLDER_INPUT
-    );
+    let current = current.to_str().unwrap_or_default();
+    let path = format!("{}/{}/blueprints.yaml", current, FOLDER_INPUT);
     let file = File::open(&path)?;
 
-    let path_type_ids = format!(
-        "{}/{}/type_ids.yaml",
-        current,
-        FOLDER_INPUT
-    );
+    let path_type_ids = format!("{}/{}/type_ids.yaml", current, FOLDER_INPUT);
     let file_type_ids = File::open(&path_type_ids)?;
 
-    let path_group_ids = format!(
-        "{}/{}/group_ids.yaml",
-        current,
-        FOLDER_INPUT
-    );
+    let path_group_ids = format!("{}/{}/group_ids.yaml", current, FOLDER_INPUT);
     let file_group_ids = File::open(&path_group_ids)?;
 
     // Map with the blueprint as key
@@ -86,7 +72,8 @@ DELETE FROM blueprint_manufacture_components CASCADE;
 DELETE FROM blueprint_inventions             CASCADE;
 DELETE FROM blueprint_research               CASCADE;
 DELETE FROM blueprint_materials              CASCADE;
-DELETE FROM blueprint_json                   CASCADE;"#.into()
+DELETE FROM blueprint_json                   CASCADE;"#
+        .into()
 }
 
 /// Generates the SQL-Code for inserting all blueprint research entries.
@@ -118,22 +105,19 @@ fn sql_research(bps: &HashMap<TypeId, Blueprint>) -> String {
             continue;
         };
 
-        let material = if let Some(x) = entry
-            .research_time(ActivityName::ResearchMaterial) {
+        let material = if let Some(x) = entry.research_time(ActivityName::ResearchMaterial) {
             x
         } else {
             continue;
         };
 
-        let time = if let Some(x) = entry
-            .research_time(ActivityName::ResearchTime) {
+        let time = if let Some(x) = entry.research_time(ActivityName::ResearchTime) {
             x
         } else {
             continue;
         };
 
-        let copy = if let Some(x) = entry
-            .research_time(ActivityName::Copying) {
+        let copy = if let Some(x) = entry.research_time(ActivityName::Copying) {
             x
         } else {
             continue;
@@ -144,35 +128,33 @@ fn sql_research(bps: &HashMap<TypeId, Blueprint>) -> String {
             ptype_id,
             material,
             time,
-            copy
+            copy,
         };
         entries.push(sql_entry.into_sql());
     }
 
-    format!("
+    format!(
+        "
 INSERT INTO blueprint_research VALUES {};",
         entries.join(", ")
     )
 }
 
 /// Generates a SQL-Query containing all blueprints
-/// 
+///
 /// # Returns
-/// 
+///
 /// String containing the value-tuple
-/// 
-fn sql_manufacture(
-    blueprints: &HashMap<TypeId, Blueprint>,
-) -> String {
+///
+fn sql_manufacture(blueprints: &HashMap<TypeId, Blueprint>) -> String {
     let excluded_type_ids = vec![
-        2738, 2742, 2743, 2744, 2745, 2746, 2747, 2748, 2749, 2751, 2753, 2754,
-        2756, 2758, 2760, 2762, 2764, 2765, 2766, 2767, 2768, 2769, 2770, 2771,
-        2772, 2773, 2786, 2788, 2789, 2790, 2791, 2793, 2795, 2797, 2800, 2820,
-        2821, 21943, 21944, 21945, 21946, 28605, 32800, 32802, 32804, 33515,
-        33582, 33584, 33868, 34222, 42134, 42135,
+        2738, 2742, 2743, 2744, 2745, 2746, 2747, 2748, 2749, 2751, 2753, 2754, 2756, 2758, 2760,
+        2762, 2764, 2765, 2766, 2767, 2768, 2769, 2770, 2771, 2772, 2773, 2786, 2788, 2789, 2790,
+        2791, 2793, 2795, 2797, 2800, 2820, 2821, 21943, 21944, 21945, 21946, 28605, 32800, 32802,
+        32804, 33515, 33582, 33584, 33868, 34222, 42134, 42135,
     ];
 
-    let mut bps       = Vec::new();
+    let mut bps = Vec::new();
     let mut materials = Vec::new();
 
     for (btype_id, entry) in blueprints {
@@ -182,7 +164,7 @@ fn sql_manufacture(
             continue;
         }
 
-        let mut queue     = VecDeque::from(entry.materials());
+        let mut queue = VecDeque::from(entry.materials());
         let mut compounds = HashMap::new();
 
         while let Some(e) = queue.pop_front() {
@@ -196,7 +178,7 @@ fn sql_manufacture(
                 quantity,
                 mtype_id,
                 produces,
-                time
+                time,
             };
             compounds
                 .entry(e.type_id)
@@ -233,12 +215,13 @@ fn sql_manufacture(
             ptype_id,
             quantity,
             time,
-            reaction
+            reaction,
         };
         bps.push(bp.into_sql());
     }
 
-    format!("
+    format!(
+        "
 INSERT INTO blueprint_manufacture VALUES {};
 INSERT INTO blueprint_materials VALUES {};",
         bps.join(", "),
@@ -247,22 +230,22 @@ INSERT INTO blueprint_materials VALUES {};",
 }
 
 /// Generates a SQL-Query containing all blueprints components
-/// 
+///
 /// # Returns
-/// 
+///
 /// String containing the value-tuple
-/// 
+///
 fn sql_manufacture_components(
     blueprints: &HashMap<TypeId, Blueprint>,
-    products:   &HashMap<TypeId, Blueprint>,
+    products: &HashMap<TypeId, Blueprint>,
 ) -> String {
-    let mut bps       = Vec::new();
+    let mut bps = Vec::new();
     let mut materials = Vec::new();
 
     for (btype_id, entry) in blueprints {
         let bp_id = Uuid::new_v4();
 
-        let mut queue      = VecDeque::from(entry.materials());
+        let mut queue = VecDeque::from(entry.materials());
         let mut components = HashMap::new();
 
         while let Some(e) = queue.pop_front() {
@@ -289,7 +272,7 @@ fn sql_manufacture_components(
                 quantity,
                 mtype_id,
                 produces,
-                time
+                time,
             };
             components
                 .entry(e.type_id)
@@ -323,7 +306,8 @@ fn sql_manufacture_components(
         bps.push(bp.into_sql());
     }
 
-    format!("
+    format!(
+        "
 INSERT INTO blueprint_manufacture_components VALUES {};
 INSERT INTO blueprint_materials VALUES {};",
         bps.join(", "),
@@ -354,14 +338,12 @@ fn sql_invention(bps: &HashMap<TypeId, Blueprint>) -> String {
             continue;
         };
 
-        let activity = if let Some(x) = entry.activities
-            .get(&ActivityName::Invention) {
+        let activity = if let Some(x) = entry.activities.get(&ActivityName::Invention) {
             x
         } else {
             continue;
         };
-        let time = if let Some(x) = entry.activities
-                .get(&ActivityName::Invention) {
+        let time = if let Some(x) = entry.activities.get(&ActivityName::Invention) {
             if !x.materials.is_empty() {
                 x.time
             } else {
@@ -372,10 +354,10 @@ fn sql_invention(bps: &HashMap<TypeId, Blueprint>) -> String {
         };
 
         for i in activity.products.iter() {
-            let bp_id       = Uuid::new_v4();
-            let btype_id    = *btype_id;
-            let itype_id    = i.type_id;
-            let ttype_id    = if let Some(x) = bps.get(&itype_id) {
+            let bp_id = Uuid::new_v4();
+            let btype_id = *btype_id;
+            let itype_id = i.type_id;
+            let ttype_id = if let Some(x) = bps.get(&itype_id) {
                 if let Some(x) = x.product() {
                     x
                 } else {
@@ -393,7 +375,7 @@ fn sql_invention(bps: &HashMap<TypeId, Blueprint>) -> String {
                 itype_id,
                 ttype_id,
                 time,
-                probability
+                probability,
             };
             inventions.push(invention.into_sql());
 
@@ -408,14 +390,15 @@ fn sql_invention(bps: &HashMap<TypeId, Blueprint>) -> String {
                     quantity,
                     mtype_id,
                     produces,
-                    time
+                    time,
                 };
                 materials.push(material.into_sql());
             }
         }
     }
 
-    format!("
+    format!(
+        "
 INSERT INTO blueprint_inventions VALUES {};
 INSERT INTO blueprint_materials VALUES {};",
         inventions.join(", "),
@@ -436,7 +419,7 @@ INSERT INTO blueprint_materials VALUES {};",
 ///
 fn sql_raw(
     blueprints: &HashMap<TypeId, Blueprint>,
-    products:   &HashMap<TypeId, Blueprint>,
+    products: &HashMap<TypeId, Blueprint>,
 ) -> String {
     let mut entries = Vec::new();
     let mut materials = Vec::new();
@@ -451,8 +434,7 @@ fn sql_raw(
             if let Some(x) = products.get(&e.type_id) {
                 todo.extend(x.materials());
             } else {
-                raw
-                    .entry(e.type_id)
+                raw.entry(e.type_id)
                     .and_modify(|r: &mut Material| r.quantity += e.quantity)
                     .or_insert(e);
             }
@@ -463,12 +445,15 @@ fn sql_raw(
         let bp_id = Uuid::new_v4();
         let quantity = bp.product_quantity().unwrap_or_default();
 
-        entries.push(BlueprintRaw {
-            bp_id,
-            btype_id,
-            ptype_id,
-            quantity
-        }.into_sql());
+        entries.push(
+            BlueprintRaw {
+                bp_id,
+                btype_id,
+                ptype_id,
+                quantity,
+            }
+            .into_sql(),
+        );
 
         for (_, raw) in raw {
             let quantity = raw.quantity;
@@ -476,17 +461,21 @@ fn sql_raw(
             let produces = bp.product_quantity().unwrap_or_default();
             let time = bp.manufacture_time().unwrap_or_default();
 
-            materials.push(BlueprintMaterial {
-                bp_id,
-                quantity,
-                mtype_id,
-                produces,
-                time
-            }.into_sql());
+            materials.push(
+                BlueprintMaterial {
+                    bp_id,
+                    quantity,
+                    mtype_id,
+                    produces,
+                    time,
+                }
+                .into_sql(),
+            );
         }
     }
 
-    format!("
+    format!(
+        "
 INSERT INTO blueprint_raw VALUES {};
 INSERT INTO blueprint_materials VALUES {};",
         entries.join(", "),
@@ -506,10 +495,10 @@ INSERT INTO blueprint_materials VALUES {};",
 /// String containing the SQL-Query.
 ///
 fn sql_json(
-    items:      &HashMap<TypeId, TypeEntry>,
-    groups:     &HashMap<GroupId, GroupEntry>,
+    items: &HashMap<TypeId, TypeEntry>,
+    groups: &HashMap<GroupId, GroupEntry>,
     blueprints: &HashMap<TypeId, Blueprint>,
-    products:   &HashMap<TypeId, Blueprint>,
+    products: &HashMap<TypeId, Blueprint>,
 ) -> String {
     #[derive(Clone, Debug, Serialize)]
     enum DependencyType {
@@ -529,28 +518,32 @@ fn sql_json(
     }
     #[derive(Clone, Debug, Serialize)]
     struct Dependency {
-        btype_id:       TypeId,
+        btype_id: TypeId,
         blueprint_name: String,
-        ptype_id:       TypeId,
-        time:           u32,
-        quantity:       u32,
-        produces:       u32,
-        info:           DependencyInfo,
-        typ:            DependencyType,
-        components:     Vec<Dependency>,
+        ptype_id: TypeId,
+        time: u32,
+        quantity: u32,
+        produces: u32,
+        info: DependencyInfo,
+        typ: DependencyType,
+        components: Vec<Dependency>,
     }
     impl Dependency {
         pub fn to_sql(self) -> String {
-            format!("({}, '{}')", &self.ptype_id, serde_json::to_string(&self).unwrap())
+            format!(
+                "({}, '{}')",
+                &self.ptype_id,
+                serde_json::to_string(&self).unwrap()
+            )
         }
     }
 
     #[derive(Clone, Debug, Serialize)]
     struct DependencyInfo {
-        ptype_id:     TypeId,
-        category_id:  u32,
-        group_id:     u32,
-        name:         String,
+        ptype_id: TypeId,
+        category_id: u32,
+        group_id: u32,
+        name: String,
     }
 
     let find_btype_id = |ptype_id: TypeId| {
@@ -568,11 +561,7 @@ fn sql_json(
 
     for (ptype_id, pentry) in products {
         let bentry = items.get(&find_btype_id(*ptype_id)).unwrap();
-        let bname = bentry
-            .name
-            .get("en")
-            .unwrap()
-            .replace('\'', "''");
+        let bname = bentry.name.get("en").unwrap().replace('\'', "''");
 
         if let None = items.get(&ptype_id) {
             continue;
@@ -583,63 +572,54 @@ fn sql_json(
             continue;
         }
 
-        let iname = ientry
-            .name
-            .get("en")
-            .unwrap()
-            .replace('\'', "''");
+        let iname = ientry.name.get("en").unwrap().replace('\'', "''");
         let igroup_id = ientry.group_id;
         let icategory_id = groups.get(&igroup_id).unwrap().category_id;
 
         let mut dependency = Dependency {
             blueprint_name: bname.clone(),
-            ptype_id:       *ptype_id,
-            btype_id:       find_btype_id(*ptype_id),
-            info:           DependencyInfo {
-                                ptype_id: *ptype_id,
-                                category_id: icategory_id as u32,
-                                group_id: igroup_id as u32,
-                                name: iname.clone()
-                            },
-            time:           pentry.manufacture_time().unwrap() as u32,
-            quantity:       pentry.product_quantity().unwrap() as u32,
-            produces:       pentry.product_quantity().unwrap() as u32,
-            typ:            DependencyType::reaction(pentry.is_reaction()),
-            components:     Vec::new()
+            ptype_id: *ptype_id,
+            btype_id: find_btype_id(*ptype_id),
+            info: DependencyInfo {
+                ptype_id: *ptype_id,
+                category_id: icategory_id as u32,
+                group_id: igroup_id as u32,
+                name: iname.clone(),
+            },
+            time: pentry.manufacture_time().unwrap() as u32,
+            quantity: pentry.product_quantity().unwrap() as u32,
+            produces: pentry.product_quantity().unwrap() as u32,
+            typ: DependencyType::reaction(pentry.is_reaction()),
+            components: Vec::new(),
         };
 
         let mut components = Vec::new();
         for material in pentry.materials() {
-            if products.contains_key(&material.type_id) &&
-               entries.contains_key(&material.type_id) {
+            if products.contains_key(&material.type_id) && entries.contains_key(&material.type_id) {
                 let mut entry = entries.get(&material.type_id).unwrap().clone();
                 entry.quantity = material.quantity as u32;
                 components.push(entry);
             } else if !products.contains_key(&material.type_id) {
                 let ientry = items.get(&material.type_id).unwrap();
-                let iname = ientry
-                    .name
-                    .get("en")
-                    .unwrap()
-                    .replace('\'', "''");
+                let iname = ientry.name.get("en").unwrap().replace('\'', "''");
                 let igroup_id = ientry.group_id;
                 let icategory_id = groups.get(&igroup_id).unwrap().category_id;
 
                 let dependency = Dependency {
                     blueprint_name: String::new(),
-                    ptype_id:       material.type_id,
-                    btype_id:       0,
-                    time:           0,
-                    quantity:       material.quantity as u32,
-                    produces:       0,
-                    info:           DependencyInfo {
-                                        ptype_id: *ptype_id,
-                                        category_id: icategory_id as u32,
-                                        group_id: igroup_id as u32,
-                                        name: iname.clone()
-                                    },
-                    typ:            DependencyType::Material,
-                    components:     Vec::new()
+                    ptype_id: material.type_id,
+                    btype_id: 0,
+                    time: 0,
+                    quantity: material.quantity as u32,
+                    produces: 0,
+                    info: DependencyInfo {
+                        ptype_id: *ptype_id,
+                        category_id: icategory_id as u32,
+                        group_id: igroup_id as u32,
+                        name: iname.clone(),
+                    },
+                    typ: DependencyType::Material,
+                    components: Vec::new(),
                 };
                 components.push(dependency);
             } else {
@@ -662,36 +642,31 @@ fn sql_json(
 
         let mut components = Vec::new();
         for material in materials.iter() {
-            if products.contains_key(&material.type_id) &&
-               entries.contains_key(&material.type_id) {
+            if products.contains_key(&material.type_id) && entries.contains_key(&material.type_id) {
                 let mut entry = entries.get(&material.type_id).unwrap().clone();
                 entry.quantity = material.quantity as u32;
                 components.push(entry);
             } else if !products.contains_key(&material.type_id) {
                 let ientry = items.get(&material.type_id).unwrap();
-                let iname = ientry
-                    .name
-                    .get("en")
-                    .unwrap()
-                    .replace('\'', "''");
+                let iname = ientry.name.get("en").unwrap().replace('\'', "''");
                 let igroup_id = ientry.group_id;
                 let icategory_id = groups.get(&igroup_id).unwrap().category_id;
 
                 let dependency = Dependency {
                     blueprint_name: String::new(),
-                    ptype_id:       material.type_id,
-                    btype_id:       0,
-                    time:           0,
-                    quantity:       material.quantity as u32,
-                    produces:       0,
-                    info:           DependencyInfo {
-                                        ptype_id: material.type_id,
-                                        category_id: icategory_id as u32,
-                                        group_id: igroup_id as u32,
-                                        name: iname.clone()
-                                    },
-                    typ:            DependencyType::Material,
-                    components:     Vec::new()
+                    ptype_id: material.type_id,
+                    btype_id: 0,
+                    time: 0,
+                    quantity: material.quantity as u32,
+                    produces: 0,
+                    info: DependencyInfo {
+                        ptype_id: material.type_id,
+                        category_id: icategory_id as u32,
+                        group_id: igroup_id as u32,
+                        name: iname.clone(),
+                    },
+                    typ: DependencyType::Material,
+                    components: Vec::new(),
                 };
                 components.push(dependency);
             } else {
@@ -713,23 +688,20 @@ fn sql_json(
         .cloned()
         .map(|x| x.to_sql())
         .collect::<Vec<_>>();
-    format!(
-        "INSERT INTO blueprint_json VALUES {};",
-        entries.join(", "),
-    )
+    format!("INSERT INTO blueprint_json VALUES {};", entries.join(", "),)
 }
 
 /// Represents a single blueprint
 #[derive(Clone, Debug, Default)]
 struct BlueprintRaw {
     /// Uniqe id
-    bp_id:    Uuid,
+    bp_id: Uuid,
     /// Blueprint type id
     btype_id: TypeId,
     /// Product type id
     ptype_id: TypeId,
     /// Quantity that is produced with each run
-    quantity: i32
+    quantity: i32,
 }
 
 impl BlueprintRaw {
@@ -742,10 +714,7 @@ impl BlueprintRaw {
     pub fn into_sql(self) -> String {
         format!(
             "('{}', {}, {}, {})",
-            self.bp_id,
-            self.btype_id,
-            self.ptype_id,
-            self.quantity
+            self.bp_id, self.btype_id, self.ptype_id, self.quantity
         )
     }
 }
@@ -754,7 +723,7 @@ impl BlueprintRaw {
 #[derive(Clone, Debug, Default)]
 struct BlueprintManufacture {
     /// Uniqe id
-    bp_id:    Uuid,
+    bp_id: Uuid,
     /// Blueprint type id
     btype_id: TypeId,
     /// Product type id
@@ -762,9 +731,9 @@ struct BlueprintManufacture {
     /// Quantity that is produced with each run
     quantity: i32,
     /// Time it takes to construct
-    time:     i32,
+    time: i32,
     /// Determines if this entry is a reaction
-    reaction: bool
+    reaction: bool,
 }
 
 impl BlueprintManufacture {
@@ -777,12 +746,7 @@ impl BlueprintManufacture {
     pub fn into_sql(self) -> String {
         format!(
             "('{}', {}, {}, {}, {}, {})",
-            self.bp_id,
-            self.btype_id,
-            self.ptype_id,
-            self.time,
-            self.reaction,
-            self.quantity,
+            self.bp_id, self.btype_id, self.ptype_id, self.time, self.reaction, self.quantity,
         )
     }
 }
@@ -791,7 +755,7 @@ impl BlueprintManufacture {
 #[derive(Clone, Debug, Default)]
 struct BlueprintManufactureComponent {
     /// Uniqe id
-    bp_id:    Uuid,
+    bp_id: Uuid,
     /// Blueprint type id
     btype_id: TypeId,
     /// Product type id
@@ -810,10 +774,7 @@ impl BlueprintManufactureComponent {
     pub fn into_sql(self) -> String {
         format!(
             "('{}', {}, {}, {})",
-            self.bp_id,
-            self.btype_id,
-            self.ptype_id,
-            self.quantity,
+            self.bp_id, self.btype_id, self.ptype_id, self.quantity,
         )
     }
 }
@@ -822,20 +783,20 @@ impl BlueprintManufactureComponent {
 #[derive(Clone, Debug, Default)]
 struct BlueprintInvention {
     /// Unique id of the invention
-    bp_id:       Uuid,
+    bp_id: Uuid,
     /// Blueprint type id
-    btype_id:    TypeId,
+    btype_id: TypeId,
     /// Tier 1 product type id
-    ttype_id:    TypeId,
+    ttype_id: TypeId,
     /// Product type id
-    ptype_id:    TypeId,
+    ptype_id: TypeId,
     /// TypeId of the invented blueprint
-    itype_id:    TypeId,
+    itype_id: TypeId,
 
     /// Time it takes to invent
-    time:        i32,
+    time: i32,
     /// Probability that the invention works
-    probability: f32
+    probability: f32,
 }
 
 impl BlueprintInvention {
@@ -859,7 +820,6 @@ impl BlueprintInvention {
     }
 }
 
-
 /// Represents a single blueprint
 #[derive(Clone, Debug, Default)]
 struct BlueprintResearch {
@@ -871,9 +831,9 @@ struct BlueprintResearch {
     /// Time to research material efficiency
     material: i32,
     /// Time to research time efficiency
-    time:     i32,
+    time: i32,
     /// Time to make a blueprint copy
-    copy:     i32,
+    copy: i32,
 }
 
 impl BlueprintResearch {
@@ -892,11 +852,7 @@ impl BlueprintResearch {
     pub fn into_sql(self) -> String {
         format!(
             "({}, {}, {}, {}, {})",
-            self.btype_id,
-            self.ptype_id,
-            self.material,
-            self.time,
-            self.copy
+            self.btype_id, self.ptype_id, self.material, self.time, self.copy
         )
     }
 }
@@ -905,7 +861,7 @@ impl BlueprintResearch {
 #[derive(Clone, Debug, Default)]
 struct BlueprintMaterial {
     /// Unique id that references to [BlueprintInvention]
-    bp_id:    Uuid,
+    bp_id: Uuid,
     /// Required quantity
     quantity: i32,
     /// TypeId of the material
@@ -913,7 +869,7 @@ struct BlueprintMaterial {
     /// Quantity that is produced by the product
     produces: i32,
     /// Time to research time efficiency
-    time:     i32,
+    time: i32,
 }
 
 impl BlueprintMaterial {
@@ -926,11 +882,7 @@ impl BlueprintMaterial {
     pub fn into_sql(self) -> String {
         format!(
             "('{}', {}, {}, {}, {})",
-            self.bp_id,
-            self.mtype_id,
-            self.produces,
-            self.time,
-            self.quantity,
+            self.bp_id, self.mtype_id, self.produces, self.time, self.quantity,
         )
     }
 }
@@ -963,7 +915,7 @@ impl Blueprint {
     ///
     pub fn has_job(&self) -> bool {
         let manufacture = self.activities.get(&ActivityName::Manufacturing);
-        let reaction    = self.activities.get(&ActivityName::Reaction);
+        let reaction = self.activities.get(&ActivityName::Reaction);
         manufacture.is_some() || reaction.is_some()
     }
 
@@ -1081,7 +1033,7 @@ enum ActivityName {
 #[derive(Clone, Debug, Deserialize)]
 struct Activity {
     /// Time it takes to perform the activity
-    time:      i32,
+    time: i32,
     /// Required materials for the activity, will be an empty Vector if not
     /// materials are required
     #[serde(default)]
@@ -1089,17 +1041,17 @@ struct Activity {
     /// Products that are produced by this blueprint, will be an empty Vec if
     /// nothing is produced by this activity
     #[serde(default)]
-    products:  Vec<Material>,
+    products: Vec<Material>,
 }
 
 /// Represents a material required for an activity
 #[derive(Clone, Debug, Deserialize)]
 struct Material {
     /// Quantity that is required
-    quantity:    i32,
+    quantity: i32,
     /// TypeId of the material that is required
     #[serde(rename = "typeID")]
-    type_id:     TypeId,
+    type_id: TypeId,
 
     /// This field is only set when the activity is an invention and there only
     /// for products

@@ -47,7 +47,7 @@
                     v-for="entry in project.required_materials(filter.key)"
                     :key="entry.ptype_id"
                   >
-                    <td><item-icon :id="entry.ptype_id" type="icon" /></td>
+                    <td><eve-icon :id="entry.ptype_id" type="icon" /></td>
                     <td>{{ entry.name }}</td>
                     <td><format-number :value="entry.products" /></td>
                     <td><format-number :value="stored_products(entry.ptype_id)" /></td>
@@ -91,11 +91,11 @@ import { Service, IStorageEntry } from '@/project/service';
 import { ProjectId } from '@/project/project';
 
 import FormatNumber from '@/components/FormatNumber.vue';
-import ItemIcon from '@/components/ItemIcon.vue';
+import EveIcon from '@/components/EveIcon.vue';
 
 import PExport from '@/project/MExport.vue';
 import PHeader from '@/project/CHeader.vue';
-import WProject from '@/project/WProject.vue';
+import WProject from '@/project/wrapper/Project.vue';
 
 @Options({
   components: {
@@ -109,7 +109,7 @@ import WProject from '@/project/WProject.vue';
     NScrollbar,
 
     FormatNumber,
-    ItemIcon,
+    EveIcon,
 
     PExport,
     PHeader,

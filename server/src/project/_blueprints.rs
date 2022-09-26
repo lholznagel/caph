@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::collections::HashMap;
 
-use super::dependency::Dependency;
+use super::dependency_v2::dependency::Dependency;
 
 /// Service for managing project storage
 #[derive(Clone)]
@@ -334,7 +334,7 @@ impl ProjectBlueprintService {
             queue.extend(x.components);
         }*/
 
-        let steps = dependencies
+        /*let steps = dependencies
             .iter()
             .map(|x| x
                     .collect_ptype_ids()
@@ -343,7 +343,8 @@ impl ProjectBlueprintService {
                     .collect::<Vec<_>>()
             )
             .flatten()
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>();*/
+        let steps = Vec::new();
 
         let bps = sqlx::query!(r#"
                 SELECT

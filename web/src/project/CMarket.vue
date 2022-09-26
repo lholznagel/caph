@@ -13,7 +13,7 @@
           <th width="50px" style="text-align: right;">Max (Stack)<br /> Max (Single)</th>
         </tr>
         <tr v-for="market in market_entries" :key="market.type_id">
-          <td><item-icon :id="market.type_id" type="icon" /></td>
+          <td><eve-icon :id="market.type_id" type="icon" /></td>
           <td>{{ market.name }}</td>
           <td>
             <format-number :value="market.count" />
@@ -57,7 +57,7 @@ NTable, NPageHeader, NStatistic, NGrid, NGridItem } from 'naive-ui';
 import { IProjectMarket, Service } from '@/project/service';
 
 import FormatNumber from '@/components/FormatNumber.vue';
-import ItemIcon from '@/components/ItemIcon.vue';
+import EveIcon from '@/components/EveIcon.vue';
 import SystemName from '@/components/SystemName.vue';
 
 class Props {
@@ -96,7 +96,7 @@ class Props {
     NGridItem,
 
     FormatNumber,
-    ItemIcon,
+    EveIcon,
     SystemName
   }
 })

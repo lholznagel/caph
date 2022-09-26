@@ -6,7 +6,7 @@ pub enum Error {
     /// Error when constructing a reqwest client fails
     CouldNotConstructClient(reqwest::Error),
     /// Error during request
-    RequestError(reqwest::Error)
+    RequestError(reqwest::Error),
 }
 
 impl std::error::Error for Error {}

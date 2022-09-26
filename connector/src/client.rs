@@ -31,11 +31,9 @@ pub trait RequestClient {
     ///
     /// Parsed json data
     ///
-    async fn fetch<T>(
-        &self,
-        path: &str,
-    ) -> Result<T, ConnectError>
-    where T: DeserializeOwned;
+    async fn fetch<T>(&self, path: &str) -> Result<T, ConnectError>
+    where
+        T: DeserializeOwned;
 
     /// Makes requests as long as there are pages to fetch.
     ///
@@ -53,11 +51,9 @@ pub trait RequestClient {
     ///
     /// Vector of parsed json
     ///
-    async fn fetch_page<T>(
-        &self,
-        path: &str,
-    ) -> Result<Vec<T>, ConnectError>
-    where T: DeserializeOwned + Send;
+    async fn fetch_page<T>(&self, path: &str) -> Result<Vec<T>, ConnectError>
+    where
+        T: DeserializeOwned + Send;
 
     /// Makes a post request to the given path and returns parses the result
     /// the given struct.
@@ -76,11 +72,7 @@ pub trait RequestClient {
     ///
     /// Parsed json data
     ///
-    async fn post<R, T>(
-        &self,
-        data: R,
-        path: &str,
-    ) -> Result<T, ConnectError>
+    async fn post<R, T>(&self, data: R, path: &str) -> Result<T, ConnectError>
     where
         R: Debug + Serialize + Send + Sync,
         T: DeserializeOwned;
@@ -99,7 +91,7 @@ pub struct EveClient(Client);
 
 impl EveClient {
     /// URL to the EVE-API
-    const EVE_API_URL:    &'static str = "https://esi.evetech.net";
+    const EVE_API_URL: &'static str = "https://esi.evetech.net";
     /// Name of the ENV of the user agent
     const ENV_USER_AGENT: &'static str = "EVE_USER_AGENT";
 
@@ -121,8 +113,8 @@ impl EveClient {
     /// New instance of the [EveClient]
     ///
     pub fn new() -> Result<Self, ConnectError> {
-        let user_agent = std::env::var(Self::ENV_USER_AGENT)
-            .map_err(|_| ConnectError::env_user_agent())?;
+        let user_agent =
+            std::env::var(Self::ENV_USER_AGENT).map_err(|_| ConnectError::env_user_agent())?;
 
         let client = Client::builder()
             .user_agent(user_agent)
@@ -171,7 +163,8 @@ impl EveClient {
                 return Err(ConnectError::TooManyRetries(path));
             }
 
-            let response = self.0
+            let response = self
+                .0
                 .get(&path)
                 .send()
                 .await
@@ -188,7 +181,7 @@ impl EveClient {
                 continue;
             }
 
-            return Ok(response)
+            return Ok(response);
         }
     }
 
@@ -221,12 +214,12 @@ impl EveClient {
 #[async_trait]
 impl RequestClient for EveClient {
     #[tracing::instrument(level = "debug")]
-    async fn fetch<T>(
-        &self,
-        path: &str,
-    ) -> Result<T, ConnectError>
-    where T: DeserializeOwned {
-        let json = self.send(path)
+    async fn fetch<T>(&self, path: &str) -> Result<T, ConnectError>
+    where
+        T: DeserializeOwned,
+    {
+        let json = self
+            .send(path)
             .await?
             .json::<T>()
             .await
@@ -235,14 +228,11 @@ impl RequestClient for EveClient {
     }
 
     #[tracing::instrument(level = "debug")]
-    async fn fetch_page<T>(
-        &self,
-        path: &str,
-    ) -> Result<Vec<T>, ConnectError>
-    where T: DeserializeOwned + Send {
-        let response = self
-            .send(path)
-            .await?;
+    async fn fetch_page<T>(&self, path: &str) -> Result<Vec<T>, ConnectError>
+    where
+        T: DeserializeOwned + Send,
+    {
+        let response = self.send(path).await?;
 
         let pages = self.page_count(&response);
 
@@ -255,11 +245,7 @@ impl RequestClient for EveClient {
 
         for page in 2..=pages {
             let next_page = self
-                .send(&format!(
-                    "{}?page={}",
-                    path,
-                    page
-                ))
+                .send(&format!("{}?page={}", path, page))
                 .await?
                 .json::<Vec<T>>()
                 .await
@@ -271,23 +257,18 @@ impl RequestClient for EveClient {
         Ok(fetched_data)
     }
 
-    async fn post<R, T>(
-        &self,
-        _data: R,
-        _path: &str,
-    ) -> Result<T, ConnectError>
+    async fn post<R, T>(&self, _data: R, _path: &str) -> Result<T, ConnectError>
     where
         R: Debug + Serialize + Send + Sync,
-        T: DeserializeOwned {
-
+        T: DeserializeOwned,
+    {
         unimplemented!()
     }
 }
 
 impl std::fmt::Debug for EveClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("EveClient")
-         .finish()
+        f.debug_struct("EveClient").finish()
     }
 }
 
@@ -317,30 +298,30 @@ impl std::fmt::Debug for EveClient {
 #[derive(Clone)]
 pub struct EveAuthClient {
     /// Client for communicating with EVE
-    client:        Client,
+    client: Client,
     /// Token to get a new `access_token`
     refresh_token: String,
     /// Token needed to get data that is behind auth
-    access_token:  Arc<Mutex<Option<String>>>,
+    access_token: Arc<Mutex<Option<String>>>,
 }
 
 impl EveAuthClient {
     /// URL to the EVE-API
-    const EVE_API_URL:    &'static str = "https://esi.evetech.net";
+    const EVE_API_URL: &'static str = "https://esi.evetech.net";
     /// URL to the EVE-API oauth login page
-    const EVE_LOGIN_URL:  &'static str = "https://login.eveonline.com/v2/oauth/authorize";
+    const EVE_LOGIN_URL: &'static str = "https://login.eveonline.com/v2/oauth/authorize";
     /// URL to the EVE-API oauth token
-    const EVE_TOKEN_URL:  &'static str = "https://login.eveonline.com/v2/oauth/token";
+    const EVE_TOKEN_URL: &'static str = "https://login.eveonline.com/v2/oauth/token";
     /// Name of the ENV of the application callback
-    const ENV_CALLBACK:   &'static str = "EVE_CALLBACK";
+    const ENV_CALLBACK: &'static str = "EVE_CALLBACK";
     /// Name of the ENV of the application client id
-    const ENV_CLIENT_ID:  &'static str = "EVE_CLIENT_ID";
+    const ENV_CLIENT_ID: &'static str = "EVE_CLIENT_ID";
     /// Name of the ENV of the application secret key
     const ENV_SECRET_KEY: &'static str = "EVE_SECRET_KEY";
     /// Name of the ENV of the user agent
     const ENV_USER_AGENT: &'static str = "EVE_USER_AGENT";
     /// Default scope that is used
-    const DEFAULT_SCOPE:  &'static str = "publicData";
+    const DEFAULT_SCOPE: &'static str = "publicData";
 
     /// Gets the initial access token,
     ///
@@ -359,9 +340,7 @@ impl EveAuthClient {
     /// If the retrieving of an `access_token` fails the function will return
     /// an error
     ///
-    pub async fn access_token(
-        code: &str
-    ) -> Result<EveOAuthToken, ConnectError> {
+    pub async fn access_token(code: &str) -> Result<EveOAuthToken, ConnectError> {
         let mut map = HashMap::new();
         map.insert("grant_type", "authorization_code");
         map.insert("code", code);
@@ -386,13 +365,11 @@ impl EveAuthClient {
     ///
     /// New token object
     ///
-    async fn get_token(
-        form: HashMap<&str, &str>
-    ) -> Result<EveOAuthToken, ConnectError> {
-        let client_id = std::env::var(Self::ENV_CLIENT_ID)
-            .map_err(|_| ConnectError::env_client_id())?;
-        let secret_key = std::env::var(Self::ENV_SECRET_KEY)
-            .map_err(|_| ConnectError::env_secret_key())?;
+    async fn get_token(form: HashMap<&str, &str>) -> Result<EveOAuthToken, ConnectError> {
+        let client_id =
+            std::env::var(Self::ENV_CLIENT_ID).map_err(|_| ConnectError::env_client_id())?;
+        let secret_key =
+            std::env::var(Self::ENV_SECRET_KEY).map_err(|_| ConnectError::env_secret_key())?;
 
         Client::new()
             .post(Self::EVE_TOKEN_URL)
@@ -429,11 +406,9 @@ impl EveAuthClient {
     ///
     /// New instance of the [EveAuthClient]
     ///
-    pub fn new(
-        refresh_token: String
-    ) -> Result<Self, ConnectError> {
-        let user_agent = std::env::var(Self::ENV_USER_AGENT)
-            .map_err(|_| ConnectError::env_user_agent())?;
+    pub fn new(refresh_token: String) -> Result<Self, ConnectError> {
+        let user_agent =
+            std::env::var(Self::ENV_USER_AGENT).map_err(|_| ConnectError::env_user_agent())?;
 
         let client = Client::builder()
             .user_agent(user_agent)
@@ -442,9 +417,9 @@ impl EveAuthClient {
             .map_err(ConnectError::CouldNotConstructClient)?;
 
         Ok(Self {
-            client:        client,
+            client: client,
             refresh_token: refresh_token,
-            access_token:  Arc::new(Mutex::new(None))
+            access_token: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -476,8 +451,8 @@ impl EveAuthClient {
     ///
     #[allow(clippy::unwrap_in_result)]
     pub fn with_access_token(
-        access_token:  String,
-        refresh_token: String
+        access_token: String,
+        refresh_token: String,
     ) -> Result<Self, ConnectError> {
         let s = Self::new(refresh_token)?;
         #[allow(clippy::unwrap_used)]
@@ -521,15 +496,13 @@ impl EveAuthClient {
             Self::DEFAULT_SCOPE
         };
 
-        let mut url = Url::parse(Self::EVE_LOGIN_URL)
-            .map_err(|_| ConnectError::UrlParseError)?;
+        let mut url = Url::parse(Self::EVE_LOGIN_URL).map_err(|_| ConnectError::UrlParseError)?;
 
-        let callback = std::env::var(Self::ENV_CALLBACK)
-            .map_err(|_| ConnectError::env_callback())?;
-        let client_id = std::env::var(Self::ENV_CLIENT_ID)
-            .map_err(|_| ConnectError::env_client_id())?;
-        let _ = std::env::var(Self::ENV_SECRET_KEY)
-            .map_err(|_| ConnectError::env_secret_key())?;
+        let callback =
+            std::env::var(Self::ENV_CALLBACK).map_err(|_| ConnectError::env_callback())?;
+        let client_id =
+            std::env::var(Self::ENV_CLIENT_ID).map_err(|_| ConnectError::env_client_id())?;
+        let _ = std::env::var(Self::ENV_SECRET_KEY).map_err(|_| ConnectError::env_secret_key())?;
 
         url.query_pairs_mut()
             .append_pair("response_type", "code")
@@ -619,7 +592,8 @@ impl EveAuthClient {
                 .await
                 .map_err(ConnectError::ReqwestError)?;
 
-            if response.status() == StatusCode::UNAUTHORIZED {
+            if response.status() == StatusCode::FORBIDDEN ||
+               response.status() == StatusCode::UNAUTHORIZED {
                 self.refresh_token().await?;
                 continue;
             }
@@ -633,7 +607,7 @@ impl EveAuthClient {
                 continue;
             }
 
-            return Ok(response)
+            return Ok(response);
         }
     }
 
@@ -661,14 +635,10 @@ impl EveAuthClient {
     /// Response of the request, ready to work with
     ///
     #[tracing::instrument(level = "debug")]
-    async fn send_post<R>(
-        &self,
-        data: R,
-        path: &str
-    ) -> Result<Response, ConnectError>
+    async fn send_post<R>(&self, data: R, path: &str) -> Result<Response, ConnectError>
     where
-        R: Debug + Serialize + Send + Sync {
-
+        R: Debug + Serialize + Send + Sync,
+    {
         let access_token = {
             #[allow(clippy::unwrap_used)]
             self.access_token.lock().unwrap().clone()
@@ -715,7 +685,7 @@ impl EveAuthClient {
                 continue;
             }
 
-            return Ok(response)
+            return Ok(response);
         }
     }
 
@@ -747,21 +717,20 @@ impl EveAuthClient {
 
 impl std::fmt::Debug for EveAuthClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("EveAuthClient")
-         .finish()
+        f.debug_struct("EveAuthClient").finish()
     }
 }
 
 #[async_trait]
 impl RequestClient for EveAuthClient {
     #[tracing::instrument(level = "debug")]
-    async fn fetch<T>(
-        &self,
-        path: &str,
-    ) -> Result<T, ConnectError>
-    where T: DeserializeOwned {
+    async fn fetch<T>(&self, path: &str) -> Result<T, ConnectError>
+    where
+        T: DeserializeOwned,
+    {
         let path = format!("{}/{}", Self::EVE_API_URL, path);
-        let json = self.send(&path)
+        let json = self
+            .send(&path)
             .await?
             .json::<T>()
             .await
@@ -770,15 +739,12 @@ impl RequestClient for EveAuthClient {
     }
 
     #[tracing::instrument(level = "debug")]
-    async fn fetch_page<T>(
-        &self,
-        path: &str,
-    ) -> Result<Vec<T>, ConnectError>
-    where T: DeserializeOwned + Send {
+    async fn fetch_page<T>(&self, path: &str) -> Result<Vec<T>, ConnectError>
+    where
+        T: DeserializeOwned + Send,
+    {
         let path = format!("{}/{}", Self::EVE_API_URL, path);
-        let response = self
-            .send(&path)
-            .await?;
+        let response = self.send(&path).await?;
 
         let pages = self.page_count(&response);
 
@@ -791,11 +757,7 @@ impl RequestClient for EveAuthClient {
 
         for page in 2..=pages {
             let next_page = self
-                .send(&format!(
-                    "{}?page={}",
-                    path,
-                    page
-                ))
+                .send(&format!("{}?page={}", path, page))
                 .await?
                 .json::<Vec<T>>()
                 .await
@@ -808,17 +770,14 @@ impl RequestClient for EveAuthClient {
     }
 
     #[tracing::instrument(level = "debug")]
-    async fn post<R, T>(
-        &self,
-        data: R,
-        path: &str,
-    ) -> Result<T, ConnectError>
+    async fn post<R, T>(&self, data: R, path: &str) -> Result<T, ConnectError>
     where
         R: Debug + Serialize + Send + Sync,
-        T: DeserializeOwned {
-
+        T: DeserializeOwned,
+    {
         let path = format!("{}/{}", Self::EVE_API_URL, path);
-        let json = self.send_post(data, &path)
+        let json = self
+            .send_post(data, &path)
             .await?
             .json::<T>()
             .await
@@ -843,15 +802,15 @@ pub enum Scp {
     /// The permission is a single String
     Str(String),
     /// The permission is a list of strings
-    StrArray(Vec<String>)
+    StrArray(Vec<String>),
 }
 
 impl Scp {
     /// Gets the inner string or vec of string and returns it as vec
     pub fn into_vec(self) -> Vec<String> {
         match self {
-            Self::Str(x)      => vec![x],
-            Self::StrArray(x) => x
+            Self::Str(x) => vec![x],
+            Self::StrArray(x) => x,
         }
     }
 }
@@ -861,11 +820,11 @@ impl Scp {
 #[derive(Debug, Deserialize)]
 pub struct EveOAuthToken {
     /// Access token required for every request
-    pub access_token:  String,
+    pub access_token: String,
     /// Type of the token
-    pub token_type:    String,
+    pub token_type: String,
     /// Lifetime of the token, typically 1199 seconds
-    pub expires_in:    i32,
+    pub expires_in: i32,
     /// Token to get a new access token
     pub refresh_token: String,
 }
@@ -885,10 +844,8 @@ impl EveOAuthToken {
         let payload = self.access_token.to_string();
         let payload = payload.split('.').collect::<Vec<_>>();
         let payload = payload.get(1).copied().unwrap_or_default();
-        let decoded = base64::decode(payload)
-            .map_err(ConnectError::OAuthPayloadDecode)?;
-        serde_json::from_slice(&decoded)
-            .map_err(ConnectError::OAuthParseError)
+        let decoded = base64::decode(payload).map_err(ConnectError::OAuthPayloadDecode)?;
+        serde_json::from_slice(&decoded).map_err(ConnectError::OAuthParseError)
     }
 
     /// Gets the character id from the token
@@ -903,7 +860,8 @@ impl EveOAuthToken {
     /// The character id
     ///
     pub fn character_id(&self) -> Result<CharacterId, ConnectError> {
-        let character_id = self.payload()?
+        let character_id = self
+            .payload()?
             .sub
             .replace("CHARACTER:EVE:", "")
             .parse::<i32>()

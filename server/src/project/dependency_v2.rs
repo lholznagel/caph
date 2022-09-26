@@ -1,3 +1,1 @@
-mod bonus;
-mod dependency;
-mod structure;
+pub mod dependency;

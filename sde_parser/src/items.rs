@@ -8,39 +8,26 @@ use std::fs::File;
 /// Wrapper for CategoryId
 type CategoryId = i32;
 /// Wrapper for GroupId
-type GroupId     = i32;
+type GroupId = i32;
 /// Wrapper for TypeId
-type TypeId     = i32;
+type TypeId = i32;
 
 /// Parses the input file and exports it as SQL
 pub fn run() -> Result<String, Box<dyn std::error::Error>> {
     tracing::info!("Starting asset parsing");
 
     let current = std::env::current_dir()?;
-    let current = current
-        .to_str()
-        .unwrap_or_default();
-    let path_type_ids = format!(
-        "{}/{}/type_ids.yaml",
-        current,
-        FOLDER_INPUT
-    );
+    let current = current.to_str().unwrap_or_default();
+    let path_type_ids = format!("{}/{}/type_ids.yaml", current, FOLDER_INPUT);
     let file_type_ids = File::open(&path_type_ids)?;
 
-    let path_group_ids = format!(
-        "{}/{}/group_ids.yaml",
-        current,
-        FOLDER_INPUT
-    );
+    let path_group_ids = format!("{}/{}/group_ids.yaml", current, FOLDER_INPUT);
     let file_group_ids = File::open(&path_group_ids)?;
 
     let type_ids: HashMap<TypeId, TypeEntry> = serde_yaml::from_reader(file_type_ids)?;
     let group_ids: HashMap<GroupId, GroupEntry> = serde_yaml::from_reader(file_group_ids)?;
 
-    let entries = vec![
-        sql_header(),
-        sql_items(&type_ids, &group_ids)
-    ];
+    let entries = vec![sql_header(), sql_items(&type_ids, &group_ids)];
 
     Ok(entries.join("\n"))
 }
@@ -56,13 +43,13 @@ fn sql_header() -> String {
 }
 
 /// Generates a SQL-Query containing all game items
-/// 
+///
 /// # Returns
-/// 
+///
 /// String containing the value-tuple
-/// 
+///
 fn sql_items(
-    type_ids:  &HashMap<TypeId, TypeEntry>,
+    type_ids: &HashMap<TypeId, TypeEntry>,
     group_ids: &HashMap<GroupId, GroupEntry>,
 ) -> String {
     let mut items = Vec::new();
@@ -76,13 +63,9 @@ fn sql_items(
             .expect("Every entry should have a categroy id");
         let volume = entry.volume.unwrap_or(0f32);
         let meta_group_id = entry.meta_group_id;
-        let name = entry
-            .name()
-            .unwrap_or(
-                format!("Unknown name {}", type_id)
-            );
+        let name = entry.name().unwrap_or(format!("Unknown name {}", type_id));
 
-        let item= Item {
+        let item = Item {
             type_id,
             group_id,
             meta_group_id,
@@ -93,26 +76,24 @@ fn sql_items(
         items.push(item.into_sql());
     }
 
-    format!("INSERT INTO items VALUES {};",
-        items.join(", "),
-    )
+    format!("INSERT INTO items VALUES {};", items.join(", "),)
 }
 
 /// Represents a single item entry
 #[derive(Clone, Debug)]
 struct Item {
     /// TypeId of the item
-    type_id:       TypeId,
+    type_id: TypeId,
     /// CategoryId of the item
-    category_id:   TypeId,
+    category_id: TypeId,
     /// GroupId of the item
-    group_id:      TypeId,
+    group_id: TypeId,
     /// MetaGroupId of the item
     meta_group_id: Option<TypeId>,
     /// Volume
-    volume:        f32,
+    volume: f32,
     /// English name of the item
-    name:          String
+    name: String,
 }
 
 impl Item {
@@ -134,7 +115,8 @@ impl Item {
             self.type_id,
             self.category_id,
             self.group_id,
-            self.meta_group_id.map_or("NULL".into(), |x| format!("{}", x)),
+            self.meta_group_id
+                .map_or("NULL".into(), |x| format!("{}", x)),
             self.volume,
             self.name.replace('\'', "''")
         )
@@ -146,19 +128,19 @@ impl Item {
 pub struct TypeEntry {
     /// ID of the group this type belongs to
     #[serde(rename = "groupID")]
-    pub group_id:                 GroupId,
+    pub group_id: GroupId,
     /// Name of the item in different languages
     #[serde(rename = "name")]
-    pub name:                     HashMap<String, String>,
+    pub name: HashMap<String, String>,
     /// Volume of the type
     #[serde(rename = "published")]
-    pub published:                bool,
+    pub published: bool,
     /// ID of the group this type belongs to
     #[serde(rename = "metaGroupID")]
-    pub meta_group_id:            Option<GroupId>,
+    pub meta_group_id: Option<GroupId>,
     /// Volume of the type
     #[serde(rename = "volume")]
-    pub volume:                   Option<f32>,
+    pub volume: Option<f32>,
 }
 
 impl TypeEntry {
@@ -170,10 +152,7 @@ impl TypeEntry {
     /// returned.
     ///
     pub fn name(&self) -> Option<String> {
-        self
-            .name
-            .get("en")
-            .cloned()
+        self.name.get("en").cloned()
     }
 }
 

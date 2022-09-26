@@ -1,13 +1,16 @@
 use appraisal::{Appraisal, AppraisalInformation, Janice};
-use caph_connector::{AllianceId, CorporationId, CharacterId, GroupId, TypeId};
+use caph_connector::{CharacterId, GroupId, TypeId};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::collections::HashMap;
+use std::convert::Infallible;
 use tracing::instrument;
 use uuid::Uuid;
+use warp::Filter;
 
-use crate::{Error, ProjectBlueprintService, Blueprint, DependencyType, Structure, StructureRig};
-use crate::project::dependency::{Dependency, DatabaseDependency, DependencyGroup};
+use crate::{Error, structure::structure::{StructureType, StructureRig}, project::dependency_v2::{dependency::{Dependency, DependencyTree, StructureMapping}}};
+use super::dependency_v2::dependency::DependencyTreeEntry;
+use crate::structure::structure::{Structure, Security};
 
 /// An id of a tracking entry
 pub type BudgetId    = Uuid;
@@ -20,22 +23,21 @@ pub type ProjectId   = Uuid;
 pub struct GodProject {
     info:             Project,
     materials_stored: Vec<Material>,
-    materials_raw:    Vec<Dependency>,
+    //materials_raw:    Vec<Dependency>,
     buildsteps:       Buildstep,
-    members:          Vec<Member>,
-    bp_required:      Vec<Blueprint>,
+    //bp_required:      Vec<Blueprint>,
     //market:           AppraisalInformation
 }
 
 /// Wrapper for managing projects
 /// TODO: split file into multiple files
 #[derive(Clone)]
+#[deprecated]
 pub struct ProjectService {
     /// Database pool
     pool:      PgPool,
 
-    /// Service for handling blueprints
-    blueprint:        ProjectBlueprintService,
+    //blueprint:        ProjectBlueprintService,
 }
 
 impl ProjectService {
@@ -52,190 +54,38 @@ impl ProjectService {
     pub fn new(
         pool:             PgPool,
 
-        blueprint:        ProjectBlueprintService,
+        //blueprint:        ProjectBlueprintService,
     ) -> Self {
         Self {
             pool,
 
-            blueprint,
-        }
-    }
-
-    /// Fetches an project by its identifier.
-    ///
-    /// # Params
-    ///
-    /// * `pid` -> [ProjectId] of the project
-    ///
-    /// # Errors
-    ///
-    /// Will throw an error if the database is not available.
-    ///
-    /// # Returns
-    ///
-    /// [Option::Some(_)] if the project exists, otherwise [Option::None].
-    ///
-    #[instrument(err)]
-    pub async fn by_id(
-        pool: &PgPool,
-        pid:  &ProjectId,
-    ) -> Result<Option<Project>, Error> {
-        let entry = sqlx::query!(r#"
-                SELECT
-                    p.project,
-                    p.owner,
-                    p.name,
-                    p.status AS "status: Status"
-                FROM projects p
-                JOIN project_products pp
-                  ON p.project = pp.project
-                WHERE p.project = $1
-            "#,
-                pid
-            )
-            .fetch_optional(pool)
-            .await?
-            .map(|x| {
-                Project {
-                    project:     x.project,
-                    owner:       x.owner.into(),
-                    name:        x.name,
-                    status:      x.status,
-                    products:    Vec::new(),
-                }
-            });
-
-        if let Some(mut x) = entry {
-            x.products = Self::fetch_products(pool, pid).await?;
-            Ok(Some(x))
-        } else {
-            Ok(None)
+            //blueprint,
         }
     }
 
     pub async fn god(
         &self,
+        cid: CharacterId,
         pid: ProjectId
     ) -> Result<GodProject, Error> {
-        let info = ProjectService::by_id(&self.pool, &pid).await?.unwrap();
+        let p_service = ProjectServiceV2::new(self.pool.clone());
+
+        let info = p_service.by_id(&pid).await?;
         let materials_stored = self.stored_materials(pid).await?;
-        let materials_raw = self.raw_materials(pid).await?;
+        //let materials_raw = self.raw_materials(pid).await?;
         let buildsteps = self.buildsteps(pid).await?;
-        let members = self.members(pid).await?;
         //let market = self.market_price(pid).await?;
-        let steps = self.buildstep_manufacturing(pid).await?;
-        let bp_required = self.blueprint.required(steps).await?;
+        //let steps = self.buildstep_manufacturing(pid).await?;
+        //let bp_required = self.blueprint.required(steps).await?;
 
         Ok(GodProject {
             info,
             materials_stored,
-            materials_raw,
+            //materials_raw,
             buildsteps,
-            members,
-            bp_required,
+            //bp_required,
             //market
         })
-    }
-
-    /// Minimal version of all projects that the user has access to.
-    ///
-    /// # Params
-    ///
-    /// * `cid` -> [CharacterId] of the requesting user
-    ///
-    /// # Errors
-    ///
-    /// When the database access is faulty
-    ///
-    /// # Returns
-    ///
-    /// List all project ids the user has access to.
-    ///
-    #[instrument(err)]
-    pub async fn all(
-        &self,
-        cid: CharacterId
-    ) -> Result<Vec<Info>, Error> {
-        let entries = sqlx::query!(r#"
-                SELECT
-                    p.project,
-                    p.name,
-                    p.owner,
-                    p.status AS "status: Status"
-                FROM project_members pm
-                JOIN projects p
-                  ON p.project = pm.project
-                WHERE character_id = $1
-                ORDER BY name
-            "#,
-                *cid
-            )
-            .fetch_all(&self.pool)
-            .await?
-            .into_iter()
-            .map(|x| Info {
-                project: x.project,
-                name:    x.name,
-                owner:   x.owner.into(),
-                status:  x.status
-            })
-            .collect::<Vec<_>>();
-        Ok(entries)
-    }
-
-    /// Creates a new project.
-    ///
-    /// # Params
-    ///
-    /// * `cid` -> [CharacterId] of the user that create the project
-    /// * `cfg` -> Holds all information needed to create a project
-    ///
-    /// # Errors
-    ///
-    /// When communicating with the database fails
-    ///
-    /// # Returns
-    ///
-    /// [Uuid] of the created entry.
-    ///
-    #[instrument(err)]
-    pub async fn create(
-        &self,
-        cid: CharacterId,
-        cfg: Config
-    ) -> Result<ProjectId, Error> {
-        let pid = sqlx::query!("
-                INSERT INTO projects
-                (
-                    owner,
-                    name
-                )
-                VALUES ($1, $2)
-                RETURNING project
-            ",
-                *cid,
-                cfg.name,
-            )
-            .fetch_one(&self.pool)
-            .await
-            .map(|x| x.project)?;
-
-        sqlx::query!("
-                INSERT INTO project_members
-                (
-                    project,
-                    character_id
-                )
-                VALUES($1, $2)
-            ",
-                pid,
-                *cid
-            )
-            .execute(&self.pool)
-            .await?;
-
-        self.insert_products(pid, cfg.products).await?;
-        Ok(pid)
     }
 
     /// Updates the given entry with the given data.
@@ -374,8 +224,9 @@ impl ProjectService {
     pub async fn raw_materials(
         &self,
         pid: ProjectId
-    ) -> Result<Vec<Dependency>, Error> {
-        let bp_bonus = self.blueprint
+    // ) -> Result<Vec<Dependency>, Error> {
+    ) -> Result<Vec<String>, Error> {
+        /*let bp_bonus = self.blueprint
             .stored(pid)
             .await?
             .into_iter()
@@ -444,7 +295,8 @@ impl ProjectService {
             .cloned()
             .collect::<Vec<_>>();
         materials.sort_by_key(|x| x.name.clone());
-        Ok(materials)
+        Ok(materials)*/
+        Ok(Vec::new())
     }
 
     /// Fetches the current market prices for all required raw materials.
@@ -470,12 +322,13 @@ impl ProjectService {
         // TODO: check if janice is available, if not fallback to evepraisal (or do both)
         let janice = Janice::init().map_err(Error::AppraisalError)?;
 
-        let raw_materials = self
+        /*let raw_materials = self
             .raw_materials(pid)
             .await?
             .into_iter()
             .map(|x| format!("{} {}", x.name, x.product()))
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>();*/
+        let raw_materials = Vec::new();
 
         janice.create(
             true,
@@ -527,9 +380,10 @@ impl ProjectService {
     pub async fn buildstep_manufacturing(
         &self,
         pid: ProjectId,
-    ) -> Result<Vec<Dependency>, Error> {
+    //) -> Result<Vec<Dependency>, Error> {
+    ) -> Result<Vec<String>, Error> {
         // TODO: Move
-        let bp_bonus = self.blueprint
+        /*let bp_bonus = self.blueprint
             .stored(pid)
             .await?
             .into_iter()
@@ -553,7 +407,7 @@ impl ProjectService {
             .into_iter()
             .map(|x| (x.ptype_id, 2.6f32))
             .collect::<HashMap<_, _>>();
-        let structures = Self::structures();
+        //let structures = Self::structures();
 
         let dependencies = sqlx::query!("
                     SELECT type_id, count, data
@@ -594,7 +448,8 @@ impl ProjectService {
         let dependencies = dependencies.build_order();
 
         //let dependencies = Vec::new();
-        Ok(dependencies)
+        Ok(dependencies)*/
+        Ok(Vec::new())
     }
 
     /// Creates a list of all inventions that are required for a the given
@@ -625,8 +480,8 @@ impl ProjectService {
                     bi.probability,
                     bim.mtype_id,
                     bim.quantity,
-                    i.name      AS iname, -- item name
-                    ii.name     AS dname,  -- datacore name
+                    i.name      AS iname,    -- item name
+                    ii.name     AS dname,    -- datacore name
                     ii.group_id AS dgroup_id -- datacore group id
                 FROM project_products pp
                 JOIN blueprint_inventions bi
@@ -907,131 +762,6 @@ impl ProjectService {
         Ok(())
     }
 
-    /// Fetches all members of a project
-    ///
-    /// # Params
-    ///
-    /// * `pid` -> [ProjectId] of the project to fetch the products for
-    ///
-    /// # Errors
-    ///
-    /// When the database connection fails.
-    ///
-    /// # Returns
-    ///
-    /// List of all memebers that are part of the project
-    ///
-    #[instrument(err)]
-    pub async fn members(
-        &self,
-        pid: ProjectId
-    ) -> Result<Vec<Member>, Error> {
-        sqlx::query!("
-                SELECT
-                    c.character_id,
-                    c.character_name,
-                    c.corporation_id,
-                    c.corporation_name,
-                    c.alliance_id,
-                    c.alliance_name
-                FROM project_members pm
-                JOIN characters c
-                  ON c.character_id = pm.character_id
-                WHERE pm.project = $1
-            ",
-                pid
-            )
-            .fetch_all(&self.pool)
-            .await
-            .map_err(Into::into)
-            .map(|x| {
-                x.into_iter()
-                    .map(|x| Member {
-                        character_id:     x.character_id.into(),
-                        character_name:   x.character_name,
-                        corporation_id:   x.corporation_id.into(),
-                        corporation_name: x.corporation_name,
-                        alliance_id:      x.alliance_id.map(|x| x.into()),
-                        alliance_name:    x.alliance_name,
-                    })
-                    .collect::<Vec<_>>()
-            })
-    }
-
-    /// Adds a character to a project.
-    ///
-    /// # Params
-    ///
-    /// * `pid` -> [ProjectId] of the project
-    /// * `cid` -> [CharacterId] of the new character
-    ///
-    /// # Errors
-    ///
-    /// When the database connection fails.
-    ///
-    /// # Returns
-    ///
-    /// Nothing
-    ///
-    #[instrument(err)]
-    pub async fn add_member(
-        &self,
-        pid: ProjectId,
-        cid: CharacterId
-    ) -> Result<(), Error> {
-        sqlx::query!("
-                INSERT INTO project_members
-                (
-                    project,
-                    character_id
-                )
-                VALUES ($1, $2)
-                ON CONFLICT DO NOTHING
-            ",
-                pid,
-                *cid
-            )
-            .execute(&self.pool)
-            .await
-            .map(drop)
-            .map_err(Into::into)
-    }
-
-    /// Kicks a member from a project.
-    ///
-    /// # Params
-    ///
-    /// * `pid` -> [ProjectId] of the project
-    /// * `cid` -> [CharacterId] of the character to kick
-    ///
-    /// # Errors
-    ///
-    /// When the database connection fails.
-    ///
-    /// # Returns
-    ///
-    /// Nothing
-    ///
-    #[instrument(err)]
-    pub async fn kick_member(
-        &self,
-        pid: ProjectId,
-        cid: CharacterId
-    ) -> Result<(), Error> {
-        sqlx::query!("
-                DELETE FROM project_members
-                WHERE project = $1
-                  AND character_id = $2
-            ",
-                pid,
-                *cid
-            )
-            .execute(&self.pool)
-            .await
-            .map(drop)
-            .map_err(Into::into)
-    }
-
     /// Fetches all products for a project.
     ///
     /// # Params
@@ -1065,7 +795,9 @@ impl ProjectService {
             .into_iter()
             .map(|x| Product {
                 name:    x.name,
-                count:   x.count,
+                count:   x.count as u32,
+                // FIXME:
+                meff:    0u32,
                 type_id: x.type_id.into(),
             })
             .collect::<Vec<_>>();
@@ -1110,7 +842,7 @@ impl ProjectService {
             .collect::<Vec<_>>();
         let counts = products
             .iter()
-            .map(|x| x.count)
+            .map(|x| x.count as i32)
             .collect::<Vec<_>>();
         sqlx::query!("
                 INSERT INTO project_products
@@ -1136,7 +868,7 @@ impl ProjectService {
             .map_err(Error::DatabaseError)
     }
 
-    fn structures() -> Vec<Structure> {
+    /*fn structures() -> Vec<Structure> {
         vec![
             Structure::new(
                 "Enablement Station - RAMI".into(),
@@ -1167,7 +899,7 @@ impl ProjectService {
                 ]
             ),
         ]
-    }
+    }*/
 }
 
 impl std::fmt::Debug for ProjectService {
@@ -1193,7 +925,7 @@ pub struct Project {
 
 /// Represents basic information about a project
 #[derive(Debug, Serialize)]
-pub struct Info {
+pub struct ProjectInfo {
     /// Id of the project
     pub project: ProjectId,
     /// Project name
@@ -1221,7 +953,9 @@ pub struct Product {
     /// Name of the product
     pub name:    String,
     /// Number of items that should be build
-    pub count:   i32,
+    pub count:   u32,
+    /// Material efficiency
+    pub meff:    u32,
     /// TypeId of the product
     pub type_id: TypeId,
 }
@@ -1346,7 +1080,9 @@ pub struct ProjectMarketItemPrice {
 #[derive(Debug, Deserialize)]
 pub struct ProductConfig {
     /// Number of items that should be build
-    pub count:   i32,
+    pub count:   u32,
+    /// Material efficiency
+    pub meff:    u32,
     /// TypeId of the product
     pub type_id: TypeId,
 }
@@ -1354,7 +1090,8 @@ pub struct ProductConfig {
 impl From<Product> for ProductConfig {
     fn from(x: Product) -> Self {
         Self {
-            count:   x.count,
+            count:   x.count as u32,
+            meff:    x.meff as u32,
             type_id: x.type_id
         }
     }
@@ -1377,7 +1114,8 @@ pub struct BlueprintTree {
 #[derive(Debug, Serialize)]
 pub struct Buildstep {
     /// Contains all required manufactures
-    pub manufacture: Vec<Dependency>,
+    //pub manufacture: Vec<Dependency>,
+    pub manufacture: Vec<String>,
     /// Contains all required inventions
     pub inventions:  Vec<BuildstepEntryInvention>
 }
@@ -1453,19 +1191,386 @@ pub struct AddBudgetEntry {
     pub description: String,
 }
 
-/// Represents a member of a project
-#[derive(Clone, Debug, Serialize)]
-pub struct Member {
-    /// ID of the character
-    pub character_id:     CharacterId,
-    /// Name of the character
-    pub character_name:   String,
-    /// If of the character corporation
-    pub corporation_id:   CorporationId,
-    /// Name of the character corporation
-    pub corporation_name: String,
-    /// Id of the alliance the corporation is in
-    pub alliance_id:      Option<AllianceId>,
-    /// Name of the alliance
-    pub alliance_name:    Option<String>,
+/// Contains all information for creating a new project
+#[derive(Debug, Deserialize)]
+pub struct ProjectConfig {
+    /// Name of the project
+    pub name:       String,
+    /// List of all products that should be build
+    pub products:   Vec<ProductConfig>,
+    /// Status of the project
+    pub status:     Option<Status>
+}
+
+pub struct ProjectServiceV2 {
+    pool: PgPool
+}
+
+impl ProjectServiceV2 {
+    pub fn new(
+        pool: PgPool,
+    ) -> Self {
+        Self {
+            pool
+        }
+    }
+
+    /// Minimal version of all projects that the user has access to.
+    ///
+    /// # Params
+    ///
+    /// * `cid` > [CharacterId] of the requesting user
+    ///
+    /// # Errors
+    ///
+    /// - If the database is not available
+    ///
+    /// # Returns
+    ///
+    /// List all project ids the user has access to.
+    ///
+    pub async fn all(
+        &self,
+        cid: CharacterId,
+    ) -> Result<Vec<ProjectInfo>, Error> {
+        let entries = sqlx::query!(r#"
+                SELECT
+                    p.project,
+                    p.name,
+                    p.owner,
+                    p.status AS "status: Status"
+                FROM projects p
+                WHERE p.owner = $1
+                ORDER BY p.name
+            "#,
+                *cid
+            )
+            .fetch_all(&self.pool)
+            .await?
+            .into_iter()
+            .map(|x| ProjectInfo {
+                project: x.project,
+                name:    x.name,
+                owner:   x.owner.into(),
+                status:  x.status
+            })
+            .collect::<Vec<_>>();
+        Ok(entries)
+    }
+
+    /// Gets a single project by its id.
+    /// 
+    /// # Params
+    /// 
+    /// * `pid` > [Uuid] of the project
+    /// 
+    /// # Erros
+    /// 
+    /// - If the database is not available
+    /// - If the project does not exist
+    /// 
+    /// # Returns
+    /// 
+    /// General information of the project.
+    /// 
+    pub async fn by_id(
+        &self,
+        pid: &ProjectId,
+    ) -> Result<Project, Error> {
+        let entry = sqlx::query!(r#"
+                SELECT
+                    p.project,
+                    p.owner,
+                    p.name,
+                    p.status AS "status: Status"
+                FROM projects p
+                JOIN project_products pp
+                  ON p.project = pp.project
+                WHERE p.project = $1
+            "#,
+                pid,
+            )
+            .fetch_optional(&self.pool)
+            .await?
+            .map(|x| {
+                Project {
+                    project:     x.project,
+                    owner:       x.owner.into(),
+                    name:        x.name,
+                    status:      x.status,
+                    products:    Vec::new(),
+                }
+            });
+
+        if let Some(mut x) = entry {
+            x.products = self.fetch_products(pid).await?;
+            Ok(x)
+        } else {
+            Err(Error::NotFound)
+        }
+    }
+
+    /// Creates a new project.
+    ///
+    /// # Params
+    ///
+    /// * `cid` -> [CharacterId] of the user that create the project
+    /// * `cfg` -> Holds all information needed to create a project
+    ///
+    /// # Errors
+    ///
+    /// When communicating with the database fails
+    ///
+    /// # Returns
+    ///
+    /// [Uuid] of the created entry.
+    ///
+    #[instrument(err)]
+    pub async fn create(
+        &self,
+        cid: CharacterId,
+        cfg: ProjectConfig,
+    ) -> Result<ProjectId, Error> {
+        let pid = sqlx::query!("
+                INSERT INTO projects
+                (
+                    owner,
+                    name
+                )
+                VALUES ($1, $2)
+                RETURNING project
+            ",
+                *cid,
+                cfg.name,
+            )
+            .fetch_one(&self.pool)
+            .await
+            .map(|x| x.project)?;
+
+        self.insert_products(pid, cfg.products).await?;
+        Ok(pid)
+    }
+
+    pub async fn jobs(
+        &self,
+        pid: ProjectId,
+    ) -> Result<Vec<DependencyTreeEntry>, Error> {
+        use std::str::FromStr;
+        let manufacturing_a = Structure::new(
+            Uuid::from_str("00000000-0000-0000-0000-000000000000").unwrap(),
+            "Sotiyo manufacturing".into(),
+            "Here".into(),
+            Security::Nullsec,
+            StructureType::Sotiyo,
+            vec![
+                StructureRig::new(&self.pool, TypeId::from(37180)).await.unwrap(),
+                StructureRig::new(&self.pool, TypeId::from(37178)).await.unwrap(),
+                StructureRig::new(&self.pool, TypeId::from(43704)).await.unwrap(),
+            ]
+        );
+
+        let reaction_a = Structure::new(
+            Uuid::from_str("00000000-0000-0000-0000-000000000001").unwrap(),
+            "Tatara reactions".into(),
+            "Here".into(),
+            Security::Nullsec,
+            StructureType::Tatara,
+            vec![
+                StructureRig::new(&self.pool, TypeId::from(46497)).await.unwrap(),
+            ]
+        );
+
+        let mapping = vec![
+            StructureMapping {
+                structure:      manufacturing_a.id,
+                category_group: manufacturing_a.category_groups(),
+            },
+            StructureMapping {
+                structure:      reaction_a.id,
+                category_group: reaction_a.category_groups(),
+            },
+        ];
+
+        /*let bonus = Bonus::new(
+            vec![manufacturing_a, reaction_a],
+            mapping,
+            HashMap::new(),
+        );*/
+
+        let mut dependencies = Vec::new();
+        let products = sqlx::query!("
+                    SELECT count, data
+                    FROM project_products pp
+                    JOIN blueprint_json bj ON bj.ptype_id = pp.type_id
+                    WHERE project = $1
+                ",
+                pid
+            )
+            .fetch_all(&self.pool)
+            .await?
+            .into_iter()
+            .map(|x| (x.count as u32, x.data))
+            .map(|(count, data)| Dependency::try_from(count, data))
+            .collect::<Vec<Result<Dependency, Error>>>();
+
+        let timer = std::time::Instant::now();
+
+        for product in products {
+            match product {
+                Ok(x)  => dependencies.push(x),
+                Err(_) => continue
+            }
+        }
+
+        let tree = DependencyTree::from_dependencies(
+                dependencies,
+                vec![manufacturing_a, reaction_a],
+                mapping,
+                HashMap::new(),
+            )
+            .apply_bonus();
+        //.flat_tree();
+        //bonus.apply_blueprint_bonus(&mut tree);
+        //bonus.apply_structure_bonus(&mut tree);
+
+        let entries = tree
+            .into_iter()
+            .map(|(_, x)| x)
+            .collect::<Vec<_>>();
+
+        dbg!(timer.elapsed().as_millis());
+        Ok(entries)
+    }
+
+    /// Fetches the products that should be produced in a project.
+    /// 
+    /// # Errors
+    /// 
+    /// - If the database is not available
+    /// 
+    /// # Returns
+    /// 
+    /// Vec of products
+    /// 
+    async fn fetch_products(
+        &self,
+        pid:  &ProjectId,
+    ) -> Result<Vec<Product>, Error> {
+        let entries = sqlx::query!("
+                SELECT
+                    pp.*,
+                    i.name
+                FROM project_products pp
+                JOIN items i
+                  ON pp.type_id = i.type_id
+                WHERE pp.project = $1
+            ",
+                pid
+            )
+            .fetch_all(&self.pool)
+            .await?
+            .into_iter()
+            .map(|x| Product {
+                name:    x.name,
+                count:   x.count as u32,
+                meff:    x.meff as u32,
+                type_id: x.type_id.into(),
+            })
+            .collect::<Vec<_>>();
+        Ok(entries)
+    }
+
+    /// Inserts a list of products into the database.
+    /// If an item is already linked with the project, the count gets
+    /// overwriten with the new value.
+    ///
+    /// # Params
+    ///
+    /// * `pid`      -> [ProjectId] the products should link to
+    /// * `products` -> List of [ProjectProduct] that should be added
+    ///
+    /// # Errors
+    ///
+    /// When there was an error while inserting the entries
+    ///
+    /// # Returns
+    ///
+    /// Nothing.
+    ///
+    #[instrument(err)]
+    async fn insert_products(
+        &self,
+        pid:      ProjectId,
+        products: Vec<ProductConfig>,
+    ) -> Result<(), Error> {
+        sqlx::query!("
+                 DELETE FROM project_products
+                 WHERE project = $1
+            ",
+                pid
+            )
+            .execute(&self.pool)
+            .await?;
+
+        let type_ids = products
+            .iter()
+            .map(|x| *x.type_id)
+            .collect::<Vec<_>>();
+        let counts = products
+            .iter()
+            .map(|x| x.count as i32)
+            .collect::<Vec<_>>();
+        let meff = products
+            .iter()
+            .map(|x| x.meff as i32)
+            .collect::<Vec<_>>();
+        sqlx::query!("
+                INSERT INTO project_products
+                (
+                    project,
+                    type_id,
+                    count,
+                    meff
+                )
+                SELECT $1, * FROM UNNEST(
+                    $2::INTEGER[],
+                    $3::INTEGER[],
+                    $4::INTEGER[]
+                )
+                ON CONFLICT (project, type_id)
+                DO UPDATE SET count = EXCLUDED.count
+            ",
+                pid,
+                &type_ids,
+                &counts,
+                &meff
+            )
+            .execute(&self.pool)
+            .await
+            .map(drop)
+            .map_err(Error::DatabaseError)
+    }
+}
+
+impl std::fmt::Debug for ProjectServiceV2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProjectService").finish()
+    }
+}
+
+/// Filter for the API.
+/// 
+/// # Params
+/// 
+/// * `pool` > Open connection to postgres
+/// 
+/// # Returns
+/// 
+/// Initialized instance of [ProjectServiceV2]
+/// 
+pub fn with_project_service(
+    pool: PgPool,
+)  -> impl Filter<Extract = (ProjectServiceV2,), Error = Infallible> + Clone {
+    warp::any()
+        .map(move || ProjectServiceV2::new(pool.clone()))
 }

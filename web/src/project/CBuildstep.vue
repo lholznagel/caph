@@ -29,7 +29,7 @@
             </n-icon>
           </td>
           <td>
-            <item-icon
+            <eve-icon
               type="icon"
               :id="entry.ptype_id"
               :width="32"
@@ -53,7 +53,7 @@
               <tbody>
                 <tr v-for="material in entry.components">
                   <td>
-                    <item-icon
+                    <eve-icon
                       type="icon"
                       :id="material.ptype_id"
                       :width="32"
@@ -68,6 +68,8 @@
             </n-table>
           </td>
         </tr>
+
+        <pre>{{ project.jobs }}</pre>
       </template>
     </tbody>
   </n-table>
@@ -81,7 +83,7 @@ import { IBuildstepEntry, Service } from '@/project/service';
 import { ProjectId } from '@/project/project';
 
 import FormatNumber from '@/components/FormatNumber.vue';
-import ItemIcon from '@/components/ItemIcon.vue';
+import EveIcon from '@/components/EveIcon.vue';
 
 class Props {
   // ProjectId
@@ -101,7 +103,7 @@ class Props {
     AngleRight,
 
     FormatNumber,
-    ItemIcon,
+    EveIcon,
   }
 })
 export default class ProjectBuildstep extends Vue.with(Props) {
@@ -110,7 +112,9 @@ export default class ProjectBuildstep extends Vue.with(Props) {
   public async created() {
     let project = await Service.by_id(<ProjectId>this.$route.params.pid);
     await project.init();
-    this.buildsteps = project.buildsteps.manufacture || [];
+
+    this.buildsteps = <any>await Service.jobs(<ProjectId>this.pid);
+    //this.buildsteps = project.buildsteps.manufacture || [];
   }
 }
 </script>

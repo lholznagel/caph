@@ -83,7 +83,7 @@ import { ItemService } from '@/services/item';
 import Resolve from '@/components/Resolve.vue';
 
 import PHeader from '@/project/CHeader.vue';
-import WProject from '@/project/WProject.vue';
+import WProject from '@/project/wrapper/Project.vue';
 
 @Options({
   components: {

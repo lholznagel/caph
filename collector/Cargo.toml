@@ -1,0 +1,13 @@
+[package]
+name = "caph_collector"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+caph_connector = { path = "../connector" }
+chrono = "0.4.23"
+dotenvy = "0.15.6"
+sqlx = { version = "0.6.2", features = ["chrono", "runtime-tokio-rustls", "postgres"] }
+tokio = { version = "1.23.0", features = ["full"] }
+tracing = "0.1.37"
+tracing-subscriber =  { version = "0.3.16", features = ["env-filter"] }

@@ -1,9 +1,10 @@
-import {CharacterId, GroupId, ItemGroup, ItemId, SystemId, BudgetId, TypeId, Uuid} from '@/utils';
+import { CharacterId, GroupId, SystemId, TypeId, Uuid } from '@/utils';
 import axios from 'axios';
 import { Project, ProjectId } from './project';
 
 // Base path that is used for all requests
-const BASE_ADDR = '/api/v1/projects';
+const BASE_ADDR: string    = '/api/v1/projects';
+const PROJECT_PATH: string = '/api/v2/projects';
 
 export const BUDGET_CATEGORIES: {
   label: string;
@@ -28,6 +29,11 @@ export const BUDGET_CATEGORIES: {
 export class Service {
   public static cache: Map<string, Project> = new Map();
 
+  // Gets all projects that the user has access to.
+  public static async get_all(): Promise<IProjectInfo[]> {
+    return (await axios.get(`${PROJECT_PATH}`)).data;
+  }
+
   // Gets a specific project by its id.
   // If the project is already in the cache, the cached version will be
   // returned.
@@ -42,21 +48,16 @@ export class Service {
     return project;
   }
 
-  // Gets all projects that the user has access to.
-  public static async get_all(): Promise<IInfo[]> {
-    return (await axios.get(`${BASE_ADDR}`)).data;
-  }
-
   // Creates a new project and fetches it.
-  public static async create(info: IConfig): Promise<ProjectId> {
-    let pid = (await axios.post(`${BASE_ADDR}`, info)).data;
+  public static async create(info: INewProject): Promise<ProjectId> {
+    let pid = (await axios.post(`${PROJECT_PATH}`, info)).data;
     await this.by_id(pid);
     return pid;
   }
 
   public static async edit(
     pid: ProjectId,
-    info: IConfig
+    info: INewProject
   ): Promise<void> {
     await axios.put(`${BASE_ADDR}/${pid}`, info);
     await this.refresh(pid);
@@ -133,6 +134,14 @@ export class Service {
   public static async blueprints_import(pid: ProjectId): Promise<any> {
     return await axios.put(`${BASE_ADDR}/${pid}/blueprints/import`)
   }
+
+  public static async aaa() {
+    return await axios.get('/api/v2/industry/stockpile');
+  }
+
+  public static async jobs(pid: ProjectId): Promise<any> {
+    return (await axios.get(`${PROJECT_PATH}/${pid}/jobs`)).data;
+  }
 }
 
 export type TemplateId  = Uuid;
@@ -170,7 +179,7 @@ export interface IProject {
   required_blueprints: IBlueprint[];
 }
 
-export interface IInfo {
+export interface IProjectInfo {
   project: ProjectId;
   name:    string;
   pinned:  boolean;
@@ -178,14 +187,15 @@ export interface IInfo {
   owner:   number;
 }
 
-export interface IConfig {
+export interface INewProject {
   name:       string;
   products:   IProduct[];
 }
 
 export interface IProduct {
-  name:    string;
   count:   number;
+  meff:    number;
+  name:    string;
   type_id: TypeId;
 }
 

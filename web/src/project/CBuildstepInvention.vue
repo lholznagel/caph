@@ -28,7 +28,7 @@
             </n-icon>
           </td>
           <td>
-            <item-icon
+            <eve-icon
               type="bpc"
               :id="entry.type_id"
               :width="32"
@@ -50,7 +50,7 @@
               <tbody>
                 <tr v-for="material in entry.materials">
                   <td>
-                    <item-icon
+                    <eve-icon
                       type="icon"
                       :id="material.type_id"
                       :width="32"
@@ -78,7 +78,7 @@ import { Service, IBuildstepEntry } from '@/project/service';
 import { ProjectId } from '@/project/project';
 
 import FormatNumber from '@/components/FormatNumber.vue';
-import ItemIcon from '@/components/ItemIcon.vue';
+import EveIcon from '@/components/EveIcon.vue';
 
 class Props {
   // ProjectId
@@ -98,7 +98,7 @@ class Props {
     AngleRight,
 
     FormatNumber,
-    ItemIcon,
+    EveIcon,
   }
 })
 export default class ProjectBuildstepInvention extends Vue.with(Props) {

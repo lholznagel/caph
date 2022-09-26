@@ -34,7 +34,7 @@
                     v-for="entry in filtered(filter.key)"
                     :key="entry.type_id"
                   >
-                    <td><item-icon :id="entry.type_id" type="icon" /></td>
+                    <td><eve-icon :id="entry.type_id" type="icon" /></td>
                     <td>{{ entry.name }}</td>
                     <td><format-number :value="entry.quantity" /></td>
                   </tr>
@@ -82,11 +82,11 @@ import { Service, IStorageEntry} from '@/project/service';
 import { ProjectId } from '@/project/project';
 
 import FormatNumber from '@/components/FormatNumber.vue';
-import ItemIcon from '@/components/ItemIcon.vue';
+import EveIcon from '@/components/EveIcon.vue';
 
 import PExport from '@/project/MExport.vue';
 import PHeader from '@/project/CHeader.vue';
-import WProject from '@/project/WProject.vue';
+import WProject from '@/project/wrapper/Project.vue';
 
 @Options({
   components: {
@@ -99,7 +99,7 @@ import WProject from '@/project/WProject.vue';
     NTabPane,
 
     FormatNumber,
-    ItemIcon,
+    EveIcon,
 
     PExport,
     PHeader,

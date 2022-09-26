@@ -40,7 +40,9 @@ pub enum Error {
 
     MissingEnvSecretKey(VarError),
     HmacInitError(InvalidLength),
-    InvalidBase64(base64::DecodeError)
+    InvalidBase64(base64::DecodeError),
+
+    CouldNotParseJsonToDependency(serde_json::Error),
 }
 
 impl std::error::Error for Error {}
@@ -68,6 +70,8 @@ impl fmt::Display for Error {
         write!(f, "{:?}", self)
     }
 }
+
+impl warp::reject::Reject for Error {}
 
 impl IntoResponse for Error {
     fn into_response(self) -> axum::http::Response<BoxBody> {

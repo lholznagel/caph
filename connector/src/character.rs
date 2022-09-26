@@ -1,15 +1,16 @@
-use crate::{ConnectError, EveAuthClient, RequestClient, EveClient, AssetEntry, BlueprintEntry};
-use crate::{AllianceId, CharacterId, CorporationId};
 use serde::{Deserialize, Serialize};
 
+use crate::{AllianceId, CharacterId, CorporationId};
+use crate::{AssetEntry, BlueprintEntry, ConnectError, EveAuthClient, EveClient, IndustryJobEntry, ItemId, RequestClient};
+
 /// Wrapper for character
-pub struct ConnectCharacterService {
+#[derive(Debug)]
+pub struct EveCharacterService {
     /// Character id this client belongs to
     cid: CharacterId,
 }
 
-impl ConnectCharacterService {
-
+impl EveCharacterService {
     /// Creates a new instance of the service
     ///
     /// # Params
@@ -21,12 +22,8 @@ impl ConnectCharacterService {
     ///
     /// New instance
     ///
-    pub fn new(
-        cid: CharacterId,
-    ) -> Self {
-        Self {
-            cid,
-        }
+    pub fn new(cid: CharacterId) -> Self {
+        Self { cid }
     }
 
     /// Gets general information about the character
@@ -39,10 +36,7 @@ impl ConnectCharacterService {
     ///
     /// Character information
     ///
-    pub async fn info(
-        &self,
-        client: &EveClient
-    ) -> Result<CharacterInfo, ConnectError> {
+    pub async fn info(&self, client: &EveClient) -> Result<CharacterInfo, ConnectError> {
         let path = format!("latest/characters/{}/", self.cid);
         client
             .fetch::<CharacterInfo>(&path)
@@ -63,13 +57,13 @@ impl ConnectCharacterService {
     pub async fn alliance_name(
         &self,
         client: &EveClient,
-        aid:    AllianceId,
+        aid: AllianceId,
     ) -> Result<String, ConnectError> {
         /// Temporary struct for deserializing
         #[derive(Deserialize)]
         struct Alliance {
             /// Name of the alliance
-            name: String
+            name: String,
         }
 
         let path = format!("latest/alliances/{}", aid);
@@ -90,16 +84,17 @@ impl ConnectCharacterService {
     ///
     /// Corporation name
     ///
+    #[deprecated(note = "Use CorporationService::name")]
     pub async fn corporation_name(
         &self,
         client: &EveClient,
-        cid:    CorporationId,
+        cid: CorporationId,
     ) -> Result<String, ConnectError> {
         /// Temporary struct for deserializing
         #[derive(Deserialize)]
         struct Corp {
             /// Name of the corporation
-            name: String
+            name: String,
         }
 
         let path = format!("latest/corporations/{}", cid);
@@ -122,11 +117,33 @@ impl ConnectCharacterService {
     ///
     pub async fn assets(
         &self,
-        client: &EveAuthClient,
+        client: &EveAuthClient
     ) -> Result<Vec<AssetEntry>, ConnectError> {
         let path = format!("latest/characters/{}/assets", self.cid);
         client
             .fetch_page::<AssetEntry>(&path)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Gets all asset names of the assets the character owns
+    ///
+    /// # Errors
+    ///
+    /// Fails when the server returns an error or parsing the response fails
+    ///
+    /// # Returns
+    ///
+    /// List of assets
+    ///
+    pub async fn asset_names(
+        &self,
+        client: &EveAuthClient,
+        iids:   Vec<ItemId>,
+    ) -> Result<Vec<AssetName>, ConnectError> {
+        let path = format!("latest/characters/{}/assets/names", self.cid);
+        client
+            .post::<Vec<ItemId>, Vec<AssetName>>(iids, &path)
             .await
             .map_err(Into::into)
     }
@@ -152,7 +169,7 @@ impl ConnectCharacterService {
             .map_err(Into::into)
     }
 
-    /// Gets all blueprints the character owns
+    /// Gets all industry jobs the character has running
     ///
     /// # Errors
     ///
@@ -160,17 +177,15 @@ impl ConnectCharacterService {
     ///
     /// # Returns
     ///
-    /// List of Blueprints
+    /// List of all industry jobs
     ///
-    #[deprecated(note = "Use CorporationService::bluerprints")]
-    pub async fn corporation_blueprints(
+    pub async fn industry_jobs(
         &self,
         client: &EveAuthClient,
-        cid:    CorporationId
-    ) -> Result<Vec<BlueprintEntry>, ConnectError> {
-        let path = format!("latest/corporations/{}/blueprints", cid);
+    ) -> Result<Vec<IndustryJobEntry>, ConnectError> {
+        let path = format!("latest/characters/{}/industry/jobs", self.cid);
         client
-            .fetch_page::<BlueprintEntry>(&path)
+            .fetch_page::<IndustryJobEntry>(&path)
             .await
             .map_err(Into::into)
     }
@@ -180,9 +195,18 @@ impl ConnectCharacterService {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CharacterInfo {
     /// Optional alliance id the character is in
-    pub alliance_id:    Option<AllianceId>,
+    pub alliance_id: Option<AllianceId>,
     /// Corporation id of the character
     pub corporation_id: CorporationId,
     /// Name of the character
-    pub name:           String,
+    pub name: String,
+}
+
+/// Information about a location by [LocationId]
+#[derive(Debug, Deserialize)]
+pub struct AssetName {
+    /// Id of the location id that maps to the name
+    pub item_id: ItemId,
+    /// Name of the location, for example a container or station
+    pub name:    String,
 }

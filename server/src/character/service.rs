@@ -1,27 +1,27 @@
-use crate::{AuthService, EVE_DEFAULT_SCOPE};
+use crate::{AuthService, ESI_DEFAULT_SCOPE, TimedCache};
 use crate::error::Error;
 
-use caph_connector::{AllianceId, CharacterId, ConnectCharacterService, CorporationId, EveAuthClient, BlueprintEntry, EveClient, TypeId, CorporationService};
+use caph_connector::{AllianceId, CharacterId, EveCharacterService, CorporationId, EveAuthClient, BlueprintEntry, EveClient, TypeId, EveCorporationService, IndustryJobEntry, CharacterInfo, CorporationInfo};
 use serde::Serialize;
 use sqlx::PgPool;
 
 #[derive(Clone, Debug)]
 pub struct CharacterService {
-    pool: PgPool,
+    pool:            PgPool,
 
-    auth_service: AuthService
+    auth_service:    AuthService,
 }
 
 impl CharacterService {
     pub fn new(
-        pool: PgPool,
+        pool:            PgPool,
 
-        auth_service: AuthService
+        auth_service:    AuthService,
     ) -> Self {
         Self {
             pool,
 
-            auth_service
+            auth_service,
         }
     }
 
@@ -115,19 +115,20 @@ impl CharacterService {
             .alts(cid)
             .await?
             .into_iter()
-            .map(|x| x.character_id)
+            .map(|x| (x.character_id, x.corporation_id))
             .collect::<Vec<_>>();
 
         let mut blueprints = Vec::new();
-        for cid in character_ids {
+        for (cid, corporation) in character_ids {
             let refresh_token = self
                 .auth_service
                 .refresh_token(&cid)
                 .await?;
 
             let client = EveAuthClient::new(refresh_token)?;
-            let character_service = ConnectCharacterService::new(cid);
+            let character_service = EveCharacterService::new(cid);
             let character_bps = character_service.blueprints(&client).await?;
+
             blueprints.extend(character_bps);
         }
 
@@ -161,7 +162,7 @@ impl CharacterService {
                 .await?;
 
             let client = EveAuthClient::new(refresh_token)?;
-            let corporation_service = CorporationService::new(corp_id);
+            let corporation_service = EveCorporationService::new(corp_id);
             let corporation_bps = corporation_service
                 .blueprints(&client)
                 .await?;
@@ -192,61 +193,12 @@ impl CharacterService {
         Ok(())
     }
 
-    /// Fetches information either from the database or the eve servers
-    ///
-    /// # Params
-    ///
-    /// `cid`  -> Character id of the character to fetch
-    /// `main` -> Optional character id of the main account
-    ///
-    /// # Returns
-    ///
-    /// Alliance, character and corporation information
-    ///
-    pub async fn info(
-        &self,
-        cid: CharacterId,
-    ) -> Result<Option<Character>, Error> {
-        // FIXME: esi_tokens must be set as NOT NULL in SQL
-        let character = sqlx::query!(r#"
-                SELECT
-                    c.alliance_id,
-                    c.alliance_name,
-                    c.character_id,
-                    c.character_name,
-                    c.corporation_id,
-                    c.corporation_name,
-                    c.esi_tokens       AS "esi_tokens!"
-                FROM logins l
-                JOIN characters c
-                ON l.character_id = c.character_id
-                WHERE c.character_id = $1;
-            "#, *cid as i32)
-            .fetch_optional(&self.pool)
-            .await?;
-
-        if let Some(x) = character {
-            let character = Character::new(
-                x.alliance_name,
-                x.alliance_id.map(|x| x.into()),
-                x.character_name,
-                x.character_id.into(),
-                x.corporation_name,
-                x.corporation_id.into(),
-                x.esi_tokens
-            );
-            Ok(Some(character))
-        } else {
-            Ok(None)
-        }
-    }
-
     pub async fn fetch_info(
         &self,
         cid:  CharacterId,
         main: Option<CharacterId>,
     ) -> Result<Character, Error> {
-        if let Some(x) = self.info(cid).await? {
+        if let Some(x) = self.character_info_db(cid).await? {
             Ok(x)
         } else {
             let character = self.eve_character_info(cid).await?;
@@ -278,6 +230,27 @@ impl CharacterService {
         }
 
         Ok(())
+    }
+
+    pub async fn info(
+        &self,
+        cid: CharacterId,
+    ) -> Result<CharacterInfo, Error> {
+        let client = EveClient::new()?;
+        let character = EveCharacterService::new(cid);
+        let character: CharacterInfo = character.info(&client).await?;
+
+        Ok(character)
+    }
+
+    pub async fn corporation_info(
+        &self,
+        cid: CorporationId,
+    ) -> Result<CorporationInfo, Error> {
+        let client = EveClient::new()?;
+        let corporation = EveCorporationService::new(cid);
+        let corporation: CorporationInfo = corporation.info(&client).await?;
+        Ok(corporation)
     }
 
     /// Saves the character information in the database
@@ -339,7 +312,7 @@ impl CharacterService {
         cid: CharacterId,
     ) -> Result<Character, Error> {
         let client = EveClient::new()?;
-        let character_service = ConnectCharacterService::new(cid);
+        let character_service = EveCharacterService::new(cid);
         let character = character_service.info(&client).await?;
 
         let aid = character.alliance_id;
@@ -359,11 +332,60 @@ impl CharacterService {
             cid,
             corporation,
             coid,
-            EVE_DEFAULT_SCOPE
+            ESI_DEFAULT_SCOPE
                 .into_iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<_>>()
         ))
+    }
+
+    /// Fetches information either from the database or the eve servers
+    ///
+    /// # Params
+    ///
+    /// `cid`  -> Character id of the character to fetch
+    /// `main` -> Optional character id of the main account
+    ///
+    /// # Returns
+    ///
+    /// Alliance, character and corporation information
+    ///
+    async fn character_info_db(
+        &self,
+        cid: CharacterId,
+    ) -> Result<Option<Character>, Error> {
+        // FIXME: esi_tokens must be set as NOT NULL in SQL
+        let character = sqlx::query!(r#"
+                SELECT
+                    c.alliance_id,
+                    c.alliance_name,
+                    c.character_id,
+                    c.character_name,
+                    c.corporation_id,
+                    c.corporation_name,
+                    c.esi_tokens       AS "esi_tokens!"
+                FROM logins l
+                JOIN characters c
+                ON l.character_id = c.character_id
+                WHERE c.character_id = $1;
+            "#, *cid as i32)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        if let Some(x) = character {
+            let character = Character::new(
+                x.alliance_name,
+                x.alliance_id.map(|x| x.into()),
+                x.character_name,
+                x.character_id.into(),
+                x.corporation_name,
+                x.corporation_id.into(),
+                x.esi_tokens
+            );
+            Ok(Some(character))
+        } else {
+            Ok(None)
+        }
     }
 }
 

@@ -6,22 +6,50 @@ use caph_connector::{CharacterId, EveAuthClient, EveOAuthToken};
 use sqlx::PgPool;
 use tracing::instrument;
 use serde::Deserialize;
+use serde_json::json;
 
-pub const EVE_DEFAULT_SCOPE: &[&str] = &[
-    "publicData",
-    "esi-assets.read_assets.v1",
-    "esi-characters.read_blueprints.v1",
+const ESI_PUBLIC_DATA:                    &str = "publicData";
+const ESI_UNIVERSE_STRUCTURES :           &str = "esi-universe.read_structures.v1";
+
+const ESI_READ_BLUEPRINTS:                &str = "esi-characters.read_blueprints.v1";
+const ESI_READ_CORPORATION_BLUEPRINTS:    &str = "esi-corporations.read_blueprints.v1";
+
+pub const ESI_READ_ASSETS:                    &str = "esi-assets.read_assets.v1";
+pub const ESI_READ_CORPORATION_ASSETS:        &str = "esi-assets.read_corporation_assets.v1";
+
+pub const ESI_READ_INDUSTRY_JOBS:             &str = "esi-industry.read_character_jobs.v1";
+pub const ESI_READ_CORPORATION_INDUSTRY_JOBS: &str = "esi-corporations.read_blueprints.v1";
+
+pub const ESI_DEFAULT_SCOPE: &[&str] = &[
+    ESI_PUBLIC_DATA
 ];
 
-pub const EVE_CORPORATION_SCOPE: &[&str] = &[
-    "esi-assets.read_corporation_assets.v1",
-    "esi-corporations.read_blueprints.v1",
+const ESI_ASSET_SCOPE: &[&str] = &[
+    ESI_READ_ASSETS,
+    ESI_READ_BLUEPRINTS,
+    ESI_UNIVERSE_STRUCTURES,
+];
+
+const ESI_CORPORATION_ASSET_SCOPE: &[&str] = &[
+    ESI_READ_CORPORATION_ASSETS,
+    ESI_READ_CORPORATION_BLUEPRINTS,
+];
+
+const ESI_ALL: &[&str] = &[
+    ESI_PUBLIC_DATA,
+    ESI_UNIVERSE_STRUCTURES,
+    ESI_READ_BLUEPRINTS,
+    ESI_READ_CORPORATION_BLUEPRINTS,
+    ESI_READ_ASSETS,
+    ESI_READ_CORPORATION_ASSETS,
+    ESI_READ_INDUSTRY_JOBS,
+    ESI_READ_CORPORATION_INDUSTRY_JOBS,
 ];
 
 /// Handles authentication and authorisation.
 ///
 /// The authentication is connected with the official EVE-API.
-/// Authorisation is configured and handled by this application.
+/// Authorisation is configured and handled by this service.
 #[derive(Clone, Debug)]
 pub struct AuthService {
     pool: PgPool
@@ -149,9 +177,11 @@ impl AuthService {
         hash:  &str,
         scope: Scope
     ) -> Result<String, Error> {
+        let scope = &ESI_ALL.join(" ");
+
         Ok(EveAuthClient::auth_uri(
             &hash,
-            Some(&scope.into_string())
+            Some(scope)
         )?
         .to_string())
     }
@@ -164,6 +194,7 @@ impl AuthService {
     ) -> Result<String, Error> {
         let scope = Scope::from(scope);
         let (_, hash) = crate::utils::generate_secure_token()?;
+
         sqlx::query!("
                 UPDATE logins
                 SET
@@ -268,16 +299,17 @@ impl AuthService {
     }
 
     #[instrument(err)]
+    #[deprecated]
     pub async fn has_project_access(
         &self,
         token: &str,
         pid:   ProjectId,
     ) -> Result<bool, Error> {
         let result = sqlx::query!("
-                SELECT character_id
-                FROM project_members
+                SELECT owner
+                FROM projects
                 WHERE project = $1
-                  AND character_id = (
+                  AND owner = (
                       SELECT character_id
                       FROM logins
                       WHERE token = $2
@@ -309,6 +341,44 @@ impl AuthService {
         } else {
             Ok(false)
         }
+    }
+
+    /// Gets a list of all scopes that are avaialble withing the application
+    pub fn available_scopes(
+        &self
+    ) -> serde_json::Value {
+        json!([
+            {
+                "key":    "public",
+                "name":   "Public data",
+                "reason": "Need for general information about the character",
+                "scopes": Scope::Public.scopes()
+            },
+            {
+                "key":    "character_assets",
+                "name":   "Read assets and blueprints",
+                "reason": "Needed for generting a warehouse",
+                "scopes": Scope::CharacterAssets.scopes()
+            },
+            {
+                "key":    "corporation_assets",
+                "name":   "Read corporation assets and blueprints",
+                "reason": "Needed for generting a warehouse",
+                "scopes": Scope::CorporationAssets.scopes()
+            },
+            {
+                "key":    "character_industry_jobs",
+                "name":   "Read industry jobs",
+                "reason": "Required to show a list of active industry jobs",
+                "scopes": Scope::CharacterIndustryJobs.scopes()
+            },
+            {
+                "key":    "corporation_industry_jobs",
+                "name":   "Read corporation industry jobs",
+                "reason": "Required to show a list of active industry jobs",
+                "scopes": Scope::CorporationIndustryJobs.scopes()
+            }
+        ])
     }
 
     /// Saves the main character in the database
@@ -417,32 +487,56 @@ where
 #[derive(Debug, Deserialize)]
 pub enum Scope {
     /// Default required scope
-    #[serde(rename = "default")]
-    Default,
-    /// Grants access to corporation blueprints
-    #[serde(rename = "corporation_blueprints")]
-    CorporationBlueprints
+    #[serde(rename = "public")]
+    Public,
+    /// Grants access to characters assets and blueprints
+    #[serde(rename = "character_assets")]
+    CharacterAssets,
+    /// Grants access to corporation assets including blueprints
+    #[serde(rename = "corporation_assets")]
+    CorporationAssets,
+    /// Grants access to corporation industry jobs
+    #[serde(rename = "character_industry_jobs")]
+    CharacterIndustryJobs,
+    /// Grants access to corporation industry jobs
+    #[serde(rename = "CorporationIndustryJobs")]
+    CorporationIndustryJobs,
 }
 
 impl Scope {
-    pub fn into_string(self) -> String {
-        let mut permissions: Vec<&str> = Vec::new();
-        permissions.extend(EVE_DEFAULT_SCOPE);
-
+    pub fn scopes(&self) -> &[&str] {
         match self {
-            Self::CorporationBlueprints => permissions.extend(EVE_CORPORATION_SCOPE),
-            _                           => ()
-        };
-
-        permissions.join(" ")
+            Self::Public                  => &[
+                "publicData"
+            ],
+            Self::CharacterAssets         => &[
+                "esi-assets.read_assets.v1",
+                "esi-characters.read_blueprints.v1"
+            ],
+            Self::CorporationAssets       => &[
+                "esi-assets.read_corporation_assets.v1",
+                "esi-corporations.read_blueprints.v1"
+            ],
+            Self::CharacterIndustryJobs   => &[
+                "esi-industry.read_character_jobs.v1"
+            ],
+            Self::CorporationIndustryJobs => &[
+                "esi-industry.read_corporation_jobs.v1"
+            ],
+            _                             => Self::Public.scopes(),
+        }
     }
 }
 
 impl From<String> for Scope {
     fn from(x: String) -> Self {
         match x.as_ref() {
-            "corporation_blueprints" => Self::CorporationBlueprints,
-            _                        => Self::Default
+            "public"                    => Self::CharacterAssets,
+            "character_assets"          => Self::CorporationAssets,
+            "corporation_assets"        => Self::CorporationAssets,
+            "character_industry_jobs"   => Self::CharacterIndustryJobs,
+            "corporation_industry_jobs" => Self::CorporationIndustryJobs,
+            _                           => Self::Public
         }
     }
 }

@@ -3,6 +3,7 @@ use crate::DependencyType;
 
 /// General information about a structure
 #[derive(Debug, Deserialize, Serialize)]
+#[deprecated]
 pub struct Structure {
     /// Name of the structure ingame
     /// TODO: figure out how to get ingame names
@@ -78,6 +79,7 @@ impl Structure {
 
 /// Determines in what security status the system is located in
 #[derive(Debug, Deserialize, Serialize)]
+#[deprecated]
 pub enum Security {
     Highsec,
     Lowsec,
@@ -87,6 +89,7 @@ pub enum Security {
 
 /// Different types of structure sizes
 #[derive(Debug, Deserialize, Serialize)]
+#[deprecated]
 pub enum StructureSize {
     M,
     L,
@@ -155,7 +158,7 @@ impl StructureType {
 
 /// Rigs that can be installed on a structure
 #[derive(Debug, Deserialize, Serialize)]
-#[non_exhaustive]
+#[deprecated]
 pub enum StructureRig {
     // Refinery Size: L
     /// https://everef.net/type/46497
@@ -215,6 +218,7 @@ impl StructureRig {
 
 /// Different kind of bonuses a blueprint, structure or rigs can have
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[deprecated]
 pub enum BonusVariations {
     Time(f32),
     Material(f32),

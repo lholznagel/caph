@@ -35,7 +35,7 @@ import { NButton, NIcon, NSpace } from 'naive-ui';
 import { Options, prop, Vue } from 'vue-class-component';
 import { Refresh } from '@vicons/tabler';
 
-import WProject from '@/project/WProject.vue';
+import WProject from '@/project/wrapper/Project.vue';
 
 class Props {
   reload = prop({

@@ -16,7 +16,7 @@
 import { Options, Vue } from 'vue-class-component';
 import { NPageHeader } from 'naive-ui';
 
-import WProject from '@/project/WProject.vue';
+import WProject from '@/project/wrapper/Project.vue';
 
 @Options({
   components: {

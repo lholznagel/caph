@@ -14,13 +14,13 @@ import { Options, Vue } from 'vue-class-component';
 import { CharacterService } from '@/services/character';
 import { h } from 'vue';
 
-import Character from '@/components/Character.vue';
+import EveIcon from '@/components/EveIcon.vue';
 
 @Options({
   components: {
     NSelect,
 
-    Character
+    EveIcon
   }
 })
 export default class CharacterSelector extends Vue {
@@ -58,15 +58,16 @@ export default class CharacterSelector extends Vue {
         }
       },
       [
-        h(Character, {
-          id: option.value,
-          withText: false,
-          onlyText: false,
-          style: {
-            marginTop:   '2px',
-            marginRight: '10px'
+        h(
+          EveIcon, {
+            id: option.value,
+            character: true,
+            style: {
+              marginTop:   '2px',
+              marginRight: '10px'
+            }
           }
-        }),
+        ),
         option.label
       ]
     )

@@ -24,7 +24,7 @@
               <th width="50px" style="text-align: right;">Sell (Total)</th>
             </tr>
             <tr v-for="market in project.market.items" :key="market.type_id">
-              <td><item-icon :id="market.type_id" type="icon" /></td>
+              <td><eve-icon :id="market.type_id" type="icon" /></td>
               <td>{{ market.name }}</td>
               <td>
                 <format-number :value="market.amount" />
@@ -83,11 +83,11 @@ import { events } from '@/main';
 import { PROJECT_ROUTE } from '@/event_bus';
 
 import FormatNumber from '@/components/FormatNumber.vue';
-import ItemIcon from '@/components/ItemIcon.vue';
+import EveIcon from '@/components/EveIcon.vue';
 
 import PExport from '@/project/MExport.vue';
 import PHeader from '@/project/CHeader.vue';
-import WProject from '@/project/WProject.vue';
+import WProject from '@/project/wrapper/Project.vue';
 
 @Options({
   components: {
@@ -99,7 +99,7 @@ import WProject from '@/project/WProject.vue';
     NTabs,
 
     FormatNumber,
-    ItemIcon,
+    EveIcon,
 
     PExport,
     PHeader,

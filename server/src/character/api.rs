@@ -7,7 +7,7 @@ use axum::extract::{Extension, Path};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{delete, get};
-use caph_connector::CharacterId;
+use caph_connector::{CharacterId, CorporationId};
 use tracing::instrument;
 
 pub struct CharacterApi;
@@ -15,8 +15,9 @@ pub struct CharacterApi;
 impl CharacterApi {
     pub fn router() -> Router {
         Router::new()
-            .route("/alts", get(Self::alts))
             .route("/blueprints", get(Self::blueprints))
+            .route("/alts", get(Self::alts))
+            .route("/corporation/:id/info", get(Self::corporation_info))
             .nest("/:id", Router::new()
                 .route("/", delete(Self::remove))
                 .route("/info", get(Self::info))
@@ -82,36 +83,6 @@ impl CharacterApi {
             .map_err(Into::into)
     }
 
-    /// Gets character, corporation and alliance information of the given
-    /// [CharacterId].
-    /// If the character is not stored in the database it will return 
-    /// status code 404.
-    /// 
-    /// # Params
-    /// 
-    /// * `service` -> [CharacterService]
-    /// * `cid`     -> [CharacterId] of the character the info is needed.
-    /// 
-    /// # Fails
-    /// 
-    /// If the database access fails.
-    /// 
-    /// # Returns
-    /// 
-    /// Information about the character.
-    /// 
-    #[instrument(err)]
-    async fn info(
-        service:   Extension<CharacterService>,
-        Path(cid): Path<CharacterId>
-    ) -> Result<impl IntoResponse, Error> {
-        service
-            .info(cid)
-            .await
-            .map(|x| (StatusCode::OK, Json(x)))
-            .map_err(Into::into)
-    }
-
     /// Removes the given user.
     /// If the user does not exist, nothing will happen.
     /// 
@@ -131,10 +102,48 @@ impl CharacterApi {
     #[instrument(err)]
     async fn remove(
         service:   Extension<CharacterService>,
-        Path(cid): Path<CharacterId>
+        Path(cid): Path<CharacterId>,
     ) -> Result<impl IntoResponse, Error> {
         service.remove(cid).await?;
         Ok((StatusCode::NO_CONTENT, Json("")))
+    }
+
+    /// Gets infos about the given [CharacterId]
+    /// 
+    /// # Params
+    /// 
+    /// * `service` -> [CharacterService]
+    /// 
+    /// # Errors
+    /// 
+    /// If there are problems with the EVE-API Endpoint
+    /// 
+    /// # Returns
+    /// 
+    /// General information about the character
+    /// 
+    #[instrument(err)]
+    async fn info(
+        service:   Extension<CharacterService>,
+        Path(cid): Path<CharacterId>,
+    ) -> Result<impl IntoResponse, Error> {
+        service
+            .info(cid)
+            .await
+            .map(|x| (StatusCode::OK, Json::from(x)))
+            .map_err(Into::into)
+    }
+
+    #[instrument(err)]
+    async fn corporation_info(
+        service:   Extension<CharacterService>,
+        Path(cid): Path<CorporationId>,
+    ) -> Result<impl IntoResponse, Error> {
+        service
+            .corporation_info(cid)
+            .await
+            .map(|x| (StatusCode::OK, Json::from(x)))
+            .map_err(Into::into)
     }
 
     /// Refreshs information about the given user.

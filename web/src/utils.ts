@@ -4,6 +4,7 @@ export type ItemId      = number;
 export type LocationId  = number;
 export type SystemId    = number;
 export type TypeId      = number;
+export type StructureId = Uuid;
 
 export type Uuid        = string;
 export type BudgetId    = Uuid;
@@ -57,9 +58,13 @@ export let format_number = (numberToFormat: number, with_comma: boolean = false)
 };
 
 export let format_time = (numberToFormat: number): string => {
-  const DAY    = 60 * 60 * 24; // seconds * minutes * hours
-  const HOUR   = 60 * 60;      // seconds * minutes
-  const MINUTE = 60;           // seconds
+  const WEEK   = 60 * 60 * 24 * 7; // seconds * minutes * hours * days
+  const DAY    = 60 * 60 * 24;     // seconds * minutes * hours
+  const HOUR   = 60 * 60;          // seconds * minutes
+  const MINUTE = 60;               // seconds
+
+  const weeks = Math.floor(numberToFormat / WEEK);
+  numberToFormat -= weeks * WEEK;
 
   const days = Math.floor(numberToFormat / DAY);
   numberToFormat -= days * DAY;
@@ -74,7 +79,9 @@ export let format_time = (numberToFormat: number): string => {
 
   const preZero = (val: number): string => val >= 10 ? `${val}` : `0${val}`;
 
-  if (days > 0) {
+  if (weeks > 0) {
+    return `${weeks}w ${preZero(days)}d ${preZero(hours)}h ${preZero(minutes)}m ${preZero(seconds)}s`;
+  } else if (days > 0) {
     return `${days}d ${preZero(hours)}h ${preZero(minutes)}m ${preZero(seconds)}s`;
   } else if (hours > 0) {
     return `${hours}h ${preZero(minutes)}m ${preZero(seconds)}s`;

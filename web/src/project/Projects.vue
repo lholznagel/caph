@@ -42,6 +42,7 @@
             <th width="10px"></th>
             <th width="700px">Name</th>
             <th width="700px">Status</th>
+            <th width="40px"></th>
             <th width="300px">Owner</th>
           </tr>
         </thead>
@@ -79,7 +80,14 @@
               <n-tag v-else>In Progress</n-tag>
             </td>
             <td>
-              <character :id="project.owner" with-text />
+              <eve-icon :id="project.owner" character />
+            </td>
+            <td>
+              <character-info :id="project.owner">
+                <template v-slot="{ info }">
+                  {{ info.name }}
+                </template>
+              </character-info>
             </td>
           </tr>
         </tbody>
@@ -114,11 +122,12 @@
 <script lang="ts">
 import { Options, Vue } from 'vue-class-component';
 import { NAlert, NButton, NCard, NCheckbox, NEmpty, NPageHeader, NSpace, NTable, NTag } from 'naive-ui';
-import { Service, IInfo } from '@/project/service';
+import { Service, IProjectInfo } from '@/project/service';
 import { events } from '@/main';
 import { PROJECT_ROUTE } from '@/event_bus';
 
-import Character from '@/components/Character.vue';
+import CharacterInfo from '@/components/CharacterInfo.vue';
+import EveIcon from '@/components/EveIcon.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Loading from '@/components/Loading.vue';
 
@@ -134,7 +143,8 @@ import Loading from '@/components/Loading.vue';
     NTable,
     NTag,
 
-    Character,
+    CharacterInfo,
+    EveIcon,
     ConfirmDialog,
     Loading,
   }
@@ -145,7 +155,7 @@ export default class ProjectsView extends Vue {
 
   public selected_project: string | undefined = '';
 
-  public projects: IInfo[] = [];
+  public projects: IProjectInfo[] = [];
 
   public async created() {
     this.busy = true;
@@ -179,7 +189,7 @@ export default class ProjectsView extends Vue {
 
   public project_name(): string {
     let info = this.projects
-      .find(x => x.project === this.selected_project) || <IInfo>{ name: '' };
+      .find(x => x.project === this.selected_project) || <IProjectInfo>{ name: '' };
     return info.name;
   }
 

@@ -1,5 +1,5 @@
 
-use crate::{AuthService, AuthUser, CharacterService, Scope};
+use crate::{AuthService, AuthUser, CharacterService, Scope, Character};
 use crate::error::Error;
 
 use axum::{Router, Json};
@@ -23,7 +23,10 @@ impl AuthApi {
             .route("/callback", get(Self::callback))
             .route("/login", get(Self::login))
             .route("/login/alt", get(Self::login_alt))
+            .route("/scopes/available", get(Self::scopes_available))
+            // TODO:: remove
             .route("/scope/:cid/:scope", get(Self::add_scope))
+            .route("/scopes/:cid/:scope", get(Self::add_scope))
             .route("/whoami", get(Self::whoami))
     }
 
@@ -90,7 +93,7 @@ impl AuthApi {
     async fn login(
         Extension(auth_service): Extension<AuthService>
     ) -> Result<impl IntoResponse, Error> {
-        let url = auth_service.login(Scope::Default).await?;
+        let url = auth_service.login(Scope::Public).await?;
         Ok(Redirect::temporary(&url))
     }
 
@@ -117,7 +120,7 @@ impl AuthApi {
         user:                    AuthUser
     ) -> Result<impl IntoResponse, Error> {
         let cid = user.character_id().await?;
-        let url = auth_service.login_alt(cid, Scope::Default).await?;
+        let url = auth_service.login_alt(cid, Scope::Public).await?;
         Ok(Redirect::temporary(&url))
     }
 
@@ -142,6 +145,13 @@ impl AuthApi {
             .add_scope(cid, scope)
             .await?;
         Ok(Redirect::temporary(&url))
+    }
+
+    async fn scopes_available(
+        Extension(auth_service): Extension<AuthService>,
+    ) -> Result<impl IntoResponse, Error> {
+        let scopes = auth_service.available_scopes();
+        Ok((StatusCode::OK, Json(scopes)))
     }
 }
 

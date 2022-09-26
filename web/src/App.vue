@@ -128,6 +128,8 @@ export default class App extends Vue {
         type:  'group',
         children: [
           this.app_link('settings_characters', 'Characters'),
+          this.app_link('settings_structures', 'Structures'),
+          this.app_link('industry_jobs', 'Industry Jobs'),
         ]
       }];
 
@@ -151,13 +153,23 @@ export default class App extends Vue {
               this.project_link('projects_raw_material', 'Materials', pid),
             ]
           },
-          // Typescript does not like multiple types
           <any>{
             type: 'divider',
             key:  'divider_buildsteps'
           },
           this.project_link('projects_buildstep', 'Buildsteps', pid),
-          this.project_link('projects_setting', 'Settings', pid),
+          <any>{
+            type:  'divider',
+            key:   'divider_settings'
+          },
+          <any>{
+            type:  'group',
+            key:   'settings',
+            label: 'Settings',
+            children: [
+              this.project_link('projects_settings_general', 'General', pid),
+            ]
+          },
         ];
         this.current_route = e;
       } else {
@@ -194,6 +206,8 @@ export default class App extends Vue {
         type:  'group',
         children: [
           this.app_link('settings_characters', 'Characters'),
+          this.app_link('settings_structures', 'Structures'),
+          this.app_link('industry_jobs', 'Industry Jobs'),
         ]
       }];
     }

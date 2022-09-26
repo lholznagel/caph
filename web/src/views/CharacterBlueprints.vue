@@ -43,7 +43,7 @@
           >
             <td>{{ entry.type_id }}</td>
             <td>
-              <item-icon
+              <eve-icon
                 type="bp"
                 :id="entry.type_id"
                 :width="32"
@@ -85,7 +85,7 @@ import { Options, Vue } from 'vue-class-component';
 import FilterText, { IFilterOption } from '@/components/Filter.vue';
 import FilterElement from '@/components/FilterElement.vue';
 import FormatNumber from '@/components/FormatNumber.vue';
-import ItemIcon from '@/components/ItemIcon.vue';
+import EveIcon from '@/components/EveIcon.vue';
 
 @Options({
   components: {
@@ -99,7 +99,7 @@ import ItemIcon from '@/components/ItemIcon.vue';
     FilterText,
     FilterElement,
     FormatNumber,
-    ItemIcon,
+    EveIcon,
   }
 })
 export default class CharacterSettings extends Vue {

@@ -1,14 +1,16 @@
-use crate::{CorporationId, ConnectError, BlueprintEntry, EveAuthClient, RequestClient, AssetEntry};
-use serde::Deserialize;
+use crate::{
+    AllianceId, AssetEntry, BlueprintEntry, ConnectError, CorporationId, EveAuthClient, EveClient,
+    IndustryJobEntry, LocationId, RequestClient,
+};
+use serde::{Deserialize, Serialize};
 
 /// Wrapper for corporations
-pub struct CorporationService {
+pub struct EveCorporationService {
     /// Corporation id this client belongs to
     cid: CorporationId,
 }
 
-impl CorporationService {
-
+impl EveCorporationService {
     /// Creates a new instance of the service
     ///
     /// # Params
@@ -20,12 +22,26 @@ impl CorporationService {
     ///
     /// New instance
     ///
-    pub fn new(
-        cid: CorporationId,
-    ) -> Self {
-        Self {
-            cid,
-        }
+    pub fn new(cid: CorporationId) -> Self {
+        Self { cid }
+    }
+
+    /// Gets general information about the corporation
+    ///
+    /// # Errors
+    ///
+    /// Fails when the server returns an error or parsing the response fails
+    ///
+    /// # Returns
+    ///
+    /// Corporation information
+    ///
+    pub async fn info(&self, client: &EveClient) -> Result<CorporationInfo, ConnectError> {
+        let path = format!("latest/corporations/{}/", self.cid);
+        client
+            .fetch::<CorporationInfo>(&path)
+            .await
+            .map_err(Into::into)
     }
 
     /// Gets all assets the corporation owns
@@ -38,10 +54,7 @@ impl CorporationService {
     ///
     /// List of Blueprints
     ///
-    pub async fn assets(
-        &self,
-        client: &EveAuthClient,
-    ) -> Result<Vec<AssetEntry>, ConnectError> {
+    pub async fn assets(&self, client: &EveAuthClient) -> Result<Vec<AssetEntry>, ConnectError> {
         let path = format!("latest/corporations/{}/assets", self.cid);
         client
             .fetch_page::<AssetEntry>(&path)
@@ -68,6 +81,32 @@ impl CorporationService {
             .fetch_page::<BlueprintEntry>(&path)
             .await
             .map_err(Into::into)
+    }
+
+    /// Gets all industry jobs the corporation has running
+    ///
+    /// # Errors
+    ///
+    /// Fails when the server returns an error or parsing the response fails
+    ///
+    /// # Returns
+    ///
+    /// List of industry jobs from the corp
+    ///
+    pub async fn industry_jobs(
+        &self,
+        client: &EveAuthClient,
+    ) -> Result<Vec<IndustryJobEntry>, ConnectError> {
+        let path = format!("latest/corporations/{}/industry/jobs", self.cid);
+        let mut data = client
+            .fetch_page::<IndustryJobEntry>(&path)
+            .await
+            .map_err(Into::into)?;
+
+        for x in data.iter_mut() {
+            x.corporation_id = Some(self.cid);
+        }
+        Ok(data)
     }
 
     /// Gets a list of last transactions of the master wallet.
@@ -101,13 +140,43 @@ impl CorporationService {
     ///
     /// List of balance
     ///
-    pub async fn wallets(
-        &self,
-        client: &EveAuthClient,
-    ) -> Result<Vec<WalletEntry>, ConnectError> {
+    pub async fn wallets(&self, client: &EveAuthClient) -> Result<Vec<WalletEntry>, ConnectError> {
         let path = format!("latest/corporations/{}/wallets", self.cid);
         client
             .fetch_page::<WalletEntry>(&path)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Gets a list of names for the given [LocationId].
+    ///
+    /// # Limits
+    ///
+    /// This is only for the current corporation as determined by the
+    /// [EveAuthClient].
+    ///
+    /// # Params
+    ///
+    /// * `client` > Authenticated ESI client
+    /// * `lid`    > List of [LocationId]s to resolve
+    ///
+    /// # Errors
+    ///
+    /// - If the endpoint is not available
+    /// - If the response cannot be parsed
+    ///
+    /// # Returns
+    ///
+    /// List of [Location]s that match the given [LocationId].
+    ///
+    pub async fn location_name(
+        &self,
+        client: &EveAuthClient,
+        lid: Vec<LocationId>,
+    ) -> Result<Vec<ItemLocation>, ConnectError> {
+        let path = format!("latest/corporations/{}/assets/names", self.cid);
+        client
+            .post::<Vec<LocationId>, Vec<ItemLocation>>(lid, &path)
             .await
             .map_err(Into::into)
     }
@@ -130,7 +199,25 @@ pub struct JournalEntry {
 #[derive(Debug, Deserialize)]
 pub struct WalletEntry {
     /// Current balance of the division
-    pub balance:  f32,
+    pub balance: f32,
     /// Devision number, eg: 1 is the master wallet
     pub division: u8,
+}
+
+/// General information about the character
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct CorporationInfo {
+    /// Optional alliance id the character is in
+    pub alliance_id: Option<AllianceId>,
+    /// Name of the character
+    pub name: String,
+}
+
+/// Information about a location by [LocationId]
+#[derive(Debug, Deserialize)]
+pub struct ItemLocation {
+    /// Id of the location id that maps to the name
+    pub item_id: LocationId,
+    /// Name of the location, for example a container or station
+    pub name: String,
 }

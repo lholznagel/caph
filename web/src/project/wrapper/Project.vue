@@ -16,7 +16,7 @@
 <script lang="ts">
 import { Options, Vue, prop } from 'vue-class-component';
 import { Service } from '@/project/service';
-import { Project, ProjectId } from './project';
+import { Project, ProjectId } from '../project';
 
 import Loading from '@/components/Loading.vue';
 
